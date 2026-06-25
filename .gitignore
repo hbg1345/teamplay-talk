@@ -6,8 +6,5 @@ __pycache__/
 dist/
 build/
 
-# Env
-.env
-
 # OS
 .DS_Store
