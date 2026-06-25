@@ -81,3 +81,9 @@ CREATE INDEX IF NOT EXISTS idx_form_answers_question ON form_answers (question_i
 -- 인증(OAuth)은 호스트(PlayMCP)가 대행하고 access_token을 요청 헤더로 전달하므로
 -- 서버는 토큰을 저장하지 않는다. 방 폴더도 호출 사용자의 Drive에서 이름으로
 -- find-or-create 하므로 별도 매핑 테이블이 필요 없다. (전용 테이블 없음)
+
+
+-- ── 카카오 알림 토큰 (users에 추가, 멤버별 self-push용) ────────────────
+ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_access_token     TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_refresh_token    TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_token_expires_at TIMESTAMPTZ;

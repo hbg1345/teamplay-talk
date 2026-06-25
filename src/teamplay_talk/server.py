@@ -17,6 +17,7 @@ from fastmcp import FastMCP
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
+from .auth_web import register_auth_routes
 from .config import settings
 from .forms_web import register_form_routes
 from .tools import register_all
@@ -47,6 +48,9 @@ register_all(mcp)
 
 # 네이티브 폼 웹 페이지(/form/<id>) 등록
 register_form_routes(mcp)
+
+# 카카오 OAuth 라우트(/auth/kakao/login, /callback) 등록
+register_auth_routes(mcp)
 
 
 def main() -> None:

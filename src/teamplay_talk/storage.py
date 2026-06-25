@@ -253,3 +253,38 @@ def get_results(form_id: int) -> dict[str, Any] | None:
         "total_responses": total,
         "results": results,
     }
+
+
+# ── 방 조회/나가기 (카카오 통합) ───────────────────────────────────────
+
+def get_room_by_invite_code(invite_code: str) -> dict[str, Any] | None:
+    """초대 코드로 방 단건 조회."""
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            cur.execute("SELECT * FROM rooms WHERE invite_code = %s", (invite_code,))
+            return cur.fetchone()
+
+
+def leave_room(invite_code: str, kakao_id: str) -> dict[str, Any] | None:
+    """카카오 인증된 사용자를 방에서 제거한다.
+
+    Returns: 코드가 틀리면 ``None``,
+             그 외 ``{"room": ..., "left": bool}`` (left=False면 원래 멤버 아님).
+    """
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            cur.execute("SELECT * FROM rooms WHERE invite_code = %s", (invite_code,))
+            room = cur.fetchone()
+            if room is None:
+                return None
+            cur.execute("SELECT id FROM users WHERE kakao_id = %s", (kakao_id,))
+            user = cur.fetchone()
+            if user is None:
+                return {"room": room, "left": False}
+            cur.execute(
+                "DELETE FROM room_members WHERE room_id = %s AND user_id = %s",
+                (room["id"], user["id"]),
+            )
+            left = cur.rowcount > 0
+        c.commit()
+    return {"room": room, "left": left}
