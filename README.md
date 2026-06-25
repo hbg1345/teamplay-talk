@@ -83,6 +83,36 @@ KAKAO PlayMCP 공모전 출품용 — 팀플(팀 프로젝트) 협업 MCP 서버
 - `room_id`: string — 대상 방 ID
 - `kind`: string — 종류 필터 (선택)
 
+### 파일 (Google Drive · 직접 연동) ✅
+
+> **Google Drive API를 직접** 호출해 호출 사용자의 Drive에 파일을 읽고 씁니다
+> (Google MCP 미사용). 스코프는 `drive.file`(이 앱이 만든 파일/폴더만 접근)이라
+> 사용자의 다른 개인 파일은 건드리지 않습니다.
+>
+> **인증은 호스트(PlayMCP)가 대행**합니다. PlayMCP가 Google OAuth로 발급한
+> access_token을 MCP 요청의 `Authorization: Bearer` 헤더로 전달하고, 서버는
+> 그 토큰을 그대로 사용합니다. 따라서 서버는 토큰을 저장하지 않습니다(상태 없음).
+
+**drive_upload** ✅ — 텍스트 내용을 파일로 Drive에 업로드합니다.
+- `name`: string — 파일 이름
+- `content`: string — 파일 내용
+- `room_id`: integer — 방 전용 폴더에 저장 (선택, 폴더 없으면 자동 생성)
+- `mime_type`: string — MIME 타입 (기본 `text/plain`)
+
+**drive_download** ✅ — file_id로 파일 내용을 읽어옵니다.
+- `file_id`: string — Drive 파일 ID
+
+**drive_list** ✅ — Drive(또는 방 폴더) 안 파일 목록을 조회합니다.
+- `room_id`: integer — 방 폴더로 한정 (선택)
+
+**create_room_folder** ✅ — 방 전용 Drive 폴더를 생성(있으면 재사용)합니다.
+- `room_id`: integer — 대상 방 ID
+
+> 방 폴더는 호출 사용자 Drive에서 이름으로 find-or-create 합니다. per-user 토큰 +
+> `drive.file` 스코프 특성상 **방 폴더는 사용자별로 각자 Drive에 생기며 공유되지
+> 않습니다.** 팀원 간 공유가 필요하면 폴더를 멤버에게 공유하거나 공유 드라이브를
+> 쓰는 별도 작업이 필요합니다.
+
 ### 리포트
 
 **daily_report** — 데일리 리포트를 생성합니다.
@@ -107,6 +137,26 @@ KAKAO PlayMCP 공모전 출품용 — 팀플(팀 프로젝트) 협업 MCP 서버
 ## 개발
 
 `.env`에 `DATABASE_URL`(DigitalOcean Managed PostgreSQL 연결 문자열)이 필요합니다.
+
+### Google Drive OAuth (PlayMCP 등록 시 설정)
+
+Drive 연동의 OAuth는 **호스트(PlayMCP)가 대행**하므로 서버 `.env`에 Google
+자격증명을 둘 필요가 없습니다. 대신 PlayMCP MCP 등록 폼의 **인증 방식: OAuth**
+에 아래를 입력합니다.
+
+1. Google Cloud Console > Drive API 사용 설정(Enable) + OAuth 2.0 클라이언트 ID 발급
+2. PlayMCP 등록 폼에 입력:
+   - **Client ID / Client Secret** — Google 클라이언트 값
+   - **Authorization Endpoint URL** — `https://accounts.google.com/o/oauth2/v2/auth`
+   - **Token Endpoint URL** — `https://oauth2.googleapis.com/token`
+   - **Scope** — `https://www.googleapis.com/auth/drive.file`
+   - **Grant Type** — `AUTHORIZATION_CODE`
+3. MCP 등록 후 발급된 `mcpId`로 Google 클라이언트의 **승인된 리디렉션 URI**에
+   `https://playmcp.kakao.com/api/v1/applied-mcps/{mcpId}/authorize/oauth:callback` 등록
+4. (권장) 사용자에게 '개인정보 제3자 제공 동의' 안내
+
+서버는 PlayMCP가 `Authorization: Bearer`로 전달한 Google access_token을 읽어
+Drive를 호출합니다. (refresh/만료 갱신도 PlayMCP가 처리)
 
 ```bash
 uv venv
