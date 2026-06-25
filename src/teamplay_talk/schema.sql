@@ -30,3 +30,49 @@ CREATE TABLE IF NOT EXISTS room_members (
 
 -- user_id로 "이 사람이 속한 방" 조회를 빠르게
 CREATE INDEX IF NOT EXISTS idx_room_members_user ON room_members (user_id);
+
+
+-- ── 네이티브 폼/투표 (Google Forms 대체) ─────────────────────────────
+-- forms ──< form_questions     (폼에 질문 N개)
+-- forms ──< form_responses ──< form_answers   (응답 1건당 답 N개)
+
+-- 폼/투표 (방에 속함)
+CREATE TABLE IF NOT EXISTS forms (
+    id          BIGSERIAL PRIMARY KEY,
+    room_id     BIGINT NOT NULL REFERENCES rooms (id) ON DELETE CASCADE,
+    title       TEXT NOT NULL,
+    description TEXT,
+    anonymous   BOOLEAN NOT NULL DEFAULT TRUE,    -- 익명 응답 여부
+    closed      BOOLEAN NOT NULL DEFAULT FALSE,   -- 마감 여부
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 질문
+CREATE TABLE IF NOT EXISTS form_questions (
+    id       BIGSERIAL PRIMARY KEY,
+    form_id  BIGINT NOT NULL REFERENCES forms (id) ON DELETE CASCADE,
+    position INT NOT NULL,                         -- 표시 순서
+    text     TEXT NOT NULL,
+    qtype    TEXT NOT NULL,                        -- 'text' | 'single' | 'multi'
+    options  JSONB                                 -- 객관식 선택지(문자열 배열). 주관식이면 NULL
+);
+
+-- 응답 1건 (제출 단위)
+CREATE TABLE IF NOT EXISTS form_responses (
+    id           BIGSERIAL PRIMARY KEY,
+    form_id      BIGINT NOT NULL REFERENCES forms (id) ON DELETE CASCADE,
+    respondent   TEXT,                             -- 익명이면 NULL
+    submitted_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 응답 내 개별 답 (집계 쉽도록 정규화; 복수선택이면 질문당 여러 row)
+CREATE TABLE IF NOT EXISTS form_answers (
+    id          BIGSERIAL PRIMARY KEY,
+    response_id BIGINT NOT NULL REFERENCES form_responses (id) ON DELETE CASCADE,
+    question_id BIGINT NOT NULL REFERENCES form_questions (id) ON DELETE CASCADE,
+    value       TEXT NOT NULL                      -- 선택지 텍스트 또는 주관식 답변
+);
+
+CREATE INDEX IF NOT EXISTS idx_form_questions_form ON form_questions (form_id);
+CREATE INDEX IF NOT EXISTS idx_form_responses_form ON form_responses (form_id);
+CREATE INDEX IF NOT EXISTS idx_form_answers_question ON form_answers (question_id);

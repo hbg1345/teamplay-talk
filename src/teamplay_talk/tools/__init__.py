@@ -14,6 +14,7 @@ from __future__ import annotations
 from fastmcp import FastMCP
 
 from . import (
+    feedback,
     integrations,
     members,
     reports,
@@ -27,6 +28,7 @@ def register_all(mcp: FastMCP) -> None:
     """모든 도메인 모듈의 도구를 MCP 서버에 등록한다."""
     rooms.register(mcp)
     members.register(mcp)
+    feedback.register(mcp)
     roadmap.register(mcp)
     resources.register(mcp)
     reports.register(mcp)

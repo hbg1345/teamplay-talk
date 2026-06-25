@@ -117,3 +117,139 @@ def list_members(room_id: int) -> list[dict[str, Any]]:
                 (room_id,),
             )
             return cur.fetchall()
+
+
+# ── 네이티브 폼/투표 ──────────────────────────────────────────────────
+
+def create_form(
+    room_id: int,
+    title: str,
+    questions: list[dict[str, Any]],
+    description: str | None = None,
+    anonymous: bool = True,
+) -> dict[str, Any]:
+    """폼과 질문들을 생성한다. (단일 트랜잭션)
+
+    questions: ``[{"text": str, "qtype": "text"|"single"|"multi", "options": [str]}]``
+    Returns: ``{"form": <forms row>, "questions": [<form_questions rows>]}``
+    """
+    from psycopg.types.json import Json
+
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                "INSERT INTO forms (room_id, title, description, anonymous) "
+                "VALUES (%s, %s, %s, %s) RETURNING *",
+                (room_id, title, description, anonymous),
+            )
+            form = cur.fetchone()
+
+            created_questions = []
+            for pos, q in enumerate(questions):
+                opts = q.get("options") or None
+                cur.execute(
+                    "INSERT INTO form_questions (form_id, position, text, qtype, options) "
+                    "VALUES (%s, %s, %s, %s, %s) RETURNING *",
+                    (
+                        form["id"],
+                        pos,
+                        q["text"],
+                        q.get("qtype", "single"),
+                        Json(opts) if opts is not None else None,
+                    ),
+                )
+                created_questions.append(cur.fetchone())
+        c.commit()
+    return {"form": form, "questions": created_questions}
+
+
+def get_form(form_id: int) -> dict[str, Any] | None:
+    """폼 + 질문 목록을 반환한다. (폼 렌더링용)"""
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            cur.execute("SELECT * FROM forms WHERE id = %s", (form_id,))
+            form = cur.fetchone()
+            if form is None:
+                return None
+            cur.execute(
+                "SELECT * FROM form_questions WHERE form_id = %s ORDER BY position",
+                (form_id,),
+            )
+            questions = cur.fetchall()
+    return {"form": form, "questions": questions}
+
+
+def save_response(
+    form_id: int,
+    answers: list[dict[str, Any]],
+    respondent: str | None = None,
+) -> int:
+    """응답 1건을 저장한다.
+
+    answers: ``[{"question_id": int, "value": str}]`` (복수선택은 같은 question_id로 여러 개)
+    Returns: 생성된 response_id
+    """
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                "INSERT INTO form_responses (form_id, respondent) VALUES (%s, %s) RETURNING id",
+                (form_id, respondent),
+            )
+            response_id = cur.fetchone()["id"]
+            for a in answers:
+                cur.execute(
+                    "INSERT INTO form_answers (response_id, question_id, value) "
+                    "VALUES (%s, %s, %s)",
+                    (response_id, a["question_id"], a["value"]),
+                )
+        c.commit()
+    return response_id
+
+
+def get_results(form_id: int) -> dict[str, Any] | None:
+    """폼 응답을 질문별로 집계한다.
+
+    객관식: 선택지별 카운트 / 주관식: 답변 텍스트 목록.
+    """
+    data = get_form(form_id)
+    if data is None:
+        return None
+    form, questions = data["form"], data["questions"]
+
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                "SELECT COUNT(*) AS n FROM form_responses WHERE form_id = %s",
+                (form_id,),
+            )
+            total = cur.fetchone()["n"]
+
+            results = []
+            for q in questions:
+                if q["qtype"] == "text":
+                    cur.execute(
+                        "SELECT fa.value FROM form_answers fa "
+                        "WHERE fa.question_id = %s ORDER BY fa.id",
+                        (q["id"],),
+                    )
+                    answers = [r["value"] for r in cur.fetchall()]
+                    results.append(
+                        {"question": q["text"], "qtype": q["qtype"], "answers": answers}
+                    )
+                else:
+                    cur.execute(
+                        "SELECT fa.value, COUNT(*) AS n FROM form_answers fa "
+                        "WHERE fa.question_id = %s GROUP BY fa.value ORDER BY n DESC",
+                        (q["id"],),
+                    )
+                    counts = {r["value"]: r["n"] for r in cur.fetchall()}
+                    results.append(
+                        {"question": q["text"], "qtype": q["qtype"], "counts": counts}
+                    )
+
+    return {
+        "form_id": form["id"],
+        "title": form["title"],
+        "total_responses": total,
+        "results": results,
+    }

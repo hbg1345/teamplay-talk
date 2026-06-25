@@ -22,14 +22,18 @@ class Settings:
     port: int
     data_dir: str
     database_url: str | None
+    public_base_url: str
 
     @classmethod
     def from_env(cls) -> "Settings":
+        port = int(os.getenv("PORT", "8000"))
         return cls(
             host=os.getenv("HOST", "0.0.0.0"),
-            port=int(os.getenv("PORT", "8000")),
+            port=port,
             data_dir=os.getenv("DATA_DIR", "./data"),
             database_url=os.getenv("DATABASE_URL"),
+            # 폼 공유 링크 생성에 쓰는 외부 접근 URL (배포 시 실제 도메인으로 지정)
+            public_base_url=os.getenv("PUBLIC_BASE_URL", f"http://localhost:{port}"),
         )
 
 

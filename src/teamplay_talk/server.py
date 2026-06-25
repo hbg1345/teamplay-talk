@@ -18,6 +18,7 @@ from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
 from .config import settings
+from .forms_web import register_form_routes
 from .tools import register_all
 
 mcp = FastMCP(
@@ -43,6 +44,9 @@ async def health_check(_request: Request) -> PlainTextResponse:
 
 # 도메인별 도구 등록
 register_all(mcp)
+
+# 네이티브 폼 웹 페이지(/form/<id>) 등록
+register_form_routes(mcp)
 
 
 def main() -> None:
