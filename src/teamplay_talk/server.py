@@ -13,11 +13,12 @@ MCP 엔드포인트: ``http://<host>:<port>/mcp/``
 
 from __future__ import annotations
 
-import os
-
 from fastmcp import FastMCP
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
+
+from .config import settings
+from .tools import register_all
 
 mcp = FastMCP(
     name="teamplay-talk",
@@ -40,10 +41,12 @@ async def health_check(_request: Request) -> PlainTextResponse:
     return PlainTextResponse("ok")
 
 
+# 도메인별 도구 등록
+register_all(mcp)
+
+
 def main() -> None:
-    host = os.getenv("HOST", "0.0.0.0")
-    port = int(os.getenv("PORT", "8000"))
-    mcp.run(transport="http", host=host, port=port)
+    mcp.run(transport="http", host=settings.host, port=settings.port)
 
 
 if __name__ == "__main__":
