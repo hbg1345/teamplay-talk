@@ -11,6 +11,7 @@ from typing import Any
 
 from fastmcp import FastMCP
 
+from .. import storage
 from ..config import settings
 from ..intents import encode_intent
 
@@ -74,4 +75,63 @@ def register(mcp: FastMCP) -> None:
             "need_login": True,
             "login_url": url,
             "message": f"카카오 로그인하면 방에 참여됩니다 → {url}",
+        }
+
+    @mcp.tool(
+        name="leave_room",
+        annotations={
+            "title": "팀플 방 나가기",
+            "readOnlyHint": False,
+            "destructiveHint": True,  # 멤버십을 제거한다
+            "idempotentHint": True,
+            "openWorldHint": False,
+        },
+    )
+    def leave_room(invite_code: str) -> dict[str, Any]:
+        """Leaves a teamplay-talk(팀플톡) room. Returns a Kakao login link; leaving completes after login (identity check).
+
+        팀플톡(teamplay-talk) 방에서 나간다. 본인 확인을 위해 카카오 로그인 링크를
+        반환하며, 로그인하면 그 사람이 방 멤버에서 제거된다.
+
+        Args:
+            invite_code: 나갈 방의 초대 코드
+        """
+        url = _login_url(encode_intent({"a": "leave", "code": invite_code}))
+        return {
+            "need_login": True,
+            "login_url": url,
+            "message": f"카카오 로그인하면 방에서 나갑니다 → {url}",
+        }
+
+    @mcp.tool(
+        name="room_info",
+        annotations={
+            "title": "방 정보·멤버 조회",
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        },
+    )
+    def room_info(invite_code: str) -> dict[str, Any]:
+        """Reads a teamplay-talk(팀플톡) room's name and member list by invite code. No login required.
+
+        팀플톡(teamplay-talk) 방의 이름과 멤버 목록(닉네임·역할)을 초대 코드로
+        조회한다. 로그인 없이 누구나(코드 소지자) 볼 수 있다.
+
+        Args:
+            invite_code: 조회할 방의 초대 코드
+        """
+        room = storage.get_room_by_invite_code(invite_code)
+        if room is None:
+            return {"ok": False, "error": "방을 찾을 수 없습니다."}
+        members = storage.list_members(room["id"])
+        return {
+            "ok": True,
+            "room_id": room["id"],
+            "name": room["name"],
+            "member_count": len(members),
+            "members": [
+                {"nickname": m["nickname"], "role": m["role"]} for m in members
+            ],
         }

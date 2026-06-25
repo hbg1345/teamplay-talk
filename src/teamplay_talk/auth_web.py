@@ -95,6 +95,17 @@ async def callback(request: Request) -> HTMLResponse:
                 f"<h2>✅ '{result['room']['name']}' 참여 완료</h2>"
                 f"<p>{nickname}님, 이제 이 방의 카카오 알림을 받습니다.</p>"
             )
+    elif action == "leave":
+        result = storage.leave_room(invite_code=intent.get("code", ""), kakao_id=kakao_id)
+        if result is None:
+            body = "<h2>❌ 유효하지 않은 초대 코드</h2>"
+        elif not result["left"]:
+            body = "<h2>이미 이 방의 멤버가 아닙니다.</h2>"
+        else:
+            body = (
+                f"<h2>✅ '{result['room']['name']}' 나가기 완료</h2>"
+                f"<p>{nickname}님이 방에서 나갔습니다. (이 방 알림은 더 이상 받지 않음)</p>"
+            )
     else:
         body = f"<h2>✅ 카카오 연결 완료</h2><p>{nickname}님 연결됨.</p>"
 
