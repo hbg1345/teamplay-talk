@@ -8,10 +8,13 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 
-# 로컬 개발 시 .env 자동 로딩 (배포 환경에선 실제 환경변수가 우선)
-load_dotenv()
+# .env 자동 로딩. 기본 load_dotenv()는 호출 파일(config.py) 위치에서 위로
+# 탐색하는데, 패키지가 site-packages에 설치되면 /app/.env를 못 찾는다.
+# usecwd=True로 현재 작업 디렉터리(컨테이너=/app, 로컬=repo 루트) 기준 탐색한다.
+# (배포 환경에 실제 환경변수가 따로 있으면 그게 우선)
+load_dotenv(find_dotenv(usecwd=True))
 
 
 @dataclass(frozen=True)
