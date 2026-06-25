@@ -87,3 +87,8 @@ CREATE INDEX IF NOT EXISTS idx_form_answers_question ON form_answers (question_i
 ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_access_token     TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_refresh_token    TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_token_expires_at TIMESTAMPTZ;
+
+-- ── 현재 작업 중인 방(active room) — 사람당 1개 포인터 ──────────────────
+-- 멤버십(room_members)은 그대로 두고, "지금 작업하는 방"만 가리킨다.
+-- 방이 삭제되면 자동으로 NULL. 방에서 나가면(멤버십 삭제) leave_room이 직접 리셋.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS active_room_id BIGINT REFERENCES rooms (id) ON DELETE SET NULL;

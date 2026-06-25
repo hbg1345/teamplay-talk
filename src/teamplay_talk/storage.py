@@ -268,6 +268,9 @@ def get_room_by_invite_code(invite_code: str) -> dict[str, Any] | None:
 def leave_room(invite_code: str, kakao_id: str) -> dict[str, Any] | None:
     """카카오 인증된 사용자를 방에서 제거한다.
 
+    나간 방이 그 사람의 '현재 작업 방'이면 → 남은 방 중 가장 최근 것으로
+    포인터를 옮긴다(남은 방 없으면 NULL).
+
     Returns: 코드가 틀리면 ``None``,
              그 외 ``{"room": ..., "left": bool}`` (left=False면 원래 멤버 아님).
     """
@@ -277,7 +280,9 @@ def leave_room(invite_code: str, kakao_id: str) -> dict[str, Any] | None:
             room = cur.fetchone()
             if room is None:
                 return None
-            cur.execute("SELECT id FROM users WHERE kakao_id = %s", (kakao_id,))
+            cur.execute(
+                "SELECT id, active_room_id FROM users WHERE kakao_id = %s", (kakao_id,)
+            )
             user = cur.fetchone()
             if user is None:
                 return {"room": room, "left": False}
@@ -286,5 +291,74 @@ def leave_room(invite_code: str, kakao_id: str) -> dict[str, Any] | None:
                 (room["id"], user["id"]),
             )
             left = cur.rowcount > 0
+            # 나간 방이 '현재 작업 방'이면 → 남은 방 중 최근 것으로(없으면 NULL)
+            if left and user["active_room_id"] == room["id"]:
+                cur.execute(
+                    "SELECT room_id FROM room_members WHERE user_id = %s "
+                    "ORDER BY joined_at DESC LIMIT 1",
+                    (user["id"],),
+                )
+                nxt = cur.fetchone()
+                cur.execute(
+                    "UPDATE users SET active_room_id = %s WHERE id = %s",
+                    (nxt["room_id"] if nxt else None, user["id"]),
+                )
         c.commit()
     return {"room": room, "left": left}
+
+
+# ── active room (현재 작업 중인 방) ────────────────────────────────────
+
+def upsert_user(kakao_id: str, nickname: str) -> dict[str, Any]:
+    """kakao_id로 사용자를 찾고 없으면 생성한다. (헤더 신원 해석용)"""
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            cur.execute("SELECT * FROM users WHERE kakao_id = %s", (kakao_id,))
+            user = cur.fetchone()
+            if user is None:
+                cur.execute(
+                    "INSERT INTO users (kakao_id, nickname) VALUES (%s, %s) RETURNING *",
+                    (kakao_id, nickname),
+                )
+                user = cur.fetchone()
+        c.commit()
+    return user
+
+
+def set_active_room(user_id: int, room_id: int | None) -> None:
+    """사용자의 '현재 작업 방' 포인터를 변경한다. (멤버십은 건드리지 않음)"""
+    with conn() as c:
+        with c.cursor() as cur:
+            cur.execute(
+                "UPDATE users SET active_room_id = %s WHERE id = %s",
+                (room_id, user_id),
+            )
+        c.commit()
+
+
+def get_active_room(user_id: int) -> dict[str, Any] | None:
+    """사용자의 현재 작업 방(rooms 행)을 반환한다. 없으면 None."""
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                "SELECT r.* FROM rooms r "
+                "JOIN users u ON u.active_room_id = r.id WHERE u.id = %s",
+                (user_id,),
+            )
+            return cur.fetchone()
+
+
+def list_user_rooms(user_id: int) -> list[dict[str, Any]]:
+    """사용자가 속한 방 목록 + 역할 + 현재방 여부(is_active)."""
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                "SELECT r.id, r.name, r.invite_code, rm.role, "
+                "(r.id = u.active_room_id) AS is_active "
+                "FROM room_members rm "
+                "JOIN rooms r ON r.id = rm.room_id "
+                "JOIN users u ON u.id = rm.user_id "
+                "WHERE rm.user_id = %s ORDER BY rm.joined_at",
+                (user_id,),
+            )
+            return cur.fetchall()

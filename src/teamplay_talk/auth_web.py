@@ -76,6 +76,7 @@ async def callback(request: Request) -> HTMLResponse:
             owner_kakao_id=kakao_id,
         )
         room = result["room"]
+        storage.set_active_room(result["owner"]["id"], room["id"])
         invite = (
             f"{settings.public_base_url}/auth/kakao/login?"
             f"state={encode_intent({'a': 'join', 'code': room['invite_code']})}"
@@ -96,9 +97,10 @@ async def callback(request: Request) -> HTMLResponse:
         if result is None:
             body = "<h2>❌ 유효하지 않은 초대 코드</h2>"
         else:
+            storage.set_active_room(result["user"]["id"], result["room"]["id"])
             body = (
                 f"<h2>✅ '{result['room']['name']}' 참여 완료</h2>"
-                f"<p>{nickname}님, 이제 이 방의 카카오 알림을 받습니다.</p>"
+                f"<p>{nickname}님, 이제 이 방의 카카오 알림을 받습니다. (현재 작업 방으로 설정됨)</p>"
             )
     elif action == "leave":
         result = storage.leave_room(invite_code=intent.get("code", ""), kakao_id=kakao_id)
@@ -111,6 +113,35 @@ async def callback(request: Request) -> HTMLResponse:
                 f"<h2>✅ '{result['room']['name']}' 나가기 완료</h2>"
                 f"<p>{nickname}님이 방에서 나갔습니다. (이 방 알림은 더 이상 받지 않음)</p>"
             )
+    elif action == "switch":
+        user = storage.upsert_user(kakao_id, nickname)
+        rooms = storage.list_user_rooms(user["id"])
+        q = (intent.get("q") or "").strip().lower()
+        matches = (
+            [r for r in rooms if r["invite_code"].lower() == q]
+            or [r for r in rooms if r["name"].lower() == q]
+            or [r for r in rooms if q in r["name"].lower()]
+        )
+        if not matches:
+            body = f"<h2>❌ '{intent.get('q')}' 방을 찾을 수 없습니다.</h2>"
+        elif len(matches) > 1:
+            names = ", ".join(r["name"] for r in matches)
+            body = f"<h2>여러 방이 일치합니다</h2><p>{names}</p><p>더 정확히 지정해 주세요.</p>"
+        else:
+            storage.set_active_room(user["id"], matches[0]["id"])
+            body = f"<h2>✅ 현재 작업 방: '{matches[0]['name']}'</h2><p>이제 방을 안 적어도 이 방에 작동합니다.</p>"
+    elif action == "rooms":
+        user = storage.upsert_user(kakao_id, nickname)
+        rooms = storage.list_user_rooms(user["id"])
+        if not rooms:
+            body = "<h2>아직 속한 방이 없습니다.</h2>"
+        else:
+            items = "".join(
+                f"<li>{'⭐ ' if r['is_active'] else ''}<b>{r['name']}</b> "
+                f"<small>({r['role'] or '멤버'})</small></li>"
+                for r in rooms
+            )
+            body = f"<h2>내 방 목록</h2><ul>{items}</ul>"
     else:
         body = f"<h2>✅ 카카오 연결 완료</h2><p>{nickname}님 연결됨.</p>"
 

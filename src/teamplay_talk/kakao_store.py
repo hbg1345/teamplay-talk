@@ -26,8 +26,11 @@ def set_kakao_token(
         expires_at = datetime.now(timezone.utc) + timedelta(seconds=int(expires_in))
     with conn() as c:
         with c.cursor() as cur:
+            # refresh_token이 None이면 기존 값을 보존한다(헤더-브로커 토큰엔
+            # refresh_token이 없을 수 있어, 링크 로그인 때 받은 걸 지우지 않도록).
             cur.execute(
-                "UPDATE users SET kakao_access_token = %s, kakao_refresh_token = %s, "
+                "UPDATE users SET kakao_access_token = %s, "
+                "kakao_refresh_token = COALESCE(%s, kakao_refresh_token), "
                 "kakao_token_expires_at = %s WHERE kakao_id = %s",
                 (access_token, refresh_token, expires_at, kakao_id),
             )
