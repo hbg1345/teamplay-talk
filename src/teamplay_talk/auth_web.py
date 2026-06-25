@@ -14,7 +14,7 @@ from starlette.responses import HTMLResponse, RedirectResponse
 
 from . import kakao, kakao_store, storage
 from .config import settings
-from .intents import decode_intent
+from .intents import decode_intent, encode_intent
 
 
 def _page(title: str, body: str, status: int = 200) -> HTMLResponse:
@@ -76,11 +76,16 @@ async def callback(request: Request) -> HTMLResponse:
             owner_kakao_id=kakao_id,
         )
         room = result["room"]
+        invite = (
+            f"{settings.public_base_url}/auth/kakao/login?"
+            f"state={encode_intent({'a': 'join', 'code': room['invite_code']})}"
+        )
         body = (
             f"<h2>✅ 방 생성 완료</h2>"
             f"<p><b>{room['name']}</b></p>"
             f"<p>초대 코드: <code style='font-size:1.3rem;background:#f2f2f2;padding:.2rem .5rem;border-radius:6px'>{room['invite_code']}</code></p>"
-            f"<p>이 코드를 팀원에게 공유하세요. (팀원도 이 코드로 로그인 참여)</p>"
+            f"<p style='margin-top:1rem'><b>초대 링크</b> — 팀원에게 이대로 공유하면 클릭만으로 참여돼요:</p>"
+            f"<p><a href='{invite}' style='word-break:break-all'>{invite}</a></p>"
         )
     elif action == "join":
         result = storage.join_room(

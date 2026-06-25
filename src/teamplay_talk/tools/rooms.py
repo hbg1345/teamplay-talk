@@ -135,3 +135,33 @@ def register(mcp: FastMCP) -> None:
                 {"nickname": m["nickname"], "role": m["role"]} for m in members
             ],
         }
+
+    @mcp.tool(
+        name="get_invite_link",
+        annotations={
+            "title": "초대 링크 받기",
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        },
+    )
+    def get_invite_link(invite_code: str) -> dict[str, Any]:
+        """Returns a shareable invite link for a teamplay-talk(팀플톡) room.
+
+        팀플톡(teamplay-talk) 방의 **공유용 초대 링크**를 반환한다. 팀원이 이
+        링크를 클릭하면 카카오 로그인 후 바로 방에 참여된다(코드 입력 불필요).
+
+        Args:
+            invite_code: 방 초대 코드
+        """
+        room = storage.get_room_by_invite_code(invite_code)
+        if room is None:
+            return {"ok": False, "error": "방을 찾을 수 없습니다."}
+        url = _login_url(encode_intent({"a": "join", "code": invite_code}))
+        return {
+            "ok": True,
+            "name": room["name"],
+            "invite_code": invite_code,
+            "invite_link": url,
+        }
