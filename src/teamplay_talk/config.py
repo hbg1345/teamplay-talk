@@ -23,6 +23,9 @@ class Settings:
     data_dir: str
     database_url: str | None
     public_base_url: str
+    kakao_rest_api_key: str
+    kakao_client_secret: str | None
+    kakao_redirect_uri: str
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -34,6 +37,11 @@ class Settings:
             database_url=os.getenv("DATABASE_URL"),
             # 폼 공유 링크 생성에 쓰는 외부 접근 URL (배포 시 실제 도메인으로 지정)
             public_base_url=os.getenv("PUBLIC_BASE_URL", f"http://localhost:{port}"),
+            kakao_rest_api_key=os.getenv("KAKAO_REST_API_KEY", ""),
+            kakao_client_secret=os.getenv("KAKAO_CLIENT_SECRET") or None,
+            kakao_redirect_uri=os.getenv(
+                "KAKAO_REDIRECT_URI", f"http://localhost:{port}/auth/kakao/callback"
+            ),
         )
 
 

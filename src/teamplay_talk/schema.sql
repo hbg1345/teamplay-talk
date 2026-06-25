@@ -76,3 +76,9 @@ CREATE TABLE IF NOT EXISTS form_answers (
 CREATE INDEX IF NOT EXISTS idx_form_questions_form ON form_questions (form_id);
 CREATE INDEX IF NOT EXISTS idx_form_responses_form ON form_responses (form_id);
 CREATE INDEX IF NOT EXISTS idx_form_answers_question ON form_answers (question_id);
+
+
+-- ── 카카오 알림 토큰 (users에 추가, 멤버별 self-push용) ────────────────
+ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_access_token     TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_refresh_token    TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_token_expires_at TIMESTAMPTZ;
