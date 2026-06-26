@@ -602,3 +602,75 @@ def update_task(
     return updated
 
 
+def add_task(
+    room_id: int,
+    *,
+    title: str,
+    details: str | None = None,
+    assignee: str | None = None,
+    start_at: Any | None = None,
+    end_at: Any | None = None,
+    status: str = "todo",
+    after_ids: list[int] | None = None,
+    before_ids: list[int] | None = None,
+) -> dict[str, Any]:
+    """로드맵에 태스크 1개를 추가하고 (선택) 그래프에 연결한다.
+
+    after_ids: 이 태스크의 **선행** 태스크들(각각 → 새 태스크 엣지)
+    before_ids: 이 태스크의 **후행** 태스크들(새 태스크 → 각각 엣지)
+    같은 방의 태스크 id만 연결된다. Returns: 생성된 task 행.
+    """
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            user_id, role = _resolve_assignee(cur, room_id, assignee)
+            cur.execute(
+                "SELECT COALESCE(MAX(position), -1) + 1 AS p FROM tasks WHERE room_id = %s",
+                (room_id,),
+            )
+            pos = cur.fetchone()["p"]
+            cur.execute(
+                "INSERT INTO tasks (room_id, title, details, assignee_user_id, "
+                "assignee_role, start_at, end_at, status, position) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *",
+                (room_id, title, details, user_id, role, start_at, end_at, status, pos),
+            )
+            task = cur.fetchone()
+            new_id = task["id"]
+
+            def _in_room(tid: int) -> bool:
+                cur.execute(
+                    "SELECT 1 FROM tasks WHERE id = %s AND room_id = %s", (tid, room_id)
+                )
+                return cur.fetchone() is not None
+
+            for p in after_ids or []:
+                if p != new_id and _in_room(p):
+                    cur.execute(
+                        "INSERT INTO task_deps (room_id, from_task_id, to_task_id) "
+                        "VALUES (%s, %s, %s) ON CONFLICT DO NOTHING",
+                        (room_id, p, new_id),
+                    )
+            for s in before_ids or []:
+                if s != new_id and _in_room(s):
+                    cur.execute(
+                        "INSERT INTO task_deps (room_id, from_task_id, to_task_id) "
+                        "VALUES (%s, %s, %s) ON CONFLICT DO NOTHING",
+                        (room_id, new_id, s),
+                    )
+        c.commit()
+    return task
+
+
+def delete_task(task_id: int, room_id: int) -> int | None:
+    """방의 태스크 1개를 삭제한다(연결 엣지는 FK CASCADE로 함께 삭제). 없으면 None."""
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                "DELETE FROM tasks WHERE id = %s AND room_id = %s RETURNING id",
+                (task_id, room_id),
+            )
+            row = cur.fetchone()
+        c.commit()
+    return row["id"] if row else None
+
+

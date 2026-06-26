@@ -126,6 +126,84 @@ def register(mcp: FastMCP) -> None:
         return {"ok": True, "room": room["name"], **_format(roadmap)}
 
     @mcp.tool(
+        name="add_task",
+        annotations={
+            "title": "태스크 추가",
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,  # 호출마다 새 태스크
+            "openWorldHint": False,
+        },
+    )
+    async def add_task(
+        title: str,
+        details: str | None = None,
+        assignee: str | None = None,
+        status: str = "todo",
+        start_at: str | None = None,
+        end_at: str | None = None,
+        after_task_ids: list[int] | None = None,
+        before_task_ids: list[int] | None = None,
+    ) -> dict[str, Any]:
+        """Adds one task to the current room's roadmap in teamplay-talk(팀플톡), optionally linking it.
+
+        팀플톡(teamplay-talk) 현재 작업 방의 로드맵에 태스크 1개를 추가한다.
+        after_task_ids/before_task_ids 로 기존 태스크와 의존 엣지를 연결할 수 있다.
+
+        Args:
+            title: 태스크 제목
+            details: 세부사항 (선택)
+            assignee: 담당 (팀원 닉네임 또는 역할, 선택)
+            status: 상태 "todo"|"doing"|"done" (기본 todo)
+            start_at: 시작 시각 UTC RFC3339 (선택)
+            end_at: 종료 시각 UTC RFC3339 (선택)
+            after_task_ids: 이 태스크의 **선행** 태스크 ID들(그것들 → 이 태스크, 선택)
+            before_task_ids: 이 태스크의 **후행** 태스크 ID들(이 태스크 → 그것들, 선택)
+        """
+        caller = await resolve_caller()
+        if caller is None:
+            return _NEED_AUTH
+        room = storage.get_active_room(caller["id"])
+        if room is None:
+            return _NO_ROOM
+        task = storage.add_task(
+            room["id"], title=title, details=details, assignee=assignee,
+            status=status, start_at=start_at, end_at=end_at,
+            after_ids=after_task_ids, before_ids=before_task_ids,
+        )
+        return {"ok": True, "task_id": task["id"], "title": task["title"], **_format(storage.get_roadmap(room["id"]))}
+
+    @mcp.tool(
+        name="delete_task",
+        annotations={
+            "title": "태스크 삭제",
+            "readOnlyHint": False,
+            "destructiveHint": True,  # 태스크와 연결 엣지를 삭제
+            "idempotentHint": True,
+            "openWorldHint": False,
+        },
+    )
+    async def delete_task(task_id: int) -> dict[str, Any]:
+        """Deletes one task (and its edges) from the current room's roadmap in teamplay-talk(팀플톡).
+
+        팀플톡(teamplay-talk) 현재 작업 방의 로드맵에서 태스크 1개를 삭제한다.
+        연결된 의존 엣지도 함께 사라진다.
+
+        Args:
+            task_id: 삭제할 태스크 ID (view_roadmap에서 확인)
+        """
+        caller = await resolve_caller()
+        if caller is None:
+            return _NEED_AUTH
+        room = storage.get_active_room(caller["id"])
+        if room is None:
+            return _NO_ROOM
+        deleted = storage.delete_task(task_id, room["id"])
+        if deleted is None:
+            return {"ok": False, "error": "해당 태스크를 찾을 수 없습니다(이 방의 태스크가 아닐 수 있음)."}
+        return {"ok": True, "deleted_task_id": deleted, **_format(storage.get_roadmap(room["id"]))}
+
+    @mcp.tool(
         name="update_task",
         annotations={
             "title": "태스크 수정",
