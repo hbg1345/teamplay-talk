@@ -84,9 +84,9 @@ def register(mcp: FastMCP) -> None:
         },
     )
     async def create_poll(
-        room_id: int,
         title: str,
         questions: list[PollQuestion],
+        room_id: int | None = None,
         description: str | None = None,
         anonymous: bool = True,
         close_minutes: int | None = None,
@@ -106,16 +106,29 @@ def register(mcp: FastMCP) -> None:
         notify_room으로 각자에게 보낸다.
 
         Args:
-            room_id: 폼이 속한 방 ID
             title: 폼 제목 (예: "회식 날짜 투표")
             questions: 질문 목록
+            room_id: 폼이 속한 방 ID (생략 시 **현재 작업 방**). ID 추측 금지 —
+                     보통 생략하면 됨.
             description: 폼 설명 (선택)
             anonymous: 익명 공유링크(True) vs 멤버별 식별 링크(False)
             close_minutes: N분 뒤 자동 마감 (선택)
             close_on_all: 전원 응답 시 자동 마감 (선택)
         """
         caller = await resolve_caller()
-        creator_id = caller["id"] if caller else None
+        if caller is None:
+            return {"ok": False, "error": "인증이 필요합니다 — PlayMCP에서 이 MCP 인증을 먼저 해주세요."}
+        if room_id is None:
+            active = storage.get_active_room(caller["id"])
+            if active is None:
+                return {
+                    "ok": False,
+                    "error": "현재 작업 중인 방이 없습니다. create_room으로 방을 만들거나 switch_room으로 선택하세요.",
+                }
+            room_id = active["id"]
+        elif storage.get_room(room_id) is None:
+            return {"ok": False, "error": f"방 {room_id}를 찾을 수 없습니다. my_rooms로 방 목록을 확인하세요."}
+        creator_id = caller["id"]
 
         closes_at = None
         if close_minutes:
