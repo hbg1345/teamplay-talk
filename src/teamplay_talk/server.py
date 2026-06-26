@@ -30,10 +30,11 @@ mcp = FastMCP(
         "원칙: ① 팀원은 이미 방에 있으니 rooms로 조회하고 사용자에게 이름 묻지 마. "
         "② 투표 선택지·역할·회의 후보시간은 프로젝트 맥락 보고 네가 직접 생성(사용자에게 떠넘기지 마). "
         "③ 역할분배: assign_roles → [팀장 확인] → send_form → finalize_roles → [확인] → set_roles. "
-        "④ 의견수렴형(회의시간·주제 등 '뭘로 할까'): 2단계 — (1) create_poll 주관식으로 자유의견 "
-        "모으기 → send_form → [완료 nudge] (2) get_poll_results 의견을 AI가 **항목화** → "
-        "create_poll 본투표(그 항목들) → send_form → 결과 공지. 후보는 AI 짐작이 아니라 "
-        "**멤버 의견에서** 뽑을 것. "
+        "④ 의견수렴형(회의시간·약속장소·주제): 2단계 — (1) create_poll 주관식으로 자유의견 "
+        "모으기(약속장소면 각자 출발지/선호지역도) → send_form → [완료 nudge] (2) get_poll_results를 "
+        "AI가 **항목화** → create_poll **복수선택(multi) 본투표**(그 항목들) → send_form → 가장 많이 "
+        "되는 것 공지. 후보는 AI 짐작 말고 **멤버 의견에서** 뽑되, *약속장소는 멤버 위치로 환승 적은 "
+        "**최적 중심점**도 AI가 추론해 후보 추가*(정밀하면 카카오맵 MCP 활용). "
         "⑤ 폼 배포는 notify_room이 아니라 send_form."
     ),
 )
