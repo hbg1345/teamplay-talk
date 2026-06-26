@@ -15,15 +15,18 @@ from typing import Any
 from fastmcp import FastMCP
 
 from .. import storage
+from ..config import settings
 from ..identity import resolve_caller
+from ..intents import encode_intent
 
 
-def _need_login(message: str) -> dict[str, Any]:
-    """OAuth 신원이 없을 때 — PlayMCP에서 인증(카카오·구글 OAuth)을 먼저 하라고 안내."""
-    return {
-        "need_login": True,
-        "message": f"{message} 먼저 PlayMCP에서 이 MCP의 인증(카카오·구글 OAuth)을 완료해 주세요.",
-    }
+def _login_url(state: str) -> str:
+    return f"{settings.public_base_url}/auth/kakao/login?state={state}"
+
+
+def _need_login(state: str, message: str) -> dict[str, Any]:
+    url = _login_url(state)
+    return {"need_login": True, "login_url": url, "message": f"{message} → {url}"}
 
 
 def _match_rooms(rooms: list[dict[str, Any]], query: str) -> list[dict[str, Any]]:
@@ -64,9 +67,9 @@ def register(mcp: FastMCP) -> None:
     async def create_room(name: str, description: str | None = None) -> dict[str, Any]:
         """Creates a team-project room in teamplay-talk(팀플톡) and makes it your current room.
 
-        팀플톡(teamplay-talk)에서 팀 프로젝트용 방을 만든다. 인증돼 있으면 바로
-        생성되고 **현재 작업 방**으로 설정되며 초대 코드가 나온다. 팀원은 우리 MCP를
-        인증한 뒤 join_room에 그 코드를 넣어 참여한다.
+        팀플톡(teamplay-talk)에서 팀 프로젝트용 방을 만든다. 카카오로 연결돼 있으면
+        바로 생성되고 **현재 작업 방**으로 설정되며 초대 코드가 나온다. 연결 전이면
+        카카오 로그인 링크를 반환한다.
 
         Args:
             name: 방 이름 (예: "캡스톤 3조")
@@ -74,7 +77,10 @@ def register(mcp: FastMCP) -> None:
         """
         caller = await resolve_caller()
         if caller is None:
-            return _need_login(f"'{name}' 방을 만들려면")
+            return _need_login(
+                encode_intent({"a": "create", "name": name, "desc": description}),
+                f"카카오 로그인하면 '{name}' 방이 생성되고 초대 코드가 나옵니다",
+            )
         result = storage.create_room(
             name=name,
             owner_nickname=caller["nickname"],
@@ -83,17 +89,15 @@ def register(mcp: FastMCP) -> None:
         )
         room = result["room"]
         storage.set_active_room(caller["id"], room["id"])
+        invite_link = _login_url(encode_intent({"a": "join", "code": room["invite_code"]}))
         return {
             "ok": True,
             "room_id": room["id"],
             "name": room["name"],
             "invite_code": room["invite_code"],
+            "invite_link": invite_link,
             "active": True,
-            "message": (
-                f"'{room['name']}' 방 생성 완료 — 현재 작업 방으로 설정됨. "
-                f"초대 코드: {room['invite_code']} "
-                f"(팀원이 우리 MCP 인증 후 join_room에 이 코드를 넣으면 참여됩니다)"
-            ),
+            "message": f"'{room['name']}' 방 생성 완료 — 현재 작업 방으로 설정됨. 초대 코드: {room['invite_code']}",
         }
 
     @mcp.tool(
@@ -110,14 +114,17 @@ def register(mcp: FastMCP) -> None:
         """Joins a teamplay-talk(팀플톡) room by invite code and makes it your current room.
 
         팀플톡(teamplay-talk)에서 초대 코드로 방에 참여하고 **현재 작업 방**으로
-        설정한다.
+        설정한다. 카카오 연결 전이면 로그인 링크를 반환한다.
 
         Args:
             invite_code: 방 생성 시 발급된 초대 코드
         """
         caller = await resolve_caller()
         if caller is None:
-            return _need_login("방에 참여하려면")
+            return _need_login(
+                encode_intent({"a": "join", "code": invite_code}),
+                "카카오 로그인하면 방에 참여됩니다",
+            )
         result = storage.join_room(
             invite_code=invite_code,
             nickname=caller["nickname"],
@@ -157,7 +164,10 @@ def register(mcp: FastMCP) -> None:
         """
         caller = await resolve_caller()
         if caller is None:
-            return _need_login("작업 방을 옮기려면")
+            return _need_login(
+                encode_intent({"a": "switch", "q": name}),
+                "카카오 로그인하면 작업 방을 옮깁니다",
+            )
         rooms = storage.list_user_rooms(caller["id"])
         matches = _match_rooms(rooms, name)
         if not matches:
@@ -194,11 +204,14 @@ def register(mcp: FastMCP) -> None:
         """Lists the teamplay-talk(팀플톡) rooms you belong to, marking the current one.
 
         팀플톡(teamplay-talk)에서 내가 속한 방 목록(이름·역할·초대코드)과 현재
-        작업 방을 보여준다.
+        작업 방을 보여준다. 카카오 연결 전이면 로그인 링크를 반환한다.
         """
         caller = await resolve_caller()
         if caller is None:
-            return _need_login("내 방 목록을 보려면")
+            return _need_login(
+                encode_intent({"a": "rooms"}),
+                "카카오 로그인하면 내 방 목록을 봅니다",
+            )
         rooms = storage.list_user_rooms(caller["id"])
         return {
             "ok": True,
@@ -229,14 +242,19 @@ def register(mcp: FastMCP) -> None:
         """Leaves a teamplay-talk(팀플톡) room, removing your membership.
 
         팀플톡(teamplay-talk) 방에서 나간다(멤버십 삭제). 코드를 안 주면 **현재
-        작업 방**에서 나간다.
+        작업 방**에서 나간다. 카카오 연결 전이면 로그인 링크를 반환한다.
 
         Args:
             invite_code: 나갈 방의 초대 코드 (생략 시 현재 작업 방)
         """
         caller = await resolve_caller()
         if caller is None:
-            return _need_login("방에서 나가려면")
+            if not invite_code:
+                return {"ok": False, "error": "나갈 방의 초대 코드가 필요합니다."}
+            return _need_login(
+                encode_intent({"a": "leave", "code": invite_code}),
+                "카카오 로그인하면 방에서 나갑니다",
+            )
         code = invite_code
         if not code:
             active = storage.get_active_room(caller["id"])
@@ -294,21 +312,21 @@ def register(mcp: FastMCP) -> None:
         }
 
     @mcp.tool(
-        name="get_invite_code",
+        name="get_invite_link",
         annotations={
-            "title": "초대 코드 받기",
+            "title": "초대 링크 받기",
             "readOnlyHint": True,
             "destructiveHint": False,
             "idempotentHint": True,
             "openWorldHint": False,
         },
     )
-    async def get_invite_code(invite_code: str | None = None) -> dict[str, Any]:
-        """Returns the invite code and how to join a teamplay-talk(팀플톡) room.
+    async def get_invite_link(invite_code: str | None = None) -> dict[str, Any]:
+        """Returns a shareable invite link for a teamplay-talk(팀플톡) room.
 
-        팀플톡(teamplay-talk) 방의 **초대 코드**와 참여 방법을 반환한다. 팀원이
-        우리 MCP를 연결·인증한 뒤 join_room에 이 코드를 넣으면 참여된다. 초대
-        코드를 주면 그 방을, 안 주면 **현재 작업 방**의 코드를 준다.
+        팀플톡(teamplay-talk) 방의 **공유용 초대 링크**를 반환한다. 팀원이 이
+        링크를 클릭하면 카카오 로그인 후 바로 방에 참여된다. 초대 코드를 주면
+        그 방을, 안 주면 **현재 작업 방**의 링크를 준다.
 
         Args:
             invite_code: 방 초대 코드 (생략 시 현재 작업 방)
@@ -319,12 +337,10 @@ def register(mcp: FastMCP) -> None:
                 "ok": False,
                 "error": "방을 찾을 수 없습니다. (초대 코드를 지정하거나 작업 방을 먼저 정하세요)",
             }
+        url = _login_url(encode_intent({"a": "join", "code": room["invite_code"]}))
         return {
             "ok": True,
             "name": room["name"],
             "invite_code": room["invite_code"],
-            "how_to_join": (
-                f"팀원이 우리 MCP를 인증한 뒤 join_room('{room['invite_code']}') 하면 "
-                f"'{room['name']}' 방에 참여됩니다."
-            ),
+            "invite_link": url,
         }
