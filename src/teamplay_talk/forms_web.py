@@ -22,30 +22,46 @@ _PAGE = """<!doctype html>
 <html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>__TITLE__</title>
-<link href="https://unpkg.com/survey-core@1/survey-core.min.css" rel="stylesheet">
-<script src="https://unpkg.com/survey-core@1/survey.core.min.js"></script>
-<script src="https://unpkg.com/survey-js-ui@1/survey-js-ui.min.js"></script>
+<link href="https://unpkg.com/survey-core@1.12.63/defaultV2.min.css" rel="stylesheet">
+<script src="https://unpkg.com/survey-core@1.12.63/survey.core.min.js"></script>
+<script src="https://unpkg.com/survey-js-ui@1.12.63/survey-js-ui.min.js"></script>
 <style>
  body{font-family:system-ui,-apple-system,sans-serif;max-width:680px;margin:1.5rem auto;padding:0 1rem}
  #done{text-align:center;padding:3rem 1rem}
+ #err{color:#b00;white-space:pre-wrap;padding:1rem;border:1px solid #f3c;border-radius:8px}
 </style></head><body>
 <div id="surveyContainer"></div>
 <div id="done" style="display:none"><h2>응답 완료 ✅</h2><p>제출해 주셔서 감사합니다!</p></div>
 <script>
-  const surveyJson = __SCHEMA__;
-  const survey = new Survey.Model(surveyJson);
-  survey.completeText = "제출";
-  survey.onComplete.add(function(sender) {
-    fetch(window.location.pathname + window.location.search, {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify(sender.data)
-    }).then(function() {
-      document.getElementById("surveyContainer").style.display = "none";
-      document.getElementById("done").style.display = "block";
-    });
-  });
-  survey.render("surveyContainer");
+  var surveyJson = __SCHEMA__;
+  function showErr(m){ document.getElementById("surveyContainer").innerHTML = '<div id="err">폼 로드 오류: ' + m + '</div>'; }
+  window.onerror = function(msg, src, line, col){ showErr(msg + ' (' + line + ':' + col + ')'); return true; };
+  try {
+    if (typeof Survey === "undefined") {
+      showErr("SurveyJS 로드 실패 (네트워크 확인)");
+    } else {
+      var survey = new Survey.Model(surveyJson);
+      survey.completeText = "제출";
+      survey.onComplete.add(function(sender){
+        fetch(window.location.pathname + window.location.search, {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(sender.data)
+        }).then(function(){
+          document.getElementById("surveyContainer").style.display = "none";
+          document.getElementById("done").style.display = "block";
+        }).catch(function(e){ showErr("제출 실패: " + e); });
+      });
+      var el = document.getElementById("surveyContainer");
+      if (typeof survey.render === "function") {
+        survey.render(el);
+      } else if (typeof SurveyUI !== "undefined" && SurveyUI.renderSurvey) {
+        SurveyUI.renderSurvey(survey, el);
+      } else {
+        showErr("render 메서드 없음 (survey-js-ui 로드 확인)");
+      }
+    }
+  } catch(e) { showErr((e && e.message) ? e.message : String(e)); }
 </script>
 </body></html>"""
 
@@ -112,7 +128,11 @@ async def submit_form(request: Request) -> JSONResponse:
         answers = {}
 
     storage.save_response(form_id, answers, member_id=member_id)
-    # (Phase4) close_on_all 체크 → 마감 + 드라이버 nudge 는 스케줄러 단계에서 추가
+    # 전원 응답 시 즉시 마감 + 드라이버 nudge (시간 마감은 스케줄러가 담당)
+    if form.get("close_on_all") and not form["closed"] and storage.all_members_responded(form_id):
+        from . import triggers
+
+        await triggers.process_closed_form(form_id)
     return JSONResponse({"ok": True})
 
 

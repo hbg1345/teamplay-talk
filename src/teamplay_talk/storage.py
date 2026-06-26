@@ -280,11 +280,66 @@ def get_invite(token: str) -> dict[str, Any] | None:
 
 
 def close_form(form_id: int) -> None:
-    """폼을 마감한다."""
+    """폼을 마감한다(수동). nudge는 보내지 않는다 — 닫는 사람이 이미 보고 있으므로."""
     with conn() as c:
         with c.cursor() as cur:
             cur.execute("UPDATE forms SET closed = true WHERE id = %s", (form_id,))
         c.commit()
+
+
+def get_user(user_id: int) -> dict[str, Any] | None:
+    """사용자 단건 조회 (카카오 토큰 포함)."""
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            cur.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+            return cur.fetchone()
+
+
+def find_due_forms() -> list[dict[str, Any]]:
+    """마감 시각이 지났는데 아직 처리 안 된 폼(스케줄러용)."""
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                "SELECT id FROM forms WHERE closes_at IS NOT NULL AND closes_at < now() "
+                "AND NOT closed AND NOT nudge_sent"
+            )
+            return cur.fetchall()
+
+
+def claim_form_for_nudge(form_id: int) -> dict[str, Any] | None:
+    """원자적으로 마감+nudge_sent 설정 후 생성자 정보 반환. 이미 처리됐으면 None(중복 방지)."""
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                "UPDATE forms SET closed = true, nudge_sent = true "
+                "WHERE id = %s AND NOT nudge_sent "
+                "RETURNING creator_user_id, title, room_id",
+                (form_id,),
+            )
+            row = cur.fetchone()
+        c.commit()
+    return row
+
+
+def all_members_responded(form_id: int) -> bool:
+    """방 멤버 전원이 응답했는지. (식별 폼=중복 멤버 제외, 익명=응답 수 기준)"""
+    form = get_form(form_id)
+    if form is None:
+        return False
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            cur.execute("SELECT COUNT(*) AS n FROM room_members WHERE room_id = %s", (form["room_id"],))
+            members = cur.fetchone()["n"]
+            if form["anonymous"]:
+                cur.execute("SELECT COUNT(*) AS n FROM form_responses WHERE form_id = %s", (form_id,))
+            else:
+                cur.execute(
+                    "SELECT COUNT(DISTINCT member_id) AS n FROM form_responses "
+                    "WHERE form_id = %s AND member_id IS NOT NULL",
+                    (form_id,),
+                )
+            responded = cur.fetchone()["n"]
+    return members > 0 and responded >= members
 
 
 # ── 방 조회/나가기 (카카오 통합) ───────────────────────────────────────

@@ -22,6 +22,7 @@ from .config import settings
 from .forms_web import register_form_routes
 from .oauth_server import register_oauth_routes
 from .tools import register_all
+from .triggers import start_scheduler
 
 mcp = FastMCP(
     name="teamplay-talk",
@@ -58,6 +59,7 @@ register_oauth_routes(mcp)
 
 
 def main() -> None:
+    start_scheduler()  # 폼 마감 감지 + 드라이버 nudge (백그라운드)
     mcp.run(transport="http", host=settings.host, port=settings.port)
 
 
