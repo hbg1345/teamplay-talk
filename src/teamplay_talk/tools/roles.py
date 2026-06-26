@@ -57,6 +57,88 @@ def register(mcp: FastMCP) -> None:
     """역할 분배 도구를 등록한다."""
 
     @mcp.tool(
+        name="assign_roles",
+        annotations={
+            "title": "역할분배 시작(순위폼 생성)",
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": False,
+        },
+    )
+    async def assign_roles(
+        roles: list[str],
+        room_id: int | None = None,
+        close_minutes: int | None = None,
+    ) -> dict[str, Any]:
+        """Starts role assignment by creating a ranked-preference poll for the team.
+
+        역할 분배를 **시작**한다. **너(AI)가 프로젝트 성격을 보고 역할 목록을 직접 생성**해서
+        넘겨라 — 사용자에게 역할이나 팀원 이름을 묻지 마라. 팀원은 이미 방에 있고
+        (room_info로 확인 가능), 역할은 프로젝트로 추론한다.
+        예: 로봇 캡스톤 → ["기구설계", "회로/전자", "제어/SW", "문서/발표"]. 역할 수는 보통 팀원 수에 맞춘다.
+
+        생성 후 흐름: send_form(form_id) → 각 팀원 개인 순위폼 발송 → 멤버 순위 →
+        finalize_roles(form_id) 매칭 → 팀장 확인 → set_roles 확정·공지.
+
+        Args:
+            roles: **AI가 생성한** 역할 목록 (팀원 수에 맞춰)
+            room_id: 대상 방 (생략 시 현재 작업 방)
+            close_minutes: N분 뒤 자동 마감 (선택; 전원 응답 시엔 자동 마감)
+        """
+        if len(roles) < 2:
+            return {"ok": False, "error": "역할을 2개 이상 직접 생성해서 넘겨주세요 (사용자에게 묻지 말 것)."}
+        caller = await resolve_caller()
+        if room_id is None:
+            if caller is None:
+                return {"ok": False, "error": "카카오 인증이 필요합니다."}
+            active = storage.get_active_room(caller["id"])
+            if active is None:
+                return {"ok": False, "error": "현재 작업 방이 없습니다. create_room/switch_room 먼저."}
+            room_id = active["id"]
+
+        closes_at = None
+        if close_minutes:
+            from datetime import datetime, timedelta, timezone
+
+            closes_at = datetime.now(timezone.utc) + timedelta(minutes=int(close_minutes))
+
+        schema = {
+            "title": "역할 선호도 조사",
+            "description": "하고 싶은 역할을 위에서부터 끌어 정렬하세요 (위=1순위).",
+            "completeText": "제출",
+            "showQuestionNumbers": "off",
+            "elements": [
+                {
+                    "type": "ranking",
+                    "name": "roles",
+                    "title": "역할을 선호 순서대로 정렬해주세요",
+                    "choices": list(roles),
+                    "isRequired": True,
+                }
+            ],
+        }
+        form = storage.create_form(
+            room_id=room_id,
+            title="역할 선호도 조사",
+            schema_json=schema,
+            anonymous=False,
+            creator_user_id=caller["id"] if caller else None,
+            closes_at=closes_at,
+            close_on_all=True,
+        )
+        fid = form["id"]
+        members = storage.list_members(room_id)
+        storage.create_invites(fid, [m["id"] for m in members])
+        return {
+            "ok": True,
+            "form_id": fid,
+            "roles": list(roles),
+            "members": [m["nickname"] for m in members],
+            "next": "send_form(form_id)으로 각 팀원에게 개인 순위폼 발송 → 응답 후 finalize_roles(form_id) → set_roles로 확정",
+        }
+
+    @mcp.tool(
         name="finalize_roles",
         annotations={
             "title": "역할 매칭(선호 기반)",
