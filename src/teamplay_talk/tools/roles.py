@@ -1,10 +1,13 @@
 """역할 분배 도구 (③ AI 결정형).
 
-AI가 난이도 균형 역할을 생성 → create_poll(rank, anonymous=False)로 선호 순위 폼 →
-send_form으로 각자 배포 → 멤버가 순위 → ``finalize_roles`` 가 선호 최대화 매칭(결정적)
-→ 팀장 확인 → ``set_roles`` 가 기록·공지.
+흐름: assign_roles(AI가 만든 역할+난이도) → 순위폼 → send_form 개인별 →
+멤버 순위 → finalize_roles(전체 역할을 난이도 균형으로 배분) → 팀장 확인 → set_roles.
 
-매칭은 서버에서 결정적으로(매번 동일·정확), 역할 생성·난이도 판단은 AI(클라 LLM)가.
+핵심:
+- **전체집합 커버**: 모든 역할이 누군가에게 배정된다(멤버<역할이면 한 명이 여러 역할).
+- **난이도 균형**: 각 멤버의 난이도 합이 비슷하게 (LPT 그리디).
+- **선호 반영**: 동률일 때 그 역할을 더 선호한 멤버에게.
+- 난이도 점수는 **멤버 폼엔 안 보이고**(균형 배분용), 매칭은 서버에서 결정적으로.
 """
 
 from __future__ import annotations
@@ -18,39 +21,49 @@ from .. import kakao_store, storage
 from ..identity import resolve_caller
 
 
+class Role(BaseModel):
+    """역할 1개 (이름 + 난이도)."""
+
+    name: str = Field(description="역할 이름 (예: 기구설계)")
+    difficulty: int = Field(
+        default=5,
+        ge=1,
+        le=10,
+        description="난이도·업무량 1~10. **멤버에겐 안 보이고** 균형 배분에만 쓰인다. 무거운 역할일수록 크게(기구설계 8, 문서 3 등).",
+    )
+
+
 class RoleAssignment(BaseModel):
-    """역할 배정 1건."""
+    """역할 배정 1건 (set_roles용)."""
 
     nickname: str = Field(description="멤버 닉네임")
-    role: str = Field(description="배정할 역할")
+    role: str = Field(description="배정할 역할(여러 개면 ', '로 연결)")
 
 
-def _greedy_match(roles: list[str], prefs: dict[str, list[str]]) -> dict[str, str]:
-    """선호 최대화 그리디 1:1 매칭. prefs: {멤버: [선호순 역할]}. return {멤버: 역할}.
+def _balanced_assign(
+    roles: list[str], difficulties: dict[str, int], prefs: dict[str, list[str]]
+) -> tuple[dict[str, list[str]], dict[str, int]]:
+    """모든 역할을 멤버에 배분(전체집합 커버) + 난이도 합 균형 + 선호 반영.
 
-    전역 최고 선호(1순위)부터 채우고, 남은 멤버↔남은 역할을 이어붙여 전원 배정.
+    무거운 역할부터(LPT) 가장 덜 일한 멤버에게 — 동률이면 그 역할을 더 선호한 멤버에게.
+    return: ({멤버: [역할들]}, {멤버: 난이도합}). 멤버<역할이면 한 명이 여러 역할.
     """
-    candidates: list[tuple[int, str, str]] = []
-    for member, ranking in prefs.items():
-        for idx, role in enumerate(ranking):
-            if role in roles:
-                candidates.append((idx, member, role))
-    candidates.sort(key=lambda x: x[0])  # 1순위(idx 작은) 먼저
+    members = list(prefs.keys())
+    loads = {m: 0 for m in members}
+    assigned: dict[str, list[str]] = {m: [] for m in members}
 
-    matched: dict[str, str] = {}
-    used: set[str] = set()
-    for _idx, member, role in candidates:
-        if member in matched or role in used:
-            continue
-        matched[member] = role
-        used.add(role)
+    def pref_rank(member: str, role: str) -> int:
+        try:
+            return prefs[member].index(role)
+        except ValueError:
+            return len(roles)  # 선호 안 한 역할은 최하 순위
 
-    # 남은 멤버 ↔ 남은 역할 채우기 (선호 다 소진된 경우)
-    rem_members = [m for m in prefs if m not in matched]
-    rem_roles = [r for r in roles if r not in used]
-    for member, role in zip(rem_members, rem_roles):
-        matched[member] = role
-    return matched
+    for role in sorted(roles, key=lambda r: -difficulties.get(r, 5)):
+        d = difficulties.get(role, 5)
+        best = min(members, key=lambda m: (loads[m] + d, pref_rank(m, role)))
+        assigned[best].append(role)
+        loads[best] += d
+    return assigned, loads
 
 
 def register(mcp: FastMCP) -> None:
@@ -67,29 +80,32 @@ def register(mcp: FastMCP) -> None:
         },
     )
     async def assign_roles(
-        roles: list[str],
+        roles: list[Role],
         room_id: int | None = None,
-        close_minutes: int | None = None,
+        close_minutes: int | None = 1440,
     ) -> dict[str, Any]:
         """Starts role assignment by creating a ranked-preference poll for the team.
 
-        역할 분배를 **시작**한다. **너(AI)가 프로젝트 성격을 보고 역할 목록을 직접 생성**해서
-        넘겨라 — 사용자에게 역할이나 팀원 이름을 묻지 마라. 팀원은 이미 방에 있고
-        (room_info로 확인 가능), 역할은 프로젝트로 추론한다.
-        예: 로봇 캡스톤 → ["기구설계", "회로/전자", "제어/SW", "문서/발표"]. 역할 수는 보통 팀원 수에 맞춘다.
+        역할 분배를 **시작**한다. **너(AI)가 프로젝트를 보고 역할 목록과 각 난이도를 직접
+        생성**해서 넘겨라 — 사용자에게 역할·이름을 묻지 마라(팀원은 방에 있고 room_info로
+        확인). 예: 로봇 캡스톤 → [{"name":"기구설계","difficulty":8}, {"name":"회로/전자",
+        "difficulty":7}, {"name":"제어/SW","difficulty":8}, {"name":"문서/발표","difficulty":3}].
+
+        난이도(difficulty)는 **멤버에겐 안 보이고**, 일을 공평하게 나누는 균형 배분에만 쓰인다.
+        역할 수는 팀원 수와 달라도 됨 — finalize_roles가 **모든 역할을 멤버에 골고루 채운다**
+        (멤버가 적으면 한 명이 여러 역할). close_minutes 기본 1일, 전원 응답 시 자동 마감.
 
         생성 후 흐름: **(1) 역할 목록을 팀장에게 보여주고 '이대로?' 확인받기** →
-        send_form(form_id) → 각 팀원 순위폼 → 멤버 순위 → finalize_roles 매칭 →
-        **(2) 매칭 결과를 팀장에게 확인받기** → set_roles 확정·공지.
-        ※ (1)(2) 확인 없이 send_form/set_roles 하지 말 것.
+        send_form(form_id) → 멤버 순위 → finalize_roles 매칭 → **(2) 결과 팀장 확인** →
+        set_roles. ※ (1)(2) 확인 없이 send_form/set_roles 하지 말 것.
 
         Args:
-            roles: **AI가 생성한** 역할 목록 (팀원 수에 맞춰)
+            roles: **AI가 생성한** 역할+난이도 목록
             room_id: 대상 방 (생략 시 현재 작업 방)
-            close_minutes: N분 뒤 자동 마감 (선택; 전원 응답 시엔 자동 마감)
+            close_minutes: 마감까지 분 (기본 1440=1일; 전원 응답 시엔 더 일찍 자동 마감)
         """
         if len(roles) < 2:
-            return {"ok": False, "error": "역할을 2개 이상 직접 생성해서 넘겨주세요 (사용자에게 묻지 말 것)."}
+            return {"ok": False, "error": "역할을 2개 이상 직접 생성해서 넘겨주세요(사용자에게 묻지 말 것)."}
         caller = await resolve_caller()
         if room_id is None:
             if caller is None:
@@ -99,6 +115,9 @@ def register(mcp: FastMCP) -> None:
                 return {"ok": False, "error": "현재 작업 방이 없습니다. create_room/switch_room 먼저."}
             room_id = active["id"]
 
+        names = [r.name for r in roles]
+        difficulties = {r.name: r.difficulty for r in roles}
+
         closes_at = None
         if close_minutes:
             from datetime import datetime, timedelta, timezone
@@ -107,7 +126,7 @@ def register(mcp: FastMCP) -> None:
 
         schema = {
             "title": "역할 선호도 조사",
-            "description": "하고 싶은 역할을 위에서부터 끌어 정렬하세요 (위=1순위).",
+            "description": "하고 싶은 역할을 위에서부터 끌어 **전부 정렬**해주세요 (위=1순위).",
             "completeText": "제출",
             "showQuestionNumbers": "off",
             "elements": [
@@ -115,10 +134,11 @@ def register(mcp: FastMCP) -> None:
                     "type": "ranking",
                     "name": "roles",
                     "title": "역할을 선호 순서대로 정렬해주세요",
-                    "choices": list(roles),
+                    "choices": names,
                     "isRequired": True,
                 }
             ],
+            "_role_difficulty": difficulties,  # 멤버 폼엔 안 보임(SurveyJS 무시), finalize가 읽음
         }
         form = storage.create_form(
             room_id=room_id,
@@ -135,20 +155,20 @@ def register(mcp: FastMCP) -> None:
         return {
             "ok": True,
             "form_id": fid,
-            "roles": list(roles),
+            "roles": [{"name": r.name, "difficulty": r.difficulty} for r in roles],
             "members": [m["nickname"] for m in members],
+            "closes_in_minutes": close_minutes,
             "action_required": (
                 "⚠️ 아직 보내지 마세요. 위 역할 목록을 사용자(팀장)에게 보여주고 "
-                "'이대로 팀원들에게 보낼까요? 바꿀 역할 있나요?'라고 물어 **명시적 확인**을 "
-                "받으세요. 사용자가 동의한 뒤에만 send_form(form_id)을 호출하세요. "
-                "확인 없이 send_form 하지 마세요."
+                "'이대로 팀원들에게 보낼까요? 바꿀 역할/난이도 있나요?'라고 물어 **명시적 "
+                "확인**을 받으세요. 동의한 뒤에만 send_form(form_id)을 호출하세요."
             ),
         }
 
     @mcp.tool(
         name="finalize_roles",
         annotations={
-            "title": "역할 매칭(선호 기반)",
+            "title": "역할 매칭(전체 배분·난이도 균형)",
             "readOnlyHint": True,
             "destructiveHint": False,
             "idempotentHint": True,
@@ -156,14 +176,14 @@ def register(mcp: FastMCP) -> None:
         },
     )
     def finalize_roles(form_id: int) -> dict[str, Any]:
-        """Computes a preference-maximizing role assignment from a teamplay-talk(팀플톡) ranking poll.
+        """Computes a balanced, full-coverage role assignment from a teamplay-talk(팀플톡) ranking poll.
 
-        역할 선호 순위 폼(create_poll에서 type=rank, anonymous=False로 만든 것)의 응답을
-        읽어, 선호를 최대화하는 역할 배정을 **계산만** 한다(아직 기록·발송 X). 결과를
-        팀장에게 보여주고, 확정은 set_roles로 한다.
+        역할 순위 폼의 응답을 읽어 **모든 역할을 멤버에 배분**(전체집합 커버)하되 **난이도
+        합을 균형**있게, **선호를 반영**해 계산한다(아직 기록·발송 X). 멤버가 역할보다 적으면
+        한 명이 여러 역할을 받는다. 결과를 팀장에게 보여주고 set_roles로 확정한다.
 
         Args:
-            form_id: 순위 선호 폼의 ID
+            form_id: 순위 선호 폼의 ID (assign_roles가 만든 것)
         """
         form = storage.get_form(form_id)
         if form is None:
@@ -175,41 +195,42 @@ def register(mcp: FastMCP) -> None:
         if rank_el is None:
             return {"ok": False, "error": "순위(rank) 질문이 있는 폼이 아닙니다."}
         roles = list(rank_el.get("choices", []))
+        difficulties = {str(k): int(v) for k, v in (schema.get("_role_difficulty") or {}).items()}
         qname = rank_el.get("name")
 
         results = storage.get_results(form_id)
         responses = (results or {}).get("responses", [])
-        if not responses:
-            return {
-                "ok": False,
-                "error": "식별 폼 응답이 없습니다. (anonymous=False로 만들고 멤버가 응답해야 매칭 가능)",
-            }
-
         prefs: dict[str, list[str]] = {}
         for r in responses:
             ranking = (r.get("answers") or {}).get(qname)
             key = r.get("nickname") or f"user{r.get('member_id')}"
             if isinstance(ranking, list) and ranking:
                 prefs[key] = [str(x) for x in ranking]
-
         if not prefs:
-            return {"ok": False, "error": "유효한 순위 응답이 없습니다."}
+            return {
+                "ok": False,
+                "error": "응답이 없습니다. (anonymous=False로 만들고 멤버가 순위를 제출해야 매칭 가능)",
+            }
 
-        matched = _greedy_match(roles, prefs)
-        assignments = []
-        for member, role in matched.items():
-            ranked = prefs.get(member, [])
-            rank_got = ranked.index(role) + 1 if role in ranked else None
-            assignments.append(
-                {"nickname": member, "role": role, "preference_rank": rank_got}
-            )
+        assigned, loads = _balanced_assign(roles, difficulties, prefs)
+        assignments = [
+            {
+                "nickname": m,
+                "roles": assigned[m],
+                "role": ", ".join(assigned[m]),
+                "workload": loads[m],
+            }
+            for m in prefs
+        ]
+        covered = {r for rs in assigned.values() for r in rs}
         return {
             "ok": True,
             "assignments": assignments,
-            "unresponded": [n for n in roles if n],  # 정보용: 역할 목록
+            "all_roles_covered": set(roles) <= covered,
+            "uncovered_roles": [r for r in roles if r not in covered],
             "note": (
-                "선호 최대화 그리디 매칭. preference_rank=받은 역할이 본인 몇 순위(낮을수록 좋음, "
-                "None=선호 외 채움). 확정·공지는 set_roles 로."
+                "모든 역할을 난이도 균형으로 배분(workload=각자 난이도 합, 비슷할수록 공평). "
+                "role(또는 roles)을 set_roles에 넘겨 확정·공지."
             ),
         }
 
@@ -231,10 +252,10 @@ def register(mcp: FastMCP) -> None:
         """Records role assignments and announces them to the teamplay-talk(팀플톡) team.
 
         역할 배정을 멤버에 **기록**하고 팀 전원에게 카카오로 **공지**한다. finalize_roles
-        결과를 팀장이 확인·조정한 뒤 이걸로 확정한다.
+        결과를 팀장이 확인·조정한 뒤 이걸로 확정한다. (확인 없이 호출하지 말 것)
 
         Args:
-            assignments: [{"nickname": 멤버, "role": 역할}] 목록
+            assignments: [{"nickname": 멤버, "role": "역할(여러개면 ', '로 연결)"}]
             room_id: 대상 방 (생략 시 현재 작업 방)
             message: 공지 문구 (생략 시 기본 형식)
         """
