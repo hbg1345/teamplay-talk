@@ -86,10 +86,16 @@ def register(mcp: FastMCP) -> None:
     ) -> dict[str, Any]:
         """Starts role assignment by creating a ranked-preference poll for the team.
 
-        역할 분배를 **시작**한다. **너(AI)가 프로젝트를 보고 역할 목록과 각 난이도를 직접
-        생성**해서 넘겨라 — 사용자에게 역할·이름을 묻지 마라(팀원은 방에 있고 room_info로
-        확인). 예: 로봇 캡스톤 → [{"name":"기구설계","difficulty":8}, {"name":"회로/전자",
-        "difficulty":7}, {"name":"제어/SW","difficulty":8}, {"name":"문서/발표","difficulty":3}].
+        역할 분배 **시작**. **너(AI)가 PM처럼 과제를 분해해 역할+난이도를 직접 생성**해서
+        넘겨라 (사용자에게 역할·팀원 이름 묻지 마 — 팀원은 room_info로 확인).
+
+        역할 생성 = **PM 분해 4단계**:
+        ① 산출물 파악 — 과제가 최종적으로 내야 할 결과물 (로봇캡스톤 → 동작하는 로봇·보고서·발표)
+        ② 작업영역 분해 — 그 산출물을 만드는 데 필요한 작업 영역들 (기구·회로·제어SW·통합테스트·문서)
+        ③ 역할화 — 영역을 역할로 묶되 **역할 수 ≈ 팀원 수**(관련 영역끼리 합쳐 과부하/과소 방지)
+        ④ 난이도 — 역할별 업무량·난이도 1~10 (범위 넓고 어려울수록 높게)
+        예: 로봇캡스톤 4명 → [{"name":"기구설계","difficulty":8},{"name":"회로/전자","difficulty":7},
+        {"name":"제어/SW","difficulty":8},{"name":"문서/발표","difficulty":3}]
 
         난이도(difficulty)는 **멤버에겐 안 보이고**, 일을 공평하게 나누는 균형 배분에만 쓰인다.
         역할 수는 팀원 수와 달라도 됨 — finalize_roles가 **모든 역할을 멤버에 골고루 채운다**
@@ -136,7 +142,13 @@ def register(mcp: FastMCP) -> None:
                     "title": "역할을 선호 순서대로 정렬해주세요",
                     "choices": names,
                     "isRequired": True,
-                }
+                },
+                {
+                    "type": "comment",
+                    "name": "notes",
+                    "title": "꼭 하고 싶은 / 절대 못 하는 역할, 참고사항이 있으면 적어주세요 (선택)",
+                    "isRequired": False,
+                },
             ],
             "_role_difficulty": difficulties,  # 멤버 폼엔 안 보임(SurveyJS 무시), finalize가 읽음
         }
@@ -201,11 +213,15 @@ def register(mcp: FastMCP) -> None:
         results = storage.get_results(form_id)
         responses = (results or {}).get("responses", [])
         prefs: dict[str, list[str]] = {}
+        notes: dict[str, str] = {}
         for r in responses:
-            ranking = (r.get("answers") or {}).get(qname)
+            ans = r.get("answers") or {}
             key = r.get("nickname") or f"user{r.get('member_id')}"
+            ranking = ans.get(qname)
             if isinstance(ranking, list) and ranking:
                 prefs[key] = [str(x) for x in ranking]
+            if ans.get("notes"):
+                notes[key] = str(ans["notes"]).strip()
         if not prefs:
             return {
                 "ok": False,
@@ -219,6 +235,7 @@ def register(mcp: FastMCP) -> None:
                 "roles": assigned[m],
                 "role": ", ".join(assigned[m]),
                 "workload": loads[m],
+                "note": notes.get(m, ""),  # 멤버 자유기입(제약/사정) — 리더가 확정 전에 볼 것
             }
             for m in prefs
         ]
@@ -228,9 +245,11 @@ def register(mcp: FastMCP) -> None:
             "assignments": assignments,
             "all_roles_covered": set(roles) <= covered,
             "uncovered_roles": [r for r in roles if r not in covered],
+            "member_notes": {m: notes[m] for m in notes},
             "note": (
-                "모든 역할을 난이도 균형으로 배분(workload=각자 난이도 합, 비슷할수록 공평). "
-                "role(또는 roles)을 set_roles에 넘겨 확정·공지."
+                "모든 역할을 난이도 균형 배분(workload=난이도 합, 비슷할수록 공평) + 선호 반영. "
+                "⚠️ **각 멤버의 note(자유기입: 못 하는 역할·사정)를 반드시 팀장에게 보여주고**, "
+                "필요하면 조정한 뒤 set_roles로 확정. AI 단독 확정 X — 팀장이 note 보고 최종 판단."
             ),
         }
 
