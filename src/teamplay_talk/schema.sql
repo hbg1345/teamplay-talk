@@ -98,3 +98,24 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS active_room_id BIGINT REFERENCES room
 -- 원문은 저장하지 않고 sha256 해시만 저장(DB 유출 시에도 토큰 악용 불가).
 ALTER TABLE users ADD COLUMN IF NOT EXISTS token_hash TEXT;
 CREATE INDEX IF NOT EXISTS idx_users_token_hash ON users (token_hash);
+
+-- ── 폼 엔진 v2 (SurveyJS JSON 모델 + 매직링크 + 트리거) ───────────────────
+-- 폼 정의를 SurveyJS JSON으로 통째 저장(질문타입 무제한). 응답도 결과 객체 JSON.
+ALTER TABLE forms ADD COLUMN IF NOT EXISTS schema_json     JSONB;          -- SurveyJS 폼 정의
+ALTER TABLE forms ADD COLUMN IF NOT EXISTS creator_user_id BIGINT REFERENCES users (id) ON DELETE SET NULL;  -- 드라이버(nudge 대상)
+ALTER TABLE forms ADD COLUMN IF NOT EXISTS closes_at       TIMESTAMPTZ;    -- 마감 시각(트리거)
+ALTER TABLE forms ADD COLUMN IF NOT EXISTS close_on_all    BOOLEAN NOT NULL DEFAULT FALSE;  -- 전원 응답 시 자동 마감
+ALTER TABLE forms ADD COLUMN IF NOT EXISTS nudge_sent      BOOLEAN NOT NULL DEFAULT FALSE;  -- 드라이버 "확인하세요" 1회 발송
+
+ALTER TABLE form_responses ADD COLUMN IF NOT EXISTS member_id    BIGINT REFERENCES users (id) ON DELETE SET NULL;  -- identified면 누구
+ALTER TABLE form_responses ADD COLUMN IF NOT EXISTS answers_json JSONB;    -- SurveyJS 결과 {q1:..., q2:[...]}
+
+-- 매직링크: 멤버별 고유 토큰 → 로그인 없이 신원 식별
+CREATE TABLE IF NOT EXISTS form_invites (
+    form_id   BIGINT NOT NULL REFERENCES forms (id) ON DELETE CASCADE,
+    member_id BIGINT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    token     TEXT NOT NULL UNIQUE,
+    PRIMARY KEY (form_id, member_id)
+);
+CREATE INDEX IF NOT EXISTS idx_form_invites_token ON form_invites (token);
+CREATE INDEX IF NOT EXISTS idx_form_responses_member ON form_responses (form_id, member_id);

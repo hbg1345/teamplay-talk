@@ -124,135 +124,167 @@ def list_members(room_id: int) -> list[dict[str, Any]]:
 def create_form(
     room_id: int,
     title: str,
-    questions: list[dict[str, Any]],
+    schema_json: dict[str, Any],
+    *,
     description: str | None = None,
     anonymous: bool = True,
+    creator_user_id: int | None = None,
+    closes_at: Any | None = None,
+    close_on_all: bool = False,
 ) -> dict[str, Any]:
-    """폼과 질문들을 생성한다. (단일 트랜잭션)
-
-    questions: ``[{"text": str, "qtype": "text"|"single"|"multi", "options": [str]}]``
-    Returns: ``{"form": <forms row>, "questions": [<form_questions rows>]}``
-    """
+    """폼(SurveyJS JSON 정의)을 생성하고 forms 행을 반환한다."""
     from psycopg.types.json import Json
 
     with conn() as c:
         with c.cursor(row_factory=dict_row) as cur:
             cur.execute(
-                "INSERT INTO forms (room_id, title, description, anonymous) "
-                "VALUES (%s, %s, %s, %s) RETURNING *",
-                (room_id, title, description, anonymous),
+                "INSERT INTO forms (room_id, title, description, anonymous, "
+                "schema_json, creator_user_id, closes_at, close_on_all) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING *",
+                (room_id, title, description, anonymous, Json(schema_json),
+                 creator_user_id, closes_at, close_on_all),
             )
             form = cur.fetchone()
-
-            created_questions = []
-            for pos, q in enumerate(questions):
-                opts = q.get("options") or None
-                cur.execute(
-                    "INSERT INTO form_questions (form_id, position, text, qtype, options) "
-                    "VALUES (%s, %s, %s, %s, %s) RETURNING *",
-                    (
-                        form["id"],
-                        pos,
-                        q["text"],
-                        q.get("qtype", "single"),
-                        Json(opts) if opts is not None else None,
-                    ),
-                )
-                created_questions.append(cur.fetchone())
         c.commit()
-    return {"form": form, "questions": created_questions}
+    return form
 
 
 def get_form(form_id: int) -> dict[str, Any] | None:
-    """폼 + 질문 목록을 반환한다. (폼 렌더링용)"""
+    """폼 단건 조회 (schema_json 포함)."""
     with conn() as c:
         with c.cursor(row_factory=dict_row) as cur:
             cur.execute("SELECT * FROM forms WHERE id = %s", (form_id,))
-            form = cur.fetchone()
-            if form is None:
-                return None
-            cur.execute(
-                "SELECT * FROM form_questions WHERE form_id = %s ORDER BY position",
-                (form_id,),
-            )
-            questions = cur.fetchall()
-    return {"form": form, "questions": questions}
+            return cur.fetchone()
 
 
 def save_response(
     form_id: int,
-    answers: list[dict[str, Any]],
+    answers_json: dict[str, Any],
+    *,
+    member_id: int | None = None,
     respondent: str | None = None,
 ) -> int:
-    """응답 1건을 저장한다.
+    """응답 1건(SurveyJS 결과 객체)을 저장한다. Returns response_id."""
+    from psycopg.types.json import Json
 
-    answers: ``[{"question_id": int, "value": str}]`` (복수선택은 같은 question_id로 여러 개)
-    Returns: 생성된 response_id
-    """
     with conn() as c:
         with c.cursor(row_factory=dict_row) as cur:
             cur.execute(
-                "INSERT INTO form_responses (form_id, respondent) VALUES (%s, %s) RETURNING id",
-                (form_id, respondent),
+                "INSERT INTO form_responses (form_id, respondent, member_id, answers_json) "
+                "VALUES (%s, %s, %s, %s) RETURNING id",
+                (form_id, respondent, member_id, Json(answers_json)),
             )
             response_id = cur.fetchone()["id"]
-            for a in answers:
-                cur.execute(
-                    "INSERT INTO form_answers (response_id, question_id, value) "
-                    "VALUES (%s, %s, %s)",
-                    (response_id, a["question_id"], a["value"]),
-                )
         c.commit()
     return response_id
 
 
 def get_results(form_id: int) -> dict[str, Any] | None:
-    """폼 응답을 질문별로 집계한다.
+    """폼 응답을 SurveyJS element별로 집계한다.
 
-    객관식: 선택지별 카운트 / 주관식: 답변 텍스트 목록.
+    radiogroup/dropdown=선택지 카운트, checkbox=복수 카운트, ranking=순위점수(1위 높음),
+    rating=평균, text/comment=답변 목록. identified 폼이면 멤버별 raw 응답도 포함(매칭용).
     """
-    data = get_form(form_id)
-    if data is None:
+    form = get_form(form_id)
+    if form is None:
         return None
-    form, questions = data["form"], data["questions"]
+    schema = form.get("schema_json") or {}
+    elements = schema.get("elements", [])
 
     with conn() as c:
         with c.cursor(row_factory=dict_row) as cur:
             cur.execute(
-                "SELECT COUNT(*) AS n FROM form_responses WHERE form_id = %s",
+                "SELECT fr.answers_json, fr.member_id, fr.respondent, u.nickname "
+                "FROM form_responses fr LEFT JOIN users u ON u.id = fr.member_id "
+                "WHERE fr.form_id = %s ORDER BY fr.id",
                 (form_id,),
             )
-            total = cur.fetchone()["n"]
+            rows = cur.fetchall()
 
-            results = []
-            for q in questions:
-                if q["qtype"] == "text":
-                    cur.execute(
-                        "SELECT fa.value FROM form_answers fa "
-                        "WHERE fa.question_id = %s ORDER BY fa.id",
-                        (q["id"],),
-                    )
-                    answers = [r["value"] for r in cur.fetchall()]
-                    results.append(
-                        {"question": q["text"], "qtype": q["qtype"], "answers": answers}
-                    )
-                else:
-                    cur.execute(
-                        "SELECT fa.value, COUNT(*) AS n FROM form_answers fa "
-                        "WHERE fa.question_id = %s GROUP BY fa.value ORDER BY n DESC",
-                        (q["id"],),
-                    )
-                    counts = {r["value"]: r["n"] for r in cur.fetchall()}
-                    results.append(
-                        {"question": q["text"], "qtype": q["qtype"], "counts": counts}
-                    )
+    responses = [r["answers_json"] or {} for r in rows]
+    results = []
+    for el in elements:
+        name = el.get("name")
+        qtype = el.get("type")
+        title = el.get("title") or name
+        vals = [r.get(name) for r in responses if r.get(name) is not None]
+        if qtype in ("radiogroup", "dropdown", "boolean"):
+            counts: dict[str, int] = {}
+            for v in vals:
+                counts[str(v)] = counts.get(str(v), 0) + 1
+            results.append({"question": title, "type": qtype, "counts": counts})
+        elif qtype == "checkbox":
+            counts = {}
+            for v in vals:
+                for item in v if isinstance(v, list) else [v]:
+                    counts[str(item)] = counts.get(str(item), 0) + 1
+            results.append({"question": title, "type": qtype, "counts": counts})
+        elif qtype == "ranking":
+            scores: dict[str, int] = {str(ch): 0 for ch in el.get("choices", [])}
+            for v in vals:
+                if isinstance(v, list):
+                    n = len(v)
+                    for i, item in enumerate(v):
+                        scores[str(item)] = scores.get(str(item), 0) + (n - i)
+            results.append({"question": title, "type": qtype, "ranking_scores": scores})
+        elif qtype == "rating":
+            nums = [float(v) for v in vals if isinstance(v, (int, float))]
+            results.append({
+                "question": title, "type": qtype,
+                "average": (sum(nums) / len(nums)) if nums else None,
+                "values": nums,
+            })
+        else:  # text / comment
+            results.append({"question": title, "type": qtype, "answers": [str(v) for v in vals]})
 
-    return {
+    out: dict[str, Any] = {
         "form_id": form["id"],
         "title": form["title"],
-        "total_responses": total,
+        "closed": form["closed"],
+        "total_responses": len(rows),
         "results": results,
     }
+    if not form["anonymous"]:
+        out["responses"] = [
+            {"member_id": r["member_id"], "nickname": r["nickname"], "answers": r["answers_json"] or {}}
+            for r in rows
+        ]
+    return out
+
+
+def create_invites(form_id: int, member_ids: list[int]) -> dict[int, str]:
+    """멤버별 매직링크 토큰을 생성/갱신하고 {member_id: token} 반환."""
+    import secrets
+
+    out: dict[int, str] = {}
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            for mid in member_ids:
+                cur.execute(
+                    "INSERT INTO form_invites (form_id, member_id, token) VALUES (%s, %s, %s) "
+                    "ON CONFLICT (form_id, member_id) DO UPDATE SET token = EXCLUDED.token "
+                    "RETURNING token",
+                    (form_id, mid, secrets.token_urlsafe(12)),
+                )
+                out[mid] = cur.fetchone()["token"]
+        c.commit()
+    return out
+
+
+def get_invite(token: str) -> dict[str, Any] | None:
+    """매직링크 토큰 → {form_id, member_id}."""
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            cur.execute("SELECT form_id, member_id FROM form_invites WHERE token = %s", (token,))
+            return cur.fetchone()
+
+
+def close_form(form_id: int) -> None:
+    """폼을 마감한다."""
+    with conn() as c:
+        with c.cursor() as cur:
+            cur.execute("UPDATE forms SET closed = true WHERE id = %s", (form_id,))
+        c.commit()
 
 
 # ── 방 조회/나가기 (카카오 통합) ───────────────────────────────────────

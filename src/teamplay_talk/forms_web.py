@@ -1,73 +1,53 @@
-"""네이티브 폼 웹 페이지.
+"""네이티브 폼 웹 페이지 (SurveyJS 렌더).
 
-``create_poll`` 도구로 만든 폼을 누구나 브라우저로 응답할 수 있도록
-``GET/POST /form/<id>`` 를 제공한다. 응답은 Postgres(form_responses/answers)에
-저장된다.
+create_poll이 만든 SurveyJS JSON 폼을 누구나 브라우저로 응답한다.
+- 익명 폼: 공유 링크 1개 (``/form/<id>``)
+- identified 폼: 멤버별 매직링크 (``/form/<id>?t=<token>``) → 로그인 없이 신원 식별
+
+응답(SurveyJS 결과 객체)은 Postgres(``form_responses.answers_json``)에 저장된다.
+폼이 모두의 입력/출력 통로 — 팀원은 AI·앱·로그인 없이 카톡 링크 클릭만 하면 된다.
 """
 
 from __future__ import annotations
 
 import html
-from typing import Any
+import json as jsonlib
 
 from starlette.requests import Request
-from starlette.responses import HTMLResponse
+from starlette.responses import HTMLResponse, JSONResponse
 
 from . import storage
 
 _PAGE = """<!doctype html>
 <html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{title}</title>
+<title>__TITLE__</title>
+<link href="https://unpkg.com/survey-core@1/survey-core.min.css" rel="stylesheet">
+<script src="https://unpkg.com/survey-core@1/survey.core.min.js"></script>
+<script src="https://unpkg.com/survey-js-ui@1/survey-js-ui.min.js"></script>
 <style>
- body{{font-family:system-ui,-apple-system,sans-serif;max-width:640px;margin:2rem auto;padding:0 1rem;color:#222}}
- .card{{border:1px solid #e3e3e3;border-radius:12px;padding:1.2rem 1.4rem;margin-bottom:1rem}}
- h1{{font-size:1.4rem}} .q{{font-weight:600;margin:.2rem 0 .6rem}}
- label{{display:block;padding:.3rem 0}} input[type=text]{{width:100%;padding:.5rem;border:1px solid #ccc;border-radius:8px}}
- button{{background:#2c5cff;color:#fff;border:0;border-radius:10px;padding:.7rem 1.4rem;font-size:1rem;cursor:pointer}}
- .desc{{color:#666}}
+ body{font-family:system-ui,-apple-system,sans-serif;max-width:680px;margin:1.5rem auto;padding:0 1rem}
+ #done{text-align:center;padding:3rem 1rem}
 </style></head><body>
-<h1>{title}</h1>
-{desc}
-<form method="post">
-{name_field}
-{questions}
-<button type="submit">제출</button>
-</form>
+<div id="surveyContainer"></div>
+<div id="done" style="display:none"><h2>응답 완료 ✅</h2><p>제출해 주셔서 감사합니다!</p></div>
+<script>
+  const surveyJson = __SCHEMA__;
+  const survey = new Survey.Model(surveyJson);
+  survey.completeText = "제출";
+  survey.onComplete.add(function(sender) {
+    fetch(window.location.pathname + window.location.search, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(sender.data)
+    }).then(function() {
+      document.getElementById("surveyContainer").style.display = "none";
+      document.getElementById("done").style.display = "block";
+    });
+  });
+  survey.render("surveyContainer");
+</script>
 </body></html>"""
-
-
-def _render_question(q: dict[str, Any]) -> str:
-    qid = q["id"]
-    text = html.escape(q["text"])
-    field = f"q_{qid}"
-    if q["qtype"] == "text":
-        body = f'<input type="text" name="{field}" />'
-    else:
-        input_type = "checkbox" if q["qtype"] == "multi" else "radio"
-        opts = q.get("options") or []
-        body = "".join(
-            f'<label><input type="{input_type}" name="{field}" '
-            f'value="{html.escape(str(o))}" /> {html.escape(str(o))}</label>'
-            for o in opts
-        )
-    return f'<div class="card"><div class="q">{text}</div>{body}</div>'
-
-
-def _render_form(form: dict[str, Any], questions: list[dict[str, Any]]) -> str:
-    desc = f'<p class="desc">{html.escape(form["description"])}</p>' if form.get("description") else ""
-    name_field = ""
-    if not form["anonymous"]:
-        name_field = (
-            '<div class="card"><div class="q">이름</div>'
-            '<input type="text" name="respondent" /></div>'
-        )
-    return _PAGE.format(
-        title=html.escape(form["title"]),
-        desc=desc,
-        name_field=name_field,
-        questions="".join(_render_question(q) for q in questions),
-    )
 
 
 def _message(title: str, msg: str, status: int = 200) -> HTMLResponse:
@@ -81,56 +61,62 @@ def _message(title: str, msg: str, status: int = 200) -> HTMLResponse:
     return HTMLResponse(page, status_code=status)
 
 
+def _resolve(request: Request) -> tuple[int | None, int | None]:
+    """경로/쿼리에서 form_id + (매직링크면) member_id 를 해석한다."""
+    try:
+        form_id = int(request.path_params["form_id"])
+    except (ValueError, KeyError):
+        return None, None
+    member_id = None
+    token = request.query_params.get("t")
+    if token:
+        inv = storage.get_invite(token)
+        if inv and inv["form_id"] == form_id:
+            member_id = inv["member_id"]
+    return form_id, member_id
+
+
 async def view_form(request: Request) -> HTMLResponse:
-    """GET /form/<id> — 폼 페이지 렌더링."""
-    try:
-        form_id = int(request.path_params["form_id"])
-    except (ValueError, KeyError):
+    """GET /form/<id>[?t=token] — SurveyJS 폼 렌더링."""
+    form_id, _member = _resolve(request)
+    if form_id is None:
         return _message("잘못된 요청", "폼 ID가 올바르지 않습니다.", 400)
-
-    data = storage.get_form(form_id)
-    if data is None:
+    form = storage.get_form(form_id)
+    if form is None:
         return _message("폼을 찾을 수 없음", "존재하지 않는 폼입니다.", 404)
-    if data["form"]["closed"]:
-        return _message("마감된 폼", "이 폼은 응답이 마감되었습니다.", 403)
-    return HTMLResponse(_render_form(data["form"], data["questions"]))
-
-
-async def submit_form(request: Request) -> HTMLResponse:
-    """POST /form/<id> — 응답 저장."""
-    try:
-        form_id = int(request.path_params["form_id"])
-    except (ValueError, KeyError):
-        return _message("잘못된 요청", "폼 ID가 올바르지 않습니다.", 400)
-
-    data = storage.get_form(form_id)
-    if data is None:
-        return _message("폼을 찾을 수 없음", "존재하지 않는 폼입니다.", 404)
-    if data["form"]["closed"]:
+    if form["closed"]:
         return _message("마감된 폼", "이 폼은 응답이 마감되었습니다.", 403)
 
-    formdata = await request.form()
-    answers: list[dict[str, Any]] = []
-    for q in data["questions"]:
-        field = f"q_{q['id']}"
-        if q["qtype"] == "multi":
-            values = formdata.getlist(field)
-        else:
-            v = formdata.get(field)
-            values = [v] if v else []
-        for value in values:
-            if value:
-                answers.append({"question_id": q["id"], "value": str(value)})
-
-    respondent = None
-    if not data["form"]["anonymous"]:
-        respondent = (formdata.get("respondent") or "").strip() or None
-
-    storage.save_response(form_id, answers, respondent=respondent)
-    return _message("응답 완료 ✅", "제출해 주셔서 감사합니다!")
+    schema = form.get("schema_json") or {"elements": []}
+    schema_str = jsonlib.dumps(schema, ensure_ascii=False).replace("</", "<\\/")
+    page = _PAGE.replace("__TITLE__", html.escape(str(form["title"]))).replace("__SCHEMA__", schema_str)
+    return HTMLResponse(page)
 
 
-def register_form_routes(mcp: Any) -> None:
+async def submit_form(request: Request) -> JSONResponse:
+    """POST /form/<id>[?t=token] — SurveyJS 결과(JSON) 저장."""
+    form_id, member_id = _resolve(request)
+    if form_id is None:
+        return JSONResponse({"ok": False, "error": "bad form id"}, status_code=400)
+    form = storage.get_form(form_id)
+    if form is None:
+        return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
+    if form["closed"]:
+        return JSONResponse({"ok": False, "error": "closed"}, status_code=403)
+
+    try:
+        answers = await request.json()
+    except Exception:
+        answers = {}
+    if not isinstance(answers, dict):
+        answers = {}
+
+    storage.save_response(form_id, answers, member_id=member_id)
+    # (Phase4) close_on_all 체크 → 마감 + 드라이버 nudge 는 스케줄러 단계에서 추가
+    return JSONResponse({"ok": True})
+
+
+def register_form_routes(mcp) -> None:
     """폼 웹 라우트를 MCP 서버(Starlette)에 등록한다."""
     mcp.custom_route("/form/{form_id}", methods=["GET"])(view_form)
     mcp.custom_route("/form/{form_id}", methods=["POST"])(submit_form)
