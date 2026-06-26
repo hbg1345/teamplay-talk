@@ -78,8 +78,10 @@ def register(mcp: FastMCP) -> None:
         (room_info로 확인 가능), 역할은 프로젝트로 추론한다.
         예: 로봇 캡스톤 → ["기구설계", "회로/전자", "제어/SW", "문서/발표"]. 역할 수는 보통 팀원 수에 맞춘다.
 
-        생성 후 흐름: send_form(form_id) → 각 팀원 개인 순위폼 발송 → 멤버 순위 →
-        finalize_roles(form_id) 매칭 → 팀장 확인 → set_roles 확정·공지.
+        생성 후 흐름: **(1) 역할 목록을 팀장에게 보여주고 '이대로?' 확인받기** →
+        send_form(form_id) → 각 팀원 순위폼 → 멤버 순위 → finalize_roles 매칭 →
+        **(2) 매칭 결과를 팀장에게 확인받기** → set_roles 확정·공지.
+        ※ (1)(2) 확인 없이 send_form/set_roles 하지 말 것.
 
         Args:
             roles: **AI가 생성한** 역할 목록 (팀원 수에 맞춰)
@@ -135,7 +137,12 @@ def register(mcp: FastMCP) -> None:
             "form_id": fid,
             "roles": list(roles),
             "members": [m["nickname"] for m in members],
-            "next": "send_form(form_id)으로 각 팀원에게 개인 순위폼 발송 → 응답 후 finalize_roles(form_id) → set_roles로 확정",
+            "action_required": (
+                "⚠️ 아직 보내지 마세요. 위 역할 목록을 사용자(팀장)에게 보여주고 "
+                "'이대로 팀원들에게 보낼까요? 바꿀 역할 있나요?'라고 물어 **명시적 확인**을 "
+                "받으세요. 사용자가 동의한 뒤에만 send_form(form_id)을 호출하세요. "
+                "확인 없이 send_form 하지 마세요."
+            ),
         }
 
     @mcp.tool(
