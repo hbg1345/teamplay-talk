@@ -5,7 +5,7 @@
 그리드 아래에 **기타 건의사항** 자유기입 칸이 붙는다. 가로(날짜)는 폼에서 스크롤된다.
 
 멤버 응답은 ``get_poll_results`` 가 셀별로 집계해 **X(절대 불가) 0명 중 O 최다** 칸을
-best_slot으로 결정적으로 반환한다(AI 분석 불필요).
+best_slots로 모두 반환한다(AI 분석 불필요). best_slot은 대표값이다.
 """
 
 from __future__ import annotations
@@ -76,8 +76,9 @@ def register(mcp: FastMCP) -> None:
         보통은 인자 없이 schedule_meeting() 만 호출하면 된다(오늘부터 14일 × 9~22시 1시간).
         특정 날짜만 보려면 dates에 직접 라벨을 넘긴다(예: ["6/30(월)", "7/1(화)"]).
 
-        멤버가 셀에 O/X 표시 → get_poll_results가 **X 0명 중 O 최다** 칸을 best_slot으로
-        반환(AI 분석 불필요). 생성 후 **팀장 확인받고** send_form. 전원 응답 시 자동 마감.
+        멤버가 셀에 O/X 표시 → get_poll_results가 **X 0명 중 O 최다** 칸을 best_slots로
+        모두 반환(AI 분석 불필요; best_slot은 대표값). 생성 후 **팀장 확인받고** send_form.
+        전원 응답 시 자동 마감.
 
         Args:
             days: 생성일부터 며칠치 (기본 14; dates 주면 무시)
@@ -154,6 +155,6 @@ def register(mcp: FastMCP) -> None:
             "members": [m["nickname"] for m in members],
             "action_required": (
                 "⚠️ 아직 보내지 마세요. 그리드 범위(날짜·시간)를 팀장에게 보여주고 확인받은 "
-                "뒤에만 send_form(form_id) 하세요. 응답 모이면 get_poll_results로 best_slot 확인."
+                "뒤에만 send_form(form_id) 하세요. 응답 모이면 get_poll_results로 best_slots 확인."
             ),
         }

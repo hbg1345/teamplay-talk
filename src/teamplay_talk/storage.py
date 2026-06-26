@@ -106,6 +106,17 @@ def get_room(room_id: int) -> dict[str, Any] | None:
             return cur.fetchone()
 
 
+def is_room_member(room_id: int, user_id: int) -> bool:
+    """사용자가 방 멤버인지 확인한다."""
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                "SELECT 1 FROM room_members WHERE room_id = %s AND user_id = %s",
+                (room_id, user_id),
+            )
+            return cur.fetchone() is not None
+
+
 def list_members(room_id: int) -> list[dict[str, Any]]:
     """방의 멤버 목록(닉네임·역할·참여시각)을 반환한다."""
     with conn() as c:
@@ -155,6 +166,39 @@ def get_form(form_id: int) -> dict[str, Any] | None:
         with c.cursor(row_factory=dict_row) as cur:
             cur.execute("SELECT * FROM forms WHERE id = %s", (form_id,))
             return cur.fetchone()
+
+
+def list_room_forms(room_id: int) -> list[dict[str, Any]]:
+    """방에 속한 모든 폼과 응답 수를 최신순으로 반환한다."""
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                "SELECT f.id, f.room_id, f.title, f.description, f.anonymous, f.closed, "
+                "f.created_at, f.schema_json, f.creator_user_id, f.closes_at, "
+                "f.close_on_all, f.nudge_sent, COUNT(fr.id)::int AS total_responses "
+                "FROM forms f "
+                "LEFT JOIN form_responses fr ON fr.form_id = f.id "
+                "WHERE f.room_id = %s "
+                "GROUP BY f.id "
+                "ORDER BY f.created_at DESC",
+                (room_id,),
+            )
+            return cur.fetchall()
+
+
+def list_form_response_rows(form_id: int) -> list[dict[str, Any]]:
+    """SurveyJS Dashboard에 넘길 폼 응답 원본 행을 반환한다."""
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                "SELECT fr.answers_json, fr.member_id, fr.respondent, fr.submitted_at, "
+                "u.nickname "
+                "FROM form_responses fr "
+                "LEFT JOIN users u ON u.id = fr.member_id "
+                "WHERE fr.form_id = %s ORDER BY fr.id",
+                (form_id,),
+            )
+            return cur.fetchall()
 
 
 def save_response(
@@ -260,9 +304,12 @@ def get_results(form_id: int) -> dict[str, Any] | None:
                             x_counts[key] = x_counts.get(key, 0) + 1
             keys = set(o_counts) | set(x_counts)
             ranked = sorted(keys, key=lambda k: (x_counts.get(k, 0), -o_counts.get(k, 0)))
-            best = next(
-                (k for k in ranked if x_counts.get(k, 0) == 0 and o_counts.get(k, 0) > 0), None
-            )
+            best_candidates = [
+                k for k in ranked if x_counts.get(k, 0) == 0 and o_counts.get(k, 0) > 0
+            ]
+            best_score = o_counts.get(best_candidates[0], 0) if best_candidates else 0
+            best_slots = [k for k in best_candidates if o_counts.get(k, 0) == best_score]
+            best = best_slots[0] if best_slots else None
             results.append({
                 "question": title,
                 "type": "grid",
@@ -270,8 +317,12 @@ def get_results(form_id: int) -> dict[str, Any] | None:
                     {"slot": k, "O": o_counts.get(k, 0), "X": x_counts.get(k, 0)} for k in ranked
                 ],
                 "best_slot": best,
-                "best_O": o_counts.get(best, 0) if best else 0,
-                "note": "best_slot = X(절대 불가) 0명 중 O 최다. X 표시된 칸은 피하세요.",
+                "best_slots": best_slots,
+                "best_O": best_score,
+                "note": (
+                    "best_slots = X(절대 불가) 0명 중 O 최다인 모든 동점 시간. "
+                    "best_slot은 그중 첫 번째 대표값입니다."
+                ),
             })
         else:  # text / comment
             results.append({"question": title, "type": qtype, "answers": [str(v) for v in vals]})
@@ -516,5 +567,3 @@ def list_user_rooms(user_id: int) -> list[dict[str, Any]]:
                 (user_id,),
             )
             return cur.fetchall()
-
-

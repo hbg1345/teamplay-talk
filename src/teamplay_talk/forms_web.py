@@ -26,31 +26,300 @@ _PAGE = """<!doctype html>
 <script src="https://unpkg.com/survey-core@1.12.63/survey.core.min.js"></script>
 <script src="https://unpkg.com/survey-js-ui@1.12.63/survey-js-ui.min.js"></script>
 <style>
- body{font-family:system-ui,-apple-system,sans-serif;max-width:680px;margin:1.5rem auto;padding:0 1rem}
+ body{font-family:system-ui,-apple-system,sans-serif;max-width:920px;margin:1.5rem auto;padding:0 1rem;background:#f6f7f8;color:#1f2328}
  #done{text-align:center;padding:3rem 1rem}
  #err{color:#b00;white-space:pre-wrap;padding:1rem;border:1px solid #f3c;border-radius:8px}
+ .schedule{background:#fff;border:1px solid #e6e8eb;border-radius:8px;box-shadow:0 1px 8px rgba(0,0,0,.04);overflow:hidden}
+ .schedule__head{padding:1.25rem 1.25rem 1rem;border-bottom:1px solid #edf0f2}
+ .schedule__title{margin:0;font-size:1.35rem;line-height:1.25}
+ .schedule__desc{margin:.45rem 0 0;color:#5b626b;line-height:1.5}
+ .schedule__legend{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.9rem;color:#4d5560;font-size:.94rem}
+ .schedule__pill{display:inline-flex;align-items:center;gap:.3rem;border:1px solid #e1e4e8;border-radius:999px;padding:.3rem .6rem;background:#fafbfc}
+ .schedule__body{padding:1rem}
+ .schedule__desktop{display:none;overflow:auto;border:1px solid #e8ebef;border-radius:8px;background:#fff}
+ .schedule__table{border-collapse:separate;border-spacing:0;min-width:max-content;width:100%}
+ .schedule__table th,.schedule__table td{border-bottom:1px solid #edf0f2;border-right:1px solid #edf0f2;padding:.55rem;text-align:center;background:#fff}
+ .schedule__table th:first-child,.schedule__table td:first-child{position:sticky;left:0;z-index:2;text-align:left;min-width:76px;background:#fbfcfd;font-weight:700}
+ .schedule__table th{position:sticky;top:0;z-index:3;background:#fbfcfd;font-weight:800;white-space:nowrap}
+ .schedule__table th:first-child{z-index:4}
+ .schedule__table tr:last-child td{border-bottom:0}
+ .schedule__cell{display:flex;gap:.35rem;justify-content:center}
+ .choice{min-width:44px;height:40px;border:1px solid #d7dce2;border-radius:8px;background:#fff;color:#4b5563;font-weight:800;font-size:1rem;cursor:pointer}
+ .choice:active{transform:translateY(1px)}
+ .choice--o.is-selected{background:#e8f7ee;border-color:#34a853;color:#137333}
+ .choice--x.is-selected{background:#fff0f0;border-color:#e5534b;color:#b3261e}
+ .schedule__mobile{display:block}
+ .date-tabs{display:flex;gap:.5rem;overflow-x:auto;padding:.1rem .05rem .8rem;scroll-snap-type:x proximity}
+ .date-tab{flex:0 0 auto;min-height:44px;border:1px solid #dde2e7;border-radius:999px;background:#fff;padding:.55rem .85rem;font-weight:800;color:#3f4650;scroll-snap-align:start}
+ .date-tab.is-active{background:#1f2328;color:#fff;border-color:#1f2328}
+ .day-panel{border:1px solid #e8ebef;border-radius:8px;background:#fff;overflow:hidden}
+ .day-panel__head{position:sticky;top:0;background:#fff;z-index:2;padding:1rem;border-bottom:1px solid #edf0f2}
+ .day-panel__date{font-weight:900;font-size:1.15rem}
+ .day-actions{display:flex;gap:.5rem;margin-top:.75rem}
+ .day-action{min-height:40px;border:1px solid #dce1e6;border-radius:8px;background:#fafbfc;padding:0 .7rem;font-weight:750;color:#4b5563}
+ .slot-row{display:grid;grid-template-columns:72px 1fr;gap:.75rem;align-items:center;padding:.75rem 1rem;border-bottom:1px solid #edf0f2}
+ .slot-row:last-child{border-bottom:0}
+ .slot-row__time{font-weight:850;color:#3b424c}
+ .slot-row__choices{display:block}
+ .slot-row__choices .schedule__cell{display:grid;grid-template-columns:1fr 1fr;gap:.55rem}
+ .slot-row .choice{width:100%;height:46px}
+ .schedule__note{margin-top:1rem}
+ .schedule__note label{display:block;font-weight:800;margin-bottom:.5rem}
+ .schedule__note textarea{box-sizing:border-box;width:100%;min-height:96px;border:1px solid #dce1e6;border-radius:8px;padding:.8rem;font:inherit;resize:vertical;background:#fff}
+ .schedule__submit{display:flex;justify-content:flex-end;margin-top:1rem}
+ .schedule__submit button{min-height:46px;border:0;border-radius:8px;background:#1f2328;color:#fff;font-weight:900;padding:0 1.2rem;font-size:1rem}
+ @media (min-width:760px){
+   .schedule__desktop{display:block}
+   .schedule__mobile{display:none}
+   .schedule__body{padding:1.25rem}
+ }
+ @media (max-width:480px){
+   body{margin:.75rem auto;padding:0 .65rem}
+   .schedule__head{padding:1rem}
+   .schedule__title{font-size:1.15rem}
+   .schedule__body{padding:.75rem}
+ }
 </style></head><body>
 <div id="surveyContainer"></div>
 <div id="done" style="display:none"><h2>응답 완료 ✅</h2><p>제출해 주셔서 감사합니다!</p></div>
 <script>
   var surveyJson = __SCHEMA__;
   function showErr(m){ document.getElementById("surveyContainer").innerHTML = '<div id="err">폼 로드 오류: ' + m + '</div>'; }
+  function postAnswers(data) {
+    return fetch(window.location.pathname + window.location.search, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(data)
+    }).then(function(){
+      document.getElementById("surveyContainer").style.display = "none";
+      document.getElementById("done").style.display = "block";
+    });
+  }
+  function findAvailabilityElement(schema) {
+    var elements = (schema && schema.elements) || [];
+    for (var i = 0; i < elements.length; i++) {
+      if (elements[i].type === "matrixdropdown" && elements[i].name === "availability") return elements[i];
+    }
+    return null;
+  }
+  function compactAvailability(data) {
+    var out = {};
+    Object.keys(data).forEach(function(row){
+      var cols = {};
+      Object.keys(data[row]).forEach(function(col){
+        if (data[row][col]) cols[col] = data[row][col];
+      });
+      if (Object.keys(cols).length) out[row] = cols;
+    });
+    return out;
+  }
+  function makeButton(label, className) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = className;
+    b.textContent = label;
+    return b;
+  }
+  function renderAvailabilityForm(schema, grid) {
+    var container = document.getElementById("surveyContainer");
+    var dates = (grid.columns || []).map(function(c){ return {name:c.name, title:c.title || c.name}; });
+    var rows = grid.rows || [];
+    var note = ((schema.elements || []).filter(function(el){ return el.type === "comment"; })[0]) || null;
+    var values = {};
+    rows.forEach(function(row){ values[row] = {}; });
+
+    var root = document.createElement("div");
+    root.className = "schedule";
+    var head = document.createElement("div");
+    head.className = "schedule__head";
+    var h1 = document.createElement("h1");
+    h1.className = "schedule__title";
+    h1.textContent = schema.title || "회의 가능 시간";
+    head.appendChild(h1);
+    if (schema.description) {
+      var desc = document.createElement("p");
+      desc.className = "schedule__desc";
+      desc.textContent = String(schema.description).replace(/\\*\\*/g, "");
+      head.appendChild(desc);
+    }
+    var legend = document.createElement("div");
+    legend.className = "schedule__legend";
+    ["O 가능", "X 절대 불가", "미선택 보통"].forEach(function(txt){
+      var pill = document.createElement("span");
+      pill.className = "schedule__pill";
+      pill.textContent = txt;
+      legend.appendChild(pill);
+    });
+    head.appendChild(legend);
+    root.appendChild(head);
+
+    var body = document.createElement("div");
+    body.className = "schedule__body";
+    var desktop = document.createElement("div");
+    desktop.className = "schedule__desktop";
+    var table = document.createElement("table");
+    table.className = "schedule__table";
+    var thead = document.createElement("thead");
+    var hr = document.createElement("tr");
+    var corner = document.createElement("th");
+    corner.textContent = "시간";
+    hr.appendChild(corner);
+    dates.forEach(function(date){
+      var th = document.createElement("th");
+      th.textContent = date.title;
+      hr.appendChild(th);
+    });
+    thead.appendChild(hr);
+    table.appendChild(thead);
+    var tbody = document.createElement("tbody");
+    table.appendChild(tbody);
+    desktop.appendChild(table);
+
+    var mobile = document.createElement("div");
+    mobile.className = "schedule__mobile";
+    var tabs = document.createElement("div");
+    tabs.className = "date-tabs";
+    var panel = document.createElement("div");
+    panel.className = "day-panel";
+    mobile.appendChild(tabs);
+    mobile.appendChild(panel);
+    var activeDate = dates[0] ? dates[0].name : "";
+
+    function selected(row, col, val) {
+      return values[row] && values[row][col] === val;
+    }
+    function setValue(row, col, val) {
+      if (!values[row]) values[row] = {};
+      values[row][col] = values[row][col] === val ? "" : val;
+      draw();
+    }
+    function setWholeDay(col, val) {
+      rows.forEach(function(row){
+        if (!values[row]) values[row] = {};
+        values[row][col] = val;
+      });
+      draw();
+    }
+    function drawChoice(row, col) {
+      var wrap = document.createElement("div");
+      wrap.className = "schedule__cell";
+      var o = makeButton("O", "choice choice--o" + (selected(row, col, "O") ? " is-selected" : ""));
+      var x = makeButton("X", "choice choice--x" + (selected(row, col, "X") ? " is-selected" : ""));
+      o.onclick = function(){ setValue(row, col, "O"); };
+      x.onclick = function(){ setValue(row, col, "X"); };
+      wrap.appendChild(o);
+      wrap.appendChild(x);
+      return wrap;
+    }
+    function drawDesktop() {
+      tbody.textContent = "";
+      rows.forEach(function(row){
+        var tr = document.createElement("tr");
+        var time = document.createElement("td");
+        time.textContent = row;
+        tr.appendChild(time);
+        dates.forEach(function(date){
+          var td = document.createElement("td");
+          td.appendChild(drawChoice(row, date.name));
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+    }
+    function drawMobileTabs() {
+      tabs.textContent = "";
+      dates.forEach(function(date){
+        var b = makeButton(date.title, "date-tab" + (date.name === activeDate ? " is-active" : ""));
+        b.onclick = function(){ activeDate = date.name; draw(); };
+        tabs.appendChild(b);
+      });
+    }
+    function drawMobilePanel() {
+      panel.textContent = "";
+      var date = dates.filter(function(d){ return d.name === activeDate; })[0] || dates[0];
+      if (!date) return;
+      var ph = document.createElement("div");
+      ph.className = "day-panel__head";
+      var dt = document.createElement("div");
+      dt.className = "day-panel__date";
+      dt.textContent = date.title;
+      ph.appendChild(dt);
+      var actions = document.createElement("div");
+      actions.className = "day-actions";
+      var allO = makeButton("이날 전부 O", "day-action");
+      var allX = makeButton("이날 전부 X", "day-action");
+      var clear = makeButton("비우기", "day-action");
+      allO.onclick = function(){ setWholeDay(date.name, "O"); };
+      allX.onclick = function(){ setWholeDay(date.name, "X"); };
+      clear.onclick = function(){ setWholeDay(date.name, ""); };
+      actions.appendChild(allO);
+      actions.appendChild(allX);
+      actions.appendChild(clear);
+      ph.appendChild(actions);
+      panel.appendChild(ph);
+      rows.forEach(function(row){
+        var sr = document.createElement("div");
+        sr.className = "slot-row";
+        var time = document.createElement("div");
+        time.className = "slot-row__time";
+        time.textContent = row;
+        var choices = document.createElement("div");
+        choices.className = "slot-row__choices";
+        choices.appendChild(drawChoice(row, date.name));
+        sr.appendChild(time);
+        sr.appendChild(choices);
+        panel.appendChild(sr);
+      });
+    }
+    function draw() {
+      drawDesktop();
+      drawMobileTabs();
+      drawMobilePanel();
+    }
+
+    body.appendChild(desktop);
+    body.appendChild(mobile);
+    var noteBox = null;
+    if (note) {
+      var noteWrap = document.createElement("div");
+      noteWrap.className = "schedule__note";
+      var label = document.createElement("label");
+      label.textContent = note.title || "기타 건의사항";
+      noteBox = document.createElement("textarea");
+      noteBox.name = note.name;
+      noteWrap.appendChild(label);
+      noteWrap.appendChild(noteBox);
+      body.appendChild(noteWrap);
+    }
+    var submit = document.createElement("div");
+    submit.className = "schedule__submit";
+    var submitButton = document.createElement("button");
+    submitButton.type = "button";
+    submitButton.textContent = schema.completeText || "제출";
+    submitButton.onclick = function(){
+      var payload = {availability: compactAvailability(values)};
+      if (noteBox && noteBox.value.trim()) payload[note.name] = noteBox.value.trim();
+      postAnswers(payload).catch(function(e){ showErr("제출 실패: " + e); });
+    };
+    submit.appendChild(submitButton);
+    body.appendChild(submit);
+    root.appendChild(body);
+    container.textContent = "";
+    container.appendChild(root);
+    draw();
+  }
   window.onerror = function(msg, src, line, col){ showErr(msg + ' (' + line + ':' + col + ')'); return true; };
   try {
-    if (typeof Survey === "undefined") {
+    var availabilityElement = findAvailabilityElement(surveyJson);
+    if (availabilityElement) {
+      renderAvailabilityForm(surveyJson, availabilityElement);
+    } else if (typeof Survey === "undefined") {
       showErr("SurveyJS 로드 실패 (네트워크 확인)");
     } else {
       var survey = new Survey.Model(surveyJson);
       survey.completeText = "제출";
       survey.onComplete.add(function(sender){
-        fetch(window.location.pathname + window.location.search, {
-          method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify(sender.data)
-        }).then(function(){
-          document.getElementById("surveyContainer").style.display = "none";
-          document.getElementById("done").style.display = "block";
-        }).catch(function(e){ showErr("제출 실패: " + e); });
+        postAnswers(sender.data).catch(function(e){ showErr("제출 실패: " + e); });
       });
       var el = document.getElementById("surveyContainer");
       if (typeof survey.render === "function") {

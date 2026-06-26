@@ -4,7 +4,7 @@
 > Kakao PlayMCP 공모전(마감 **2026-07-14**). repo: `hbg1345/teamplay-talk` (private).
 
 ## 지금 상태 (한 줄)
-회의 일정 조율(When2meet 그리드)까지 구현·배포·푸시 완료. **다음 할 일 = 사용자가 PlayMCP에서 MCP 재등록 후 실제 동작 QC**, 그리고 PM 로드맵의 남은 축(진척 추적 등).
+회의 일정 조율(When2meet 그리드) + 방별 결과 타임라인까지 구현·배포 완료. **다음 할 일 = 사용자가 PlayMCP에서 MCP 재등록 후 실제 동작 QC**, 그리고 PM 로드맵의 남은 축(진척 추적 등).
 
 ## 인프라 / 배포 (중요)
 - **라이브**: `https://167.71.219.241.sslip.io` (DigitalOcean 드롭릿, Docker)
@@ -38,31 +38,36 @@
 - 핵심 픽스: PlayMCP가 /token에 client creds를 **Basic 헤더**로 보내는데 카카오는 **body**만 받음 →
   `kakao_token_proxy.py`(`/kakao/token`)가 Basic→body 변환. (구글은 제거됨)
 
-## 현재 도구 15개
+## 현재 도구 16개
 - **방(5)**: create_room, join_room, switch_room, rooms(목록/상세 통합), leave_room
 - **폼/투표(5)**: create_poll, gather_opinions, get_poll_results, close_poll, send_form
 - **역할(3)**: assign_roles, finalize_roles, set_roles
 - **일정(1)**: schedule_meeting  ← 최신
 - **알림(1)**: notify_room
+- **대시보드(1)**: room_dashboard
 
 ## 핵심 아키텍처
 - FastMCP v3 (Python), HTTP transport. 진입점 `teamplay-talk`→`server.main()`.
 - **폼 엔진**: SurveyJS. `storage.create_form(schema_json,...)` → `/form/<id>?t=<token>` 매직링크.
   `forms_web.py`가 SurveyJS 임베드 페이지 렌더. 응답 `storage.save_response`(식별폼은 1인1표 upsert).
 - **집계**: `storage.get_results` — 객관식 카운트/ranking 점수/rating 평균/text 목록/
-  **matrixdropdown=O·X 그리드 집계(best_slot=X 0명 중 O 최다)**.
+  **matrixdropdown=O·X 그리드 집계(best_slots=X 0명 중 O 최다, 동점 전부)**.
 - **트리거**: `triggers.py` 백그라운드 스케줄러(30s) — 폼 마감(시간/전원) 감지 → 작성자에게 카톡 nudge.
 - **카톡 발송**: `kakao_store.send_with_refresh`(self-send + 401 시 토큰 refresh).
 - **DB**: DigitalOcean Postgres. `schema.sql`.
+- **방별 결과 타임라인**: `room_dashboard` → `/dashboard/rooms/{room_id}?token=...`.
+  새 DB 없이 `forms.schema_json` + `form_responses.answers_json` 집계를 시간순 결과 카드로 렌더한다.
 
 ## 의사결정 흐름 3종 (server.py instructions에 가이드됨)
 1. **역할분배**: assign_roles → [팀장 확인] → send_form → finalize_roles → [확인] → set_roles
    - LPT 균형배정(_balanced_assign): 모든 역할 커버, 난이도 균형(멤버엔 점수 숨김), 선호 tiebreak.
 2. **회의 일정**: `schedule_meeting()` (기본 오늘부터 14일×9~22시 O/X 그리드, 가로=날짜 스크롤,
    세로=시간, 셀=O/X 드롭다운, 하단 기타건의사항) → [팀장 확인] → send_form →
-   get_poll_results의 **best_slot** 공지. AI는 인자 없이 호출만 하면 됨.
+   get_poll_results의 **best_slots**(동점 전부) 공지. AI는 인자 없이 호출만 하면 됨.
 3. **의견수렴형(주제 등 막연한 것)**: gather_opinions(자유의견) → [nudge] → AI 항목화 →
    create_poll(복수선택 본투표) → 결과. (회의·후보 뻔한 건 위 단일단계로)
+4. **방 결과 보기**: `room_dashboard()` → 결과 타임라인 링크. 방의 모든 투표/폼/일정 결과를
+   생성된 순서대로 보여준다. 회의 일정 폼은 `best_slots`도 별도 요약.
 
 ## 반복된 교훈 (GPT-4.0이 클라 LLM이라 약함)
 - 지침(`instructions`)이 GPT-4.0에 잘 안 닿음 → **도구 설명(docstring)에 흐름을 박아야** 동작.

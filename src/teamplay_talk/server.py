@@ -18,6 +18,7 @@ from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
 from .config import settings
+from .dashboard_web import register_dashboard_routes
 from .forms_web import register_form_routes
 from .kakao_token_proxy import register_kakao_token_proxy
 from .tools import register_all
@@ -31,11 +32,13 @@ mcp = FastMCP(
         "② 투표 선택지·역할·회의 후보시간은 프로젝트 맥락 보고 네가 직접 생성(사용자에게 떠넘기지 마). "
         "③ 역할분배: assign_roles → [팀장 확인] → send_form → finalize_roles → [확인] → set_roles. "
         "④ 정하기: **회의 일정**은 schedule_meeting()(기본 오늘부터 14일×시간 O/X 그리드)으로 "
-        "생성 → [팀장 확인] → send_form → get_poll_results의 **best_slot**(X 0명 중 O 최다) 공지. "
+        "생성 → [팀장 확인] → send_form → get_poll_results의 **best_slots**"
+        "(X 0명 중 O 최다, 동점 전부) 공지. "
         "**그 외 후보가 뻔하면**(약속장소 등) create_poll 복수선택, **막연하면**(주제) gather_opinions "
         "(2단계: 자유의견→항목화→본투표). 후보는 AI/멤버가 생성(사용자에 떠넘기지 마). 약속장소는 "
         "멤버 위치로 최적 중심점도 후보 추가(카카오맵 MCP). "
-        "⑤ 폼 배포는 notify_room이 아니라 send_form."
+        "⑤ 폼 배포는 notify_room이 아니라 send_form. "
+        "⑥ 방의 지금까지 결과를 한눈에 보려면 room_dashboard."
     ),
 )
 
@@ -51,6 +54,9 @@ register_all(mcp)
 
 # 네이티브 폼 웹 페이지(/form/<id>) 등록
 register_form_routes(mcp)
+
+# 방별 SurveyJS 결과 대시보드(/dashboard/rooms/<id>) 등록
+register_dashboard_routes(mcp)
 
 # 카카오 토큰 프록시(/kakao/token) — PlayMCP의 Basic 인증을 카카오용 body로 변환
 register_kakao_token_proxy(mcp)
