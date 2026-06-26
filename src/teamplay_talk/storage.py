@@ -342,6 +342,20 @@ def all_members_responded(form_id: int) -> bool:
     return members > 0 and responded >= members
 
 
+def set_member_role(room_id: int, nickname: str, role: str) -> int:
+    """방 멤버(닉네임)의 역할을 기록한다. 갱신된 행 수 반환."""
+    with conn() as c:
+        with c.cursor() as cur:
+            cur.execute(
+                "UPDATE room_members SET role = %s WHERE room_id = %s "
+                "AND user_id = (SELECT id FROM users WHERE nickname = %s ORDER BY id LIMIT 1)",
+                (role, room_id, nickname),
+            )
+            updated = cur.rowcount
+        c.commit()
+    return updated
+
+
 def list_form_recipients(form_id: int) -> list[dict[str, Any]]:
     """식별 폼의 멤버별 (카카오 토큰 + 개인 링크 토큰). 카카오 로그인 한 멤버만."""
     with conn() as c:

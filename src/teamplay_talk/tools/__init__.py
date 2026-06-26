@@ -21,6 +21,7 @@ from . import (
     reports,
     resources,
     roadmap,
+    roles,
     rooms,
 )
 
@@ -31,6 +32,7 @@ def register_all(mcp: FastMCP) -> None:
     notifications.register(mcp)
     members.register(mcp)
     feedback.register(mcp)
+    roles.register(mcp)
     roadmap.register(mcp)
     resources.register(mcp)
     reports.register(mcp)
