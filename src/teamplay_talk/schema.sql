@@ -113,3 +113,32 @@ CREATE TABLE IF NOT EXISTS form_invites (
 );
 CREATE INDEX IF NOT EXISTS idx_form_invites_token ON form_invites (token);
 CREATE INDEX IF NOT EXISTS idx_form_responses_member ON form_responses (form_id, member_id);
+
+
+-- ── 로드맵 (방 = 하나의 프로젝트 타임라인, 태스크 그래프) ─────────────────
+-- 태스크(노드)들이 의존 엣지(from→to, 선행→후행)로 연결된 DAG.
+-- 각 태스크에 세부사항·담당(팀원 또는 역할)·일정(start/end)·상태가 들어간다.
+
+CREATE TABLE IF NOT EXISTS tasks (
+    id               BIGSERIAL PRIMARY KEY,
+    room_id          BIGINT NOT NULL REFERENCES rooms (id) ON DELETE CASCADE,
+    title            TEXT NOT NULL,
+    details          TEXT,                                                    -- 세부 사항
+    assignee_user_id BIGINT REFERENCES users (id) ON DELETE SET NULL,         -- 담당 팀원(멤버로 매칭된 경우)
+    assignee_role    TEXT,                                                    -- 담당 역할(또는 미매칭 이름)
+    start_at         TIMESTAMPTZ,                                             -- 일정 시작
+    end_at           TIMESTAMPTZ,                                             -- 일정 종료
+    status           TEXT NOT NULL DEFAULT 'todo',                            -- todo | doing | done
+    position         INT NOT NULL DEFAULT 0,                                  -- 표시 순서(보조)
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_tasks_room ON tasks (room_id, position);
+
+-- 태스크 의존 엣지(그래프): from_task 선행 → to_task 후행
+CREATE TABLE IF NOT EXISTS task_deps (
+    room_id      BIGINT NOT NULL REFERENCES rooms (id) ON DELETE CASCADE,
+    from_task_id BIGINT NOT NULL REFERENCES tasks (id) ON DELETE CASCADE,
+    to_task_id   BIGINT NOT NULL REFERENCES tasks (id) ON DELETE CASCADE,
+    PRIMARY KEY (from_task_id, to_task_id)
+);
+CREATE INDEX IF NOT EXISTS idx_task_deps_room ON task_deps (room_id);
