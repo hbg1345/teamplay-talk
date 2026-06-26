@@ -243,26 +243,35 @@ def get_results(form_id: int) -> dict[str, Any] | None:
                 "average": (sum(nums) / len(nums)) if nums else None,
                 "values": nums,
             })
-        elif qtype == "matrixdropdown":  # 가용성 그리드(날짜×시간) — 셀별 가능 인원 카운트
-            cell_counts: dict[str, int] = {}
+        elif qtype == "matrixdropdown":  # 가용성 그리드(날짜×시간) — 셀별 O/X 집계
+            o_counts: dict[str, int] = {}
+            x_counts: dict[str, int] = {}
             for v in vals:
                 if not isinstance(v, dict):
                     continue
                 for row, cols in v.items():
                     if not isinstance(cols, dict):
                         continue
-                    for col, checked in cols.items():
-                        if checked:
-                            key = f"{col} {row}"
-                            cell_counts[key] = cell_counts.get(key, 0) + 1
-            ranked = sorted(cell_counts.items(), key=lambda kv: -kv[1])
-            best = ranked[0] if ranked else None
+                    for col, ans in cols.items():
+                        key = f"{col} {row}"
+                        if ans == "O":
+                            o_counts[key] = o_counts.get(key, 0) + 1
+                        elif ans == "X":
+                            x_counts[key] = x_counts.get(key, 0) + 1
+            keys = set(o_counts) | set(x_counts)
+            ranked = sorted(keys, key=lambda k: (x_counts.get(k, 0), -o_counts.get(k, 0)))
+            best = next(
+                (k for k in ranked if x_counts.get(k, 0) == 0 and o_counts.get(k, 0) > 0), None
+            )
             results.append({
                 "question": title,
                 "type": "grid",
-                "available_by_slot": dict(ranked),
-                "best_slot": best[0] if best else None,
-                "best_count": best[1] if best else 0,
+                "slots": [
+                    {"slot": k, "O": o_counts.get(k, 0), "X": x_counts.get(k, 0)} for k in ranked
+                ],
+                "best_slot": best,
+                "best_O": o_counts.get(best, 0) if best else 0,
+                "note": "best_slot = X(절대 불가) 0명 중 O 최다. X 표시된 칸은 피하세요.",
             })
         else:  # text / comment
             results.append({"question": title, "type": qtype, "answers": [str(v) for v in vals]})

@@ -1,19 +1,37 @@
 """회의 일정 조율 도구 — When2meet식 가용성 그리드(날짜 × 시간 매트릭스).
 
-``schedule_meeting`` 이 **날짜(열) × 시간(행)** 그리드 폼을 만든다(SurveyJS
-``matrixdropdown``, 각 셀 = boolean 체크박스). 멤버가 가능한 셀을 체크하면
-``get_poll_results`` 가 셀별 가능 인원을 세서 가장 많이 되는 시간을 찾는다(결정적).
-AI 분석 없이 카운트로 끝나므로 GPT-4.0이 틀릴 여지가 없다.
+``schedule_meeting`` 이 **날짜(열, 기본 생성일부터 14일) × 시간(행, 시간 단위)** 그리드
+폼을 만든다(SurveyJS ``matrixdropdown``). 각 셀은 **O(가능)/X(절대 불가)** 드롭다운이고,
+그리드 아래에 **기타 건의사항** 자유기입 칸이 붙는다. 가로(날짜)는 폼에서 스크롤된다.
+
+멤버 응답은 ``get_poll_results`` 가 셀별로 집계해 **X(절대 불가) 0명 중 O 최다** 칸을
+best_slot으로 결정적으로 반환한다(AI 분석 불필요).
 """
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastmcp import FastMCP
 
 from .. import storage
 from ..identity import resolve_caller
+
+_KST = timezone(timedelta(hours=9))
+_WD = ["월", "화", "수", "목", "금", "토", "일"]
+
+
+def _date_labels(days: int, dates: list[str] | None) -> list[str]:
+    """명시 dates가 있으면 그대로, 없으면 생성일(KST)부터 days일치 'M/D(요일)' 라벨."""
+    if dates:
+        return list(dates)
+    today = datetime.now(_KST).date()
+    out: list[str] = []
+    for i in range(max(1, days)):
+        d = today + timedelta(days=i)
+        out.append(f"{d.month}/{d.day}({_WD[d.weekday()]})")
+    return out
 
 
 def _time_slots(start_hour: int, end_hour: int, slot_minutes: int) -> list[str]:
@@ -41,35 +59,36 @@ def register(mcp: FastMCP) -> None:
         },
     )
     async def schedule_meeting(
-        dates: list[str],
+        days: int = 14,
+        dates: list[str] | None = None,
         start_hour: int = 9,
-        end_hour: int = 18,
+        end_hour: int = 22,
         slot_minutes: int = 60,
         room_id: int | None = None,
         close_minutes: int | None = 1440,
     ) -> dict[str, Any]:
-        """Creates a When2meet-style availability grid (dates x time) for meeting scheduling.
+        """Creates a When2meet-style availability grid (dates x time, O/X) for meetings.
 
-        회의 일정 조율용 **가용성 그리드**(날짜=열 × 시간=행, 각 셀 체크) 폼을 만든다.
-        **너(AI)가 후보 날짜를 직접 생성**해 dates로 넘겨라(현재 날짜 기준 구체적 라벨;
-        사용자에게 떠넘기지 말 것). 시간 행은 start_hour~end_hour를 slot_minutes 간격으로
-        자동 생성한다.
+        회의 일정 조율용 **가용성 그리드**를 만든다: **열=날짜**(기본 생성일부터 14일,
+        가로 스크롤) × **행=시간**(시간 단위). 각 셀은 **O(가능)/X(절대 불가)** 드롭다운,
+        그리드 아래 **기타 건의사항** 자유기입 칸.
 
-        멤버가 가능한 셀을 모두 체크 → get_poll_results가 셀별 가능 인원을 세서
-        **best_slot**(가장 많이 되는 날짜+시간)을 결정적으로 반환한다(AI 분석 불필요).
-        생성 후 **그리드를 팀장에게 보여주고 확인받은 뒤** send_form 한다. 전원 응답 시
-        자동 마감.
+        보통은 인자 없이 schedule_meeting() 만 호출하면 된다(오늘부터 14일 × 9~22시 1시간).
+        특정 날짜만 보려면 dates에 직접 라벨을 넘긴다(예: ["6/30(월)", "7/1(화)"]).
+
+        멤버가 셀에 O/X 표시 → get_poll_results가 **X 0명 중 O 최다** 칸을 best_slot으로
+        반환(AI 분석 불필요). 생성 후 **팀장 확인받고** send_form. 전원 응답 시 자동 마감.
 
         Args:
-            dates: **AI가 생성한** 후보 날짜 라벨들 (예: ["6/30(월)", "7/1(화)", "7/2(수)"])
-            start_hour: 그리드 시작 시각(시, 기본 9)
-            end_hour: 그리드 종료 시각(시, 기본 18)
+            days: 생성일부터 며칠치 (기본 14; dates 주면 무시)
+            dates: 날짜 라벨 직접 지정 (선택; 주면 days 무시)
+            start_hour: 시간 행 시작(시, 기본 9)
+            end_hour: 시간 행 종료(시, 기본 22)
             slot_minutes: 시간 칸 간격(분, 기본 60)
             room_id: 대상 방 (생략 시 현재 작업 방)
-            close_minutes: 마감까지 분 (기본 1일; 전원 응답 시 더 일찍 자동 마감)
+            close_minutes: 마감까지 분 (기본 1일; 전원 응답 시 자동 마감)
         """
-        if not dates:
-            return {"ok": False, "error": "후보 날짜를 1개 이상 직접 생성해서 넘겨주세요."}
+        date_cols = _date_labels(days, dates)
         slots = _time_slots(start_hour, end_hour, slot_minutes)
         if not slots:
             return {"ok": False, "error": "start_hour < end_hour 여야 합니다."}
@@ -85,25 +104,33 @@ def register(mcp: FastMCP) -> None:
 
         closes_at = None
         if close_minutes:
-            from datetime import datetime, timedelta, timezone
-
             closes_at = datetime.now(timezone.utc) + timedelta(minutes=int(close_minutes))
 
         schema = {
             "title": "회의 가능 시간",
-            "description": "참석 **가능한 시간을 모두** 체크해주세요.",
+            "description": "각 칸에 **O(가능) / X(절대 불가)** 를 선택하세요. 비워두면 '보통'.",
             "completeText": "제출",
             "showQuestionNumbers": "off",
             "elements": [
                 {
                     "type": "matrixdropdown",
                     "name": "availability",
-                    "title": "가능한 시간 (셀 체크)",
-                    "cellType": "boolean",
+                    "title": "가능한 시간 (← 날짜는 옆으로 스크롤)",
+                    "cellType": "dropdown",
                     "isRequired": False,
-                    "columns": [{"name": d, "title": d} for d in dates],
+                    "choices": [
+                        {"value": "O", "text": "⭕ 가능"},
+                        {"value": "X", "text": "❌ 절대 불가"},
+                    ],
+                    "columns": [{"name": d, "title": d} for d in date_cols],
                     "rows": slots,
-                }
+                },
+                {
+                    "type": "comment",
+                    "name": "note",
+                    "title": "기타 건의사항 (선택)",
+                    "isRequired": False,
+                },
             ],
         }
         form = storage.create_form(
@@ -121,11 +148,12 @@ def register(mcp: FastMCP) -> None:
         return {
             "ok": True,
             "form_id": fid,
-            "dates": list(dates),
+            "date_count": len(date_cols),
+            "dates": date_cols,
             "time_slots": slots,
             "members": [m["nickname"] for m in members],
             "action_required": (
-                "⚠️ 아직 보내지 마세요. 그리드(날짜×시간)를 팀장에게 보여주고 확인받은 뒤에만 "
-                "send_form(form_id) 하세요. 응답 모이면 get_poll_results로 best_slot 확인."
+                "⚠️ 아직 보내지 마세요. 그리드 범위(날짜·시간)를 팀장에게 보여주고 확인받은 "
+                "뒤에만 send_form(form_id) 하세요. 응답 모이면 get_poll_results로 best_slot 확인."
             ),
         }
