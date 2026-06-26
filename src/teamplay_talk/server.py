@@ -26,13 +26,13 @@ from .triggers import start_scheduler
 mcp = FastMCP(
     name="teamplay-talk",
     instructions=(
-        "팀플(팀 프로젝트) 협업 MCP — 팀 방·투표/폼·역할분배·카카오 알림.\n"
-        "원칙: ① 팀원은 이미 방에 있으니 room_info/my_rooms로 조회하고 사용자에게 "
-        "이름을 묻지 마라. ② 투표 선택지·역할은 프로젝트 맥락 보고 네가 직접 생성하라"
-        "(사용자에게 떠넘기지 말 것). ③ 역할분배: assign_roles(네가 만든 역할들) → "
-        "**역할을 팀장에게 보여주고 확인받은 뒤** send_form → finalize_roles → "
-        "**매칭 결과 확인받은 뒤** set_roles (확인 없이 발송/확정 금지). "
-        "④ 폼 배포는 notify_room이 아니라 send_form 으로."
+        "팀플(팀 프로젝트) 협업 MCP — 팀 방·투표/폼·역할분배·일정조율·카카오 알림.\n"
+        "원칙: ① 팀원은 이미 방에 있으니 rooms로 조회하고 사용자에게 이름 묻지 마. "
+        "② 투표 선택지·역할·회의 후보시간은 프로젝트 맥락 보고 네가 직접 생성(사용자에게 떠넘기지 마). "
+        "③ 역할분배: assign_roles → [팀장 확인] → send_form → finalize_roles → [확인] → set_roles. "
+        "④ 회의시간(일정조율): create_poll(다중선택 '가능한 시간', anonymous=False) → send_form → "
+        "get_poll_results(가장 많이 되는 시간) → [확인] → notify_room 공지. "
+        "⑤ 폼 배포는 notify_room이 아니라 send_form."
     ),
 )
 
