@@ -1,8 +1,8 @@
 """호출자 신원 해석 — ``Authorization: Bearer`` 헤더의 카카오 access_token으로 식별.
 
 PlayMCP가 카카오 OAuth를 broker하면 매 호출 헤더에 카카오 토큰이 실려오고,
-그러면 로그인 없이 바로 신원이 잡힌다. 헤더가 없으면(현재 데모 상태) 도구가
-카카오 로그인 링크를 반환한다(auth_web 의 🅐 fallback).
+그러면 로그인 없이 바로 신원이 잡힌다(구글 Drive 때와 동일한 broker 방식).
+헤더가 없으면 도구는 "카카오 연결 필요"를 반환한다.
 """
 
 from __future__ import annotations
