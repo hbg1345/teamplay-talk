@@ -164,11 +164,20 @@ def save_response(
     member_id: int | None = None,
     respondent: str | None = None,
 ) -> int:
-    """응답 1건(SurveyJS 결과 객체)을 저장한다. Returns response_id."""
+    """응답 1건을 저장한다. **식별 응답(member_id 있음)은 멤버당 1개** — 재제출 시 교체.
+
+    익명 응답(member_id None)은 신원이 없어 중복 제거 불가(여러 번 누적).
+    """
     from psycopg.types.json import Json
 
     with conn() as c:
         with c.cursor(row_factory=dict_row) as cur:
+            if member_id is not None:
+                # 같은 멤버의 이전 응답 제거 → 1인 1응답(최신만 유지)
+                cur.execute(
+                    "DELETE FROM form_responses WHERE form_id = %s AND member_id = %s",
+                    (form_id, member_id),
+                )
             cur.execute(
                 "INSERT INTO form_responses (form_id, respondent, member_id, answers_json) "
                 "VALUES (%s, %s, %s, %s) RETURNING id",
