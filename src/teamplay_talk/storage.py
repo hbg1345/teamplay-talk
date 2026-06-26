@@ -465,3 +465,140 @@ def list_user_rooms(user_id: int) -> list[dict[str, Any]]:
             return cur.fetchall()
 
 
+# ── 로드맵 (태스크 그래프) ────────────────────────────────────────────────
+
+def _resolve_assignee(
+    cur: Any, room_id: int, assignee: str | None
+) -> tuple[int | None, str | None]:
+    """담당자 문자열을 (user_id, role)로 해석. 방 멤버 닉네임이면 user_id, 아니면 role."""
+    name = (assignee or "").strip()
+    if not name:
+        return None, None
+    cur.execute(
+        "SELECT u.id FROM room_members rm JOIN users u ON u.id = rm.user_id "
+        "WHERE rm.room_id = %s AND lower(u.nickname) = lower(%s) LIMIT 1",
+        (room_id, name),
+    )
+    row = cur.fetchone()
+    if row:
+        return row["id"], None
+    return None, name
+
+
+def set_roadmap(
+    room_id: int,
+    tasks: list[dict[str, Any]],
+    edges: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """방의 로드맵(태스크 그래프)을 통째로 생성/교체한다. (단일 트랜잭션)
+
+    tasks: ``[{key, title, details?, assignee?, start_at?, end_at?, status?}]``
+    edges: ``[{from: key, to: key}]`` (선행→후행)
+    key는 호출 측 임시 식별자 → 실제 task id로 매핑해 엣지를 연결한다.
+    Returns: ``get_roadmap(room_id)`` 결과.
+    """
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            # 기존 로드맵 제거(task_deps는 FK CASCADE로 함께 삭제)
+            cur.execute("DELETE FROM tasks WHERE room_id = %s", (room_id,))
+
+            key_to_id: dict[str, int] = {}
+            for pos, t in enumerate(tasks):
+                user_id, role = _resolve_assignee(cur, room_id, t.get("assignee"))
+                cur.execute(
+                    "INSERT INTO tasks (room_id, title, details, assignee_user_id, "
+                    "assignee_role, start_at, end_at, status, position) "
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+                    (
+                        room_id, t["title"], t.get("details"), user_id, role,
+                        t.get("start_at"), t.get("end_at"),
+                        t.get("status", "todo"), pos,
+                    ),
+                )
+                key_to_id[str(t.get("key", t["title"]))] = cur.fetchone()["id"]
+
+            for e in edges or []:
+                f = key_to_id.get(str(e.get("from")))
+                to = key_to_id.get(str(e.get("to")))
+                if f and to and f != to:
+                    cur.execute(
+                        "INSERT INTO task_deps (room_id, from_task_id, to_task_id) "
+                        "VALUES (%s, %s, %s) ON CONFLICT DO NOTHING",
+                        (room_id, f, to),
+                    )
+        c.commit()
+    return get_roadmap(room_id)
+
+
+def get_roadmap(room_id: int) -> dict[str, Any]:
+    """방의 로드맵을 반환한다: ``{"tasks": [...], "edges": [...]}``.
+
+    각 task에 담당자 닉네임(assignee_nickname) 또는 역할(assignee_role)이 포함된다.
+    """
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                "SELECT t.id, t.title, t.details, t.status, t.start_at, t.end_at, "
+                "t.position, t.assignee_role, u.nickname AS assignee_nickname "
+                "FROM tasks t LEFT JOIN users u ON u.id = t.assignee_user_id "
+                "WHERE t.room_id = %s ORDER BY t.position, t.id",
+                (room_id,),
+            )
+            tasks = cur.fetchall()
+            cur.execute(
+                "SELECT from_task_id, to_task_id FROM task_deps WHERE room_id = %s",
+                (room_id,),
+            )
+            edges = cur.fetchall()
+    return {"tasks": tasks, "edges": edges}
+
+
+def update_task(
+    task_id: int,
+    *,
+    title: str | None = None,
+    details: str | None = None,
+    assignee: str | None = None,
+    start_at: Any | None = None,
+    end_at: Any | None = None,
+    status: str | None = None,
+) -> dict[str, Any] | None:
+    """태스크 1개를 수정한다(지정한 필드만). 없으면 None."""
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            cur.execute("SELECT room_id FROM tasks WHERE id = %s", (task_id,))
+            row = cur.fetchone()
+            if row is None:
+                return None
+            room_id = row["room_id"]
+
+            sets: list[str] = []
+            vals: list[Any] = []
+            if title is not None:
+                sets.append("title = %s"); vals.append(title)
+            if details is not None:
+                sets.append("details = %s"); vals.append(details)
+            if start_at is not None:
+                sets.append("start_at = %s"); vals.append(start_at)
+            if end_at is not None:
+                sets.append("end_at = %s"); vals.append(end_at)
+            if status is not None:
+                sets.append("status = %s"); vals.append(status)
+            if assignee is not None:
+                user_id, role = _resolve_assignee(cur, room_id, assignee)
+                sets.append("assignee_user_id = %s"); vals.append(user_id)
+                sets.append("assignee_role = %s"); vals.append(role)
+
+            if not sets:
+                cur.execute("SELECT * FROM tasks WHERE id = %s", (task_id,))
+                return cur.fetchone()
+
+            vals.append(task_id)
+            cur.execute(
+                f"UPDATE tasks SET {', '.join(sets)} WHERE id = %s RETURNING *", vals
+            )
+            updated = cur.fetchone()
+        c.commit()
+    return updated
+
+
