@@ -35,6 +35,18 @@ def _hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
+def caller_from_our_token() -> dict[str, Any] | None:
+    """헤더의 우리 OAuth 토큰으로만 호출자를 식별한다(동기, 카카오 fallback 없음).
+
+    Drive처럼 저장된 구글 토큰이 필요한 동기 도구에서 쓴다. 우리 /oauth/token이
+    발급한 토큰은 token_hash로 users를 즉시 조회(동기)할 수 있다.
+    """
+    token = bearer_token()
+    if token is None:
+        return None
+    return storage.get_user_by_token_hash(_hash_token(token))
+
+
 def issue_personal_token(user_id: int) -> str:
     """사용자에게 개인 액세스 토큰을 발급한다(해시만 저장). 원문은 1회만 노출."""
     token = secrets.token_urlsafe(24)

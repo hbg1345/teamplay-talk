@@ -1,12 +1,10 @@
-"""Google Drive 파일 도메인 도구 (Google API 직접 호출, 토큰은 호스트가 전달).
+"""Google Drive 파일 도메인 도구 (Google API 직접 호출).
 
-인증은 **호스트(PlayMCP)가 OAuth를 대행**한다. 사용자가 도구를 호출하면
-PlayMCP가 Google access_token을 발급/갱신해 MCP 요청의 ``Authorization: Bearer``
-헤더로 전달한다. 이 모듈은 그 토큰을 꺼내 본인 Drive에 파일을 쓰고/읽고/나열한다.
-
-따라서 이 서버는 OAuth 토큰을 저장하지 않는다(상태 없음). 방 전용 폴더도
-호출한 사용자의 Drive에서 이름으로 find-or-create 한다(per-user 토큰 +
-drive.file 스코프에서는 다른 사람이 만든 폴더에 접근할 수 없기 때문).
+인증은 **우리 OAuth 2.1 인가 서버**가 카카오+구글 체인으로 받아 ``users``에
+저장한 Google access_token을 쓴다. MCP 요청 헤더의 Bearer는 *우리 OAuth 토큰*
+(신원용)이라 Drive API엔 직접 못 쓰므로, 그 토큰으로 호출자를 식별한 뒤 그
+사람의 저장된 구글 토큰을 꺼낸다. 방 전용 폴더는 호출 사용자의 Drive에서
+이름으로 find-or-create 한다(per-user 토큰 + drive.file 스코프).
 """
 
 from __future__ import annotations
@@ -15,27 +13,21 @@ from base64 import b64encode
 from typing import Any
 
 from fastmcp import FastMCP
-from fastmcp.server.dependencies import get_http_headers
 
 from .. import gdrive, storage
+from ..identity import caller_from_our_token
 
 
 class _NoToken(Exception):
-    """요청에 Google access_token이 없음 (호스트가 OAuth를 안 거쳤거나 연결 안 됨)."""
+    """호출자의 저장된 Google access_token이 없음 (인증 안 됐거나 구글 동의 미완료)."""
 
 
 def _google_token() -> str:
-    """현재 MCP 요청의 Authorization 헤더에서 Google access_token을 꺼낸다.
-
-    PlayMCP가 OAuth로 발급한 Google access_token을 Bearer로 전달한다는 전제.
-    """
-    headers = get_http_headers(include=["authorization"])
-    auth = headers.get("authorization", "")
-    if auth.lower().startswith("bearer "):
-        token = auth[7:].strip()
-        if token:
-            return token
-    raise _NoToken
+    """현재 호출자(우리 OAuth 토큰으로 식별)의 저장된 Google access_token을 반환한다."""
+    caller = caller_from_our_token()
+    if caller is None or not caller.get("google_access_token"):
+        raise _NoToken
+    return caller["google_access_token"]
 
 
 _NOT_CONNECTED = {
