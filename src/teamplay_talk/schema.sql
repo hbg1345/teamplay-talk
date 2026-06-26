@@ -77,12 +77,6 @@ CREATE INDEX IF NOT EXISTS idx_form_questions_form ON form_questions (form_id);
 CREATE INDEX IF NOT EXISTS idx_form_responses_form ON form_responses (form_id);
 CREATE INDEX IF NOT EXISTS idx_form_answers_question ON form_answers (question_id);
 
--- ── Google Drive 연동 ────────────────────────────────────────────────
--- 인증(OAuth)은 호스트(PlayMCP)가 대행하고 access_token을 요청 헤더로 전달하므로
--- 서버는 토큰을 저장하지 않는다. 방 폴더도 호출 사용자의 Drive에서 이름으로
--- find-or-create 하므로 별도 매핑 테이블이 필요 없다. (전용 테이블 없음)
-
-
 -- ── 카카오 알림 토큰 (users에 추가, 멤버별 self-push용) ────────────────
 ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_access_token     TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_refresh_token    TEXT;
@@ -92,14 +86,3 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_token_expires_at TIMESTAMPTZ;
 -- 멤버십(room_members)은 그대로 두고, "지금 작업하는 방"만 가리킨다.
 -- 방이 삭제되면 자동으로 NULL. 방에서 나가면(멤버십 삭제) leave_room이 직접 리셋.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS active_room_id BIGINT REFERENCES rooms (id) ON DELETE SET NULL;
-
--- ── 개인 액세스 토큰 (우리 OAuth 인가 서버가 발급 — 매 호출 신원) ─────────
--- 우리 /oauth/token이 발급하는 액세스 토큰. PlayMCP가 매 호출 헤더로 보낸다.
--- 원문은 저장하지 않고 sha256 해시만 저장(DB 유출 시에도 토큰 악용 불가).
-ALTER TABLE users ADD COLUMN IF NOT EXISTS token_hash TEXT;
-CREATE INDEX IF NOT EXISTS idx_users_token_hash ON users (token_hash);
-
--- ── 구글 토큰 (인가 서버가 카카오 다음에 체인으로 수집, Drive용) ──────────
-ALTER TABLE users ADD COLUMN IF NOT EXISTS google_access_token     TEXT;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS google_refresh_token    TEXT;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS google_token_expires_at TIMESTAMPTZ;
