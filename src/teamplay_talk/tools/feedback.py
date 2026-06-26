@@ -168,6 +168,88 @@ def register(mcp: FastMCP) -> None:
         return out
 
     @mcp.tool(
+        name="gather_opinions",
+        annotations={
+            "title": "의견수렴 시작(자유의견)",
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": False,
+        },
+    )
+    async def gather_opinions(
+        question: str,
+        room_id: int | None = None,
+        anonymous: bool = True,
+        close_minutes: int | None = 1440,
+    ) -> dict[str, Any]:
+        """Starts opinion gathering (stage 1 of 의견수렴형) — a free-text poll to the team.
+
+        팀의 의사결정(**회의 시간·약속 장소·주제 등 '뭘로 할까'**)을 시작한다.
+        **사용자에게 후보를 묻지 마라** — 이 도구로 팀원에게 자유의견을 모으는 게 시작이다.
+
+        2단계 흐름:
+        (1) gather_opinions(question) → 팀원이 자유롭게 글로 의견 → send_form → [완료 nudge]
+        (2) get_poll_results로 의견 읽고 **AI가 항목화** → create_poll(**복수선택** 본투표, 그
+            항목들) → send_form → 결과 공지.
+        (약속장소면 question에 출발지도 묻고, 항목화 때 멤버 위치로 환승 적은 최적 중심점도
+        추론해 후보 추가.)
+
+        예: "회의 일정 잡자" → gather_opinions("회의 가능한 날짜·시간을 자유롭게 적어주세요").
+
+        Args:
+            question: 팀원에게 물을 질문 (네가 맥락 보고 직접 작성)
+            room_id: 대상 방 (생략 시 현재 작업 방)
+            anonymous: 익명 여부 (기본 True)
+            close_minutes: 마감까지 분 (기본 1일; 전원 응답 시 자동 마감)
+        """
+        caller = await resolve_caller()
+        if room_id is None:
+            if caller is None:
+                return {"ok": False, "error": "카카오 인증이 필요합니다."}
+            active = storage.get_active_room(caller["id"])
+            if active is None:
+                return {"ok": False, "error": "현재 작업 방이 없습니다."}
+            room_id = active["id"]
+
+        closes_at = None
+        if close_minutes:
+            from datetime import datetime, timedelta, timezone
+
+            closes_at = datetime.now(timezone.utc) + timedelta(minutes=int(close_minutes))
+
+        schema = {
+            "title": question,
+            "completeText": "제출",
+            "showQuestionNumbers": "off",
+            "elements": [
+                {"type": "comment", "name": "opinion", "title": question, "isRequired": True}
+            ],
+        }
+        form = storage.create_form(
+            room_id=room_id,
+            title=question,
+            schema_json=schema,
+            anonymous=anonymous,
+            creator_user_id=caller["id"] if caller else None,
+            closes_at=closes_at,
+            close_on_all=True,
+        )
+        fid = form["id"]
+        if not anonymous:
+            storage.create_invites(fid, [m["id"] for m in storage.list_members(room_id)])
+        return {
+            "ok": True,
+            "form_id": fid,
+            "stage": "1/2 (의견수렴)",
+            "next": (
+                "send_form(form_id)으로 팀원에게 발송 → 응답 모이면(또는 마감 nudge) "
+                "get_poll_results로 의견을 읽고 **항목화**한 뒤, create_poll(복수선택 본투표)로 "
+                "2단계 투표를 만드세요."
+            ),
+        }
+
+    @mcp.tool(
         name="get_poll_results",
         annotations={
             "title": "폼/투표 결과 조회",
