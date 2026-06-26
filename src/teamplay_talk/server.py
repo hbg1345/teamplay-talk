@@ -20,6 +20,7 @@ from starlette.responses import PlainTextResponse
 from .auth_web import register_auth_routes
 from .config import settings
 from .forms_web import register_form_routes
+from .oauth_server import register_oauth_routes
 from .tools import register_all
 
 mcp = FastMCP(
@@ -51,6 +52,9 @@ register_form_routes(mcp)
 
 # 카카오 OAuth 라우트(/auth/kakao/login, /callback) 등록
 register_auth_routes(mcp)
+
+# OAuth 2.1 인가 서버(/oauth/authorize, /oauth/token) 등록 — PlayMCP가 broker하는 제공자
+register_oauth_routes(mcp)
 
 
 def main() -> None:

@@ -1,0 +1,20 @@
+# teamplay-talk 배포 구성 — 앱(FastMCP) + Caddy(자동 HTTPS).
+# .env 는 서버에 따로 둔다(gitignore). PUBLIC_BASE_URL / DATABASE_URL /
+# KAKAO_* 는 .env 에서 주입.
+services:
+  app:
+    build: .
+    env_file: .env
+    restart: unless-stopped
+    expose: ["8000"]
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+volumes:
+  caddy_data:
+  caddy_config:

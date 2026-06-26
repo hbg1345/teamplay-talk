@@ -11,8 +11,9 @@ from typing import Any
 
 from fastmcp import FastMCP
 
-from .. import kakao, kakao_store
+from .. import kakao, kakao_store, storage
 from ..config import settings
+from ..identity import resolve_caller
 
 
 def register(mcp: FastMCP) -> None:
@@ -28,16 +29,32 @@ def register(mcp: FastMCP) -> None:
             "openWorldHint": True,  # 외부(카카오)로 메시지 발송
         },
     )
-    async def notify_room(room_id: int, message: str) -> dict[str, Any]:
+    async def notify_room(message: str, room_id: int | None = None) -> dict[str, Any]:
         """Sends a KakaoTalk notification to every member of a teamplay-talk(팀플톡) room.
 
         팀플톡(teamplay-talk) 방의 모든 멤버에게 카카오톡 '나와의 채팅방'으로
-        알림을 보낸다. 카카오 로그인을 마친 멤버에게만 전달된다.
+        알림을 보낸다. 카카오 로그인을 마친 멤버에게만 전달된다. room_id를 안
+        주면 **현재 작업 방**으로 보낸다.
 
         Args:
-            room_id: 알림을 보낼 방 ID
             message: 보낼 메시지 내용
+            room_id: 알림을 보낼 방 ID (생략 시 현재 작업 방)
         """
+        if room_id is None:
+            caller = await resolve_caller()
+            if caller is None:
+                return {
+                    "ok": False,
+                    "error": "방을 지정하거나 카카오 연결이 필요합니다.",
+                }
+            active = storage.get_active_room(caller["id"])
+            if active is None:
+                return {
+                    "ok": False,
+                    "error": "현재 작업 중인 방이 없습니다. switch_room으로 방을 정하거나 room_id를 지정하세요.",
+                }
+            room_id = active["id"]
+
         members = kakao_store.list_members_with_tokens(room_id)
         if not members:
             return {
