@@ -14,6 +14,7 @@ from __future__ import annotations
 from fastmcp import FastMCP
 
 from . import (
+    calendar,
     feedback,
     integrations,
     meeting,
@@ -39,3 +40,4 @@ def register_all(mcp: FastMCP) -> None:
     resources.register(mcp)
     reports.register(mcp)
     integrations.register(mcp)
+    calendar.register(mcp)
