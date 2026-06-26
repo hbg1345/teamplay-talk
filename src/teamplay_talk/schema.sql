@@ -98,8 +98,3 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS active_room_id BIGINT REFERENCES room
 -- 원문은 저장하지 않고 sha256 해시만 저장(DB 유출 시에도 토큰 악용 불가).
 ALTER TABLE users ADD COLUMN IF NOT EXISTS token_hash TEXT;
 CREATE INDEX IF NOT EXISTS idx_users_token_hash ON users (token_hash);
-
--- ── 구글 토큰 (인가 서버가 카카오 다음에 체인으로 수집, Drive용) ──────────
-ALTER TABLE users ADD COLUMN IF NOT EXISTS google_access_token     TEXT;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS google_refresh_token    TEXT;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS google_token_expires_at TIMESTAMPTZ;

@@ -384,24 +384,3 @@ def get_user_by_token_hash(token_hash: str) -> dict[str, Any] | None:
             return cur.fetchone()
 
 
-def set_google_token(
-    user_id: int,
-    access_token: str,
-    refresh_token: str | None,
-    expires_in: int | None = None,
-) -> None:
-    """사용자의 구글 토큰을 저장/갱신한다. refresh_token이 None이면 기존값 보존."""
-    from datetime import datetime, timedelta, timezone
-
-    expires_at = None
-    if expires_in:
-        expires_at = datetime.now(timezone.utc) + timedelta(seconds=int(expires_in))
-    with conn() as c:
-        with c.cursor() as cur:
-            cur.execute(
-                "UPDATE users SET google_access_token = %s, "
-                "google_refresh_token = COALESCE(%s, google_refresh_token), "
-                "google_token_expires_at = %s WHERE id = %s",
-                (access_token, refresh_token, expires_at, user_id),
-            )
-        c.commit()

@@ -8,7 +8,7 @@
   5. 이후 PlayMCP가 매 호출 헤더에 그 토큰 → ``identity.resolve_caller`` 가 신원 인식
 
 카카오 redirect URI가 우리 **고정 URL**이라 mcpId 변동/KOE006 문제가 없다.
-(구글 체인은 2단계 카카오 인증 후 추가 예정 — 현재는 카카오만.)
+(카카오 단일 인증 — 구글/Drive는 제거됨.)
 
 저장은 단기 인메모리(단일 워커 가정). 운영 강화 시 DB로 이전.
 """
@@ -24,7 +24,7 @@ from urllib.parse import parse_qs, urlencode
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse
 
-from . import google, kakao, kakao_store, storage
+from . import kakao, kakao_store, storage
 from .config import settings
 from .identity import issue_personal_token
 
@@ -50,11 +50,6 @@ def _gc(store: dict) -> None:
 def _oauth_redirect_uri() -> str:
     """우리 OAuth 서버의 카카오 콜백(고정). 카카오 콘솔에 1회 등록 필요."""
     return f"{settings.public_base_url}/oauth/kakao/callback"
-
-
-def _google_redirect_uri() -> str:
-    """우리 OAuth 서버의 구글 콜백(고정). 구글 콘솔에 1회 등록 필요."""
-    return f"{settings.public_base_url}/oauth/google/callback"
 
 
 def _issue_code(playmcp: dict, user_id: int) -> RedirectResponse:
@@ -144,50 +139,7 @@ async def kakao_callback(request: Request):
         kakao_id, tokens["access_token"], tokens.get("refresh_token"), tokens.get("expires_in")
     )
 
-    # 구글 체인: 설정돼 있으면 구글 동의로 한 번 더 (Drive 토큰 수집).
-    if settings.google_client_id and settings.google_client_secret:
-        gsid = secrets.token_urlsafe(24)
-        _sessions[gsid] = {
-            "redirect_uri": sess["redirect_uri"],
-            "state": sess.get("state"),
-            "code_challenge": sess.get("code_challenge"),
-            "method": sess.get("method"),
-            "user_id": user["id"],
-            "exp": _now() + _SESSION_TTL,
-        }
-        url = google.build_authorize_url(settings.google_client_id, _google_redirect_uri(), state=gsid)
-        return RedirectResponse(url)
-
     return _issue_code(sess, user["id"])
-
-
-async def google_callback(request: Request):
-    """구글 콜백 — Drive 토큰 저장(실패해도 비치명적) 후 인가코드 발급."""
-    _gc(_sessions)
-    gsid = request.query_params.get("state")
-    sess = _sessions.pop(gsid, None) if gsid else None
-    if sess is None:
-        return HTMLResponse(
-            "<h2>인증 세션이 만료되었거나 올바르지 않습니다. 처음부터 다시 시도해 주세요.</h2>", 400
-        )
-    user_id = sess["user_id"]
-    # 구글 토큰 — 거부/실패해도 카카오 신원은 이미 확보됐으므로 그대로 진행.
-    gcode = request.query_params.get("code")
-    if gcode and not request.query_params.get("error"):
-        try:
-            gtokens = await google.exchange_code_for_token(
-                gcode, settings.google_client_id, settings.google_client_secret, _google_redirect_uri()
-            )
-            if "access_token" in gtokens:
-                storage.set_google_token(
-                    user_id,
-                    gtokens["access_token"],
-                    gtokens.get("refresh_token"),
-                    gtokens.get("expires_in"),
-                )
-        except Exception:
-            pass
-    return _issue_code(sess, user_id)
 
 
 def _err(sess: dict, error: str, desc: str) -> dict:
@@ -256,5 +208,4 @@ def register_oauth_routes(mcp) -> None:
     """OAuth 2.1 인가 서버 라우트를 등록한다."""
     mcp.custom_route("/oauth/authorize", methods=["GET"])(authorize)
     mcp.custom_route("/oauth/kakao/callback", methods=["GET"])(kakao_callback)
-    mcp.custom_route("/oauth/google/callback", methods=["GET"])(google_callback)
     mcp.custom_route("/oauth/token", methods=["POST"])(token)
