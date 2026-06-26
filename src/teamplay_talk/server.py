@@ -37,12 +37,6 @@ mcp = FastMCP(
 )
 
 
-@mcp.tool
-def teamplay_ping() -> str:
-    """서버 동작 확인용 더미 도구. 항상 ``pong`` 을 반환한다."""
-    return "pong"
-
-
 @mcp.custom_route("/health", methods=["GET"])
 async def health_check(_request: Request) -> PlainTextResponse:
     """배포 헬스체크용 엔드포인트."""

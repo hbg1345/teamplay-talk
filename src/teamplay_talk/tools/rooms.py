@@ -36,16 +36,6 @@ def _match_rooms(rooms: list[dict[str, Any]], query: str) -> list[dict[str, Any]
     return [r for r in rooms if q in r["name"].lower()]
 
 
-async def _resolve_room(invite_code: str | None) -> dict[str, Any] | None:
-    """초대 코드가 있으면 그 방, 없으면 호출자의 현재 작업 방을 반환한다."""
-    if invite_code:
-        return storage.get_room_by_invite_code(invite_code)
-    caller = await resolve_caller()
-    if caller is None:
-        return None
-    return storage.get_active_room(caller["id"])
-
-
 def register(mcp: FastMCP) -> None:
     """방 도메인 도구를 등록한다."""
 
@@ -175,29 +165,46 @@ def register(mcp: FastMCP) -> None:
         }
 
     @mcp.tool(
-        name="my_rooms",
+        name="rooms",
         annotations={
-            "title": "내 방 목록",
+            "title": "내 방 목록 / 방 정보",
             "readOnlyHint": True,
             "destructiveHint": False,
             "idempotentHint": True,
             "openWorldHint": False,
         },
     )
-    async def my_rooms() -> dict[str, Any]:
-        """Lists the teamplay-talk(팀플톡) rooms you belong to, marking the current one.
+    async def rooms(invite_code: str | None = None) -> dict[str, Any]:
+        """Lists your teamplay-talk(팀플톡) rooms, or shows one room's details + members.
 
-        팀플톡(teamplay-talk)에서 내가 속한 방 목록(이름·역할·초대코드)과 현재
-        작업 방을 보여준다. 카카오 인증은 호스트(PlayMCP) 토큰으로 처리된다.
+        팀플톡(teamplay-talk): **invite_code 없으면** 내가 속한 방 목록(이름·역할·초대코드·
+        현재 작업 방), **있으면** 그 방의 상세(이름·초대코드·멤버 목록). 초대코드를 팀원에게
+        공유하면 join_room으로 참여한다.
+
+        Args:
+            invite_code: 상세를 볼 방의 초대 코드 (생략 시 내 방 전체 목록)
         """
         caller = await resolve_caller()
         if caller is None:
             return _NEED_AUTH
-        rooms = storage.list_user_rooms(caller["id"])
+        if invite_code:
+            room = storage.get_room_by_invite_code(invite_code)
+            if room is None:
+                return {"ok": False, "error": "유효하지 않은 초대 코드입니다."}
+            members = storage.list_members(room["id"])
+            return {
+                "ok": True,
+                "room_id": room["id"],
+                "name": room["name"],
+                "invite_code": room["invite_code"],
+                "member_count": len(members),
+                "members": [{"nickname": m["nickname"], "role": m["role"]} for m in members],
+            }
+        my = storage.list_user_rooms(caller["id"])
         return {
             "ok": True,
-            "count": len(rooms),
-            "active_room": next((r["name"] for r in rooms if r["is_active"]), None),
+            "count": len(my),
+            "active_room": next((r["name"] for r in my if r["is_active"]), None),
             "rooms": [
                 {
                     "name": r["name"],
@@ -205,7 +212,7 @@ def register(mcp: FastMCP) -> None:
                     "invite_code": r["invite_code"],
                     "active": r["is_active"],
                 }
-                for r in rooms
+                for r in my
             ],
         }
 
@@ -251,71 +258,4 @@ def register(mcp: FastMCP) -> None:
             "message": f"'{result['room']['name']}' 나가기 완료.",
         }
 
-    @mcp.tool(
-        name="room_info",
-        annotations={
-            "title": "방 정보·멤버 조회",
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-            "openWorldHint": False,
-        },
-    )
-    async def room_info(invite_code: str | None = None) -> dict[str, Any]:
-        """Reads a teamplay-talk(팀플톡) room's name and member list.
-
-        팀플톡(teamplay-talk) 방의 이름과 멤버 목록(닉네임·역할)을 조회한다.
-        초대 코드를 주면 그 방을, 안 주면 **현재 작업 방**을 본다.
-
-        Args:
-            invite_code: 조회할 방의 초대 코드 (생략 시 현재 작업 방)
-        """
-        room = await _resolve_room(invite_code)
-        if room is None:
-            return {
-                "ok": False,
-                "error": "방을 찾을 수 없습니다. (초대 코드를 지정하거나 작업 방을 먼저 정하세요)",
-            }
-        members = storage.list_members(room["id"])
-        return {
-            "ok": True,
-            "room_id": room["id"],
-            "name": room["name"],
-            "member_count": len(members),
-            "members": [
-                {"nickname": m["nickname"], "role": m["role"]} for m in members
-            ],
-        }
-
-    @mcp.tool(
-        name="get_invite_code",
-        annotations={
-            "title": "초대 코드 받기",
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-            "openWorldHint": False,
-        },
-    )
-    async def get_invite_code(invite_code: str | None = None) -> dict[str, Any]:
-        """Returns the invite code to share for a teamplay-talk(팀플톡) room.
-
-        팀플톡(teamplay-talk) 방의 **초대 코드**를 반환한다. 팀원에게 이 코드를
-        공유하면 팀원이 join_room 으로 참여한다. 초대 코드를 주면 그 방을, 안 주면
-        **현재 작업 방**의 코드를 준다.
-
-        Args:
-            invite_code: 방 초대 코드 (생략 시 현재 작업 방)
-        """
-        room = await _resolve_room(invite_code)
-        if room is None:
-            return {
-                "ok": False,
-                "error": "방을 찾을 수 없습니다. (초대 코드를 지정하거나 작업 방을 먼저 정하세요)",
-            }
-        return {
-            "ok": True,
-            "name": room["name"],
-            "invite_code": room["invite_code"],
-            "message": f"이 코드를 팀원에게 공유하세요: {room['invite_code']} (팀원은 join_room으로 참여)",
-        }
+    # (room_info·get_invite_code 는 rooms 도구로 통합됨)
