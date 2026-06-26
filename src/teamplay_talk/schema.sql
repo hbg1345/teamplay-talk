@@ -93,12 +93,6 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_token_expires_at TIMESTAMPTZ;
 -- 방이 삭제되면 자동으로 NULL. 방에서 나가면(멤버십 삭제) leave_room이 직접 리셋.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS active_room_id BIGINT REFERENCES rooms (id) ON DELETE SET NULL;
 
--- ── 개인 액세스 토큰 (우리 OAuth 인가 서버가 발급 — 매 호출 신원) ─────────
--- 우리 /oauth/token이 발급하는 액세스 토큰. PlayMCP가 매 호출 헤더로 보낸다.
--- 원문은 저장하지 않고 sha256 해시만 저장(DB 유출 시에도 토큰 악용 불가).
-ALTER TABLE users ADD COLUMN IF NOT EXISTS token_hash TEXT;
-CREATE INDEX IF NOT EXISTS idx_users_token_hash ON users (token_hash);
-
 -- ── 폼 엔진 v2 (SurveyJS JSON 모델 + 매직링크 + 트리거) ───────────────────
 -- 폼 정의를 SurveyJS JSON으로 통째 저장(질문타입 무제한). 응답도 결과 객체 JSON.
 ALTER TABLE forms ADD COLUMN IF NOT EXISTS schema_json     JSONB;          -- SurveyJS 폼 정의

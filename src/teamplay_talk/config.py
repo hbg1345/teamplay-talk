@@ -29,9 +29,6 @@ class Settings:
     kakao_rest_api_key: str
     kakao_client_secret: str | None
     kakao_redirect_uri: str
-    # 우리 OAuth 2.1 인가 서버가 PlayMCP(클라이언트)에 발급하는 자격증명
-    oauth_client_id: str
-    oauth_client_secret: str | None
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -48,8 +45,6 @@ class Settings:
             kakao_redirect_uri=os.getenv(
                 "KAKAO_REDIRECT_URI", f"http://localhost:{port}/auth/kakao/callback"
             ),
-            oauth_client_id=os.getenv("OAUTH_CLIENT_ID", "playmcp"),
-            oauth_client_secret=os.getenv("OAUTH_CLIENT_SECRET") or None,
         )
 
 

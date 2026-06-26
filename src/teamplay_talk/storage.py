@@ -465,23 +465,3 @@ def list_user_rooms(user_id: int) -> list[dict[str, Any]]:
             return cur.fetchall()
 
 
-# ── 개인 액세스 토큰 (PlayMCP Key/Token 인증) ─────────────────────────────
-
-def set_user_token(user_id: int, token_hash: str) -> None:
-    """사용자의 개인 액세스 토큰(해시)을 저장/갱신한다."""
-    with conn() as c:
-        with c.cursor() as cur:
-            cur.execute(
-                "UPDATE users SET token_hash = %s WHERE id = %s", (token_hash, user_id)
-            )
-        c.commit()
-
-
-def get_user_by_token_hash(token_hash: str) -> dict[str, Any] | None:
-    """개인 토큰 해시로 사용자를 조회한다. (매 호출 신원 해석용)"""
-    with conn() as c:
-        with c.cursor(row_factory=dict_row) as cur:
-            cur.execute("SELECT * FROM users WHERE token_hash = %s", (token_hash,))
-            return cur.fetchone()
-
-
