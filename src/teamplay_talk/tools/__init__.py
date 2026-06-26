@@ -16,6 +16,7 @@ from fastmcp import FastMCP
 from . import (
     feedback,
     integrations,
+    meeting,
     members,
     notifications,
     reports,
@@ -33,6 +34,7 @@ def register_all(mcp: FastMCP) -> None:
     members.register(mcp)
     feedback.register(mcp)
     roles.register(mcp)
+    meeting.register(mcp)
     roadmap.register(mcp)
     resources.register(mcp)
     reports.register(mcp)

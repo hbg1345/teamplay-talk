@@ -243,6 +243,27 @@ def get_results(form_id: int) -> dict[str, Any] | None:
                 "average": (sum(nums) / len(nums)) if nums else None,
                 "values": nums,
             })
+        elif qtype == "matrixdropdown":  # 가용성 그리드(날짜×시간) — 셀별 가능 인원 카운트
+            cell_counts: dict[str, int] = {}
+            for v in vals:
+                if not isinstance(v, dict):
+                    continue
+                for row, cols in v.items():
+                    if not isinstance(cols, dict):
+                        continue
+                    for col, checked in cols.items():
+                        if checked:
+                            key = f"{col} {row}"
+                            cell_counts[key] = cell_counts.get(key, 0) + 1
+            ranked = sorted(cell_counts.items(), key=lambda kv: -kv[1])
+            best = ranked[0] if ranked else None
+            results.append({
+                "question": title,
+                "type": "grid",
+                "available_by_slot": dict(ranked),
+                "best_slot": best[0] if best else None,
+                "best_count": best[1] if best else 0,
+            })
         else:  # text / comment
             results.append({"question": title, "type": qtype, "answers": [str(v) for v in vals]})
 

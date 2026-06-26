@@ -30,11 +30,11 @@ mcp = FastMCP(
         "원칙: ① 팀원은 이미 방에 있으니 rooms로 조회하고 사용자에게 이름 묻지 마. "
         "② 투표 선택지·역할·회의 후보시간은 프로젝트 맥락 보고 네가 직접 생성(사용자에게 떠넘기지 마). "
         "③ 역할분배: assign_roles → [팀장 확인] → send_form → finalize_roles → [확인] → set_roles. "
-        "④ 정하기(투표): **후보가 뻔하면**(회의 날짜·시간 등) AI가 후보 슬롯 생성 → "
-        "create_poll **복수선택** → send_form → get_poll_results(최다 가능) → 공지 (단일단계). "
-        "**후보가 막연하면**(주제 등) gather_opinions로 자유의견 모아 → 항목화 → create_poll 본투표 "
-        "(2단계). 후보는 사용자 아닌 AI/멤버가 생성. 약속장소는 멤버 위치로 최적 중심점도 후보 추가"
-        "(카카오맵 MCP). "
+        "④ 정하기: **회의 일정**은 schedule_meeting(후보 날짜들)으로 날짜×시간 그리드(When2meet) "
+        "생성 → [팀장 확인] → send_form → get_poll_results의 **best_slot**(최다 가능 시간) 공지. "
+        "**그 외 후보가 뻔하면**(약속장소 등) create_poll 복수선택, **막연하면**(주제) gather_opinions "
+        "(2단계: 자유의견→항목화→본투표). 후보는 AI/멤버가 생성(사용자에 떠넘기지 마). 약속장소는 "
+        "멤버 위치로 최적 중심점도 후보 추가(카카오맵 MCP). "
         "⑤ 폼 배포는 notify_room이 아니라 send_form."
     ),
 )
