@@ -13,7 +13,7 @@ from typing import Any, Literal
 from fastmcp import FastMCP
 from pydantic import BaseModel, Field
 
-from .. import storage
+from .. import kakao_store, storage
 from ..config import settings
 from ..identity import resolve_caller
 
@@ -100,10 +100,13 @@ def register(mcp: FastMCP) -> None:
         질문 타입(type): single=단일선택, multi=복수선택, rank=선호 순위(드래그),
         rating=점수, text=주관식.
 
-        anonymous=True(기본): 공유 링크 1개·익명 → 의견수렴·익명투표에.
-        anonymous=False: 멤버별 **개인 링크(매직링크)** — 누가 응답했는지 식별됨.
-        역할분배·진척체크처럼 응답자를 알아야 할 때. 반환된 member_links를
-        notify_room으로 각자에게 보낸다.
+        **anonymous=True (기본·대부분)**: 공유 링크 1개를 전원에게 → 의견수렴·투표·
+        선호조사 등 "전체 목소리 모으기". 보통 이거면 된다.
+        **anonymous=False (특수)**: 응답을 *특정 멤버에 매칭*해야 할 때만 — 역할분배·
+        진척체크. 멤버별 개인 링크가 생긴다.
+
+        생성 후 배포는 **send_form(form_id)** 으로 한다(notify_room ❌). send_form이
+        익명이면 한 메시지 브로드캐스트, 식별이면 각자에게 개인 링크를 보낸다.
 
         Args:
             title: 폼 제목 (예: "회식 날짜 투표")
@@ -111,7 +114,7 @@ def register(mcp: FastMCP) -> None:
             room_id: 폼이 속한 방 ID (생략 시 **현재 작업 방**). ID 추측 금지 —
                      보통 생략하면 됨.
             description: 폼 설명 (선택)
-            anonymous: 익명 공유링크(True) vs 멤버별 식별 링크(False)
+            anonymous: 공유링크(True·기본) vs 멤버별 식별 링크(False·매칭 필요시만)
             close_minutes: N분 뒤 자동 마감 (선택)
             close_on_all: 전원 응답 시 자동 마감 (선택)
         """
@@ -154,16 +157,14 @@ def register(mcp: FastMCP) -> None:
             "title": title,
             "anonymous": anonymous,
             "question_count": len(questions),
+            "next": "send_form(form_id)으로 팀에 발송하세요 (notify_room ❌).",
         }
         if anonymous:
             out["share_url"] = base
         else:
             members = storage.list_members(room_id)
-            tokens = storage.create_invites(fid, [m["id"] for m in members])
-            out["member_links"] = [
-                {"nickname": m["nickname"], "url": f"{base}?t={tokens[m['id']]}"}
-                for m in members
-            ]
+            storage.create_invites(fid, [m["id"] for m in members])
+            out["mode"] = "identified — send_form이 각 멤버에게 개인 링크를 발송"
         return out
 
     @mcp.tool(
@@ -213,3 +214,45 @@ def register(mcp: FastMCP) -> None:
             return {"ok": False, "error": "존재하지 않는 폼입니다."}
         storage.close_form(form_id)
         return {"ok": True, "closed": True, **results}
+
+    @mcp.tool(
+        name="send_form",
+        annotations={
+            "title": "폼 링크 팀에 발송",
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": True,  # 외부(카카오) 발송
+        },
+    )
+    async def send_form(form_id: int, message: str | None = None) -> dict[str, Any]:
+        """Sends a teamplay-talk(팀플톡) form link to the team via KakaoTalk.
+
+        폼을 팀에 발송한다. **익명 폼이면 공유 링크 1개를 전원에게**, **식별 폼이면
+        각 멤버에게 자기 개인 링크를** 보낸다. create_poll 뒤 배포는 이걸로 한다.
+        (notify_room으로 폼 링크를 보내지 말 것 — 개인 링크가 섞인다.)
+
+        Args:
+            form_id: 발송할 폼 ID
+            message: 안내 문구 (생략 시 기본). 링크는 자동으로 뒤에 붙는다.
+        """
+        form = storage.get_form(form_id)
+        if form is None:
+            return {"ok": False, "error": "존재하지 않는 폼입니다."}
+        base = f"{settings.public_base_url}/form/{form_id}"
+        prefix = (message or f"📋 '{form['title']}' 폼에 응답해주세요").rstrip()
+
+        sent: list[str] = []
+        failed: list[str] = []
+        if form["anonymous"]:
+            for m in kakao_store.list_members_with_tokens(form["room_id"]):
+                status = await kakao_store.send_with_refresh(m, f"{prefix}\n{base}")
+                (sent if status == 200 else failed).append(m["nickname"])
+        else:
+            for r in storage.list_form_recipients(form_id):
+                status = await kakao_store.send_with_refresh(r, f"{prefix}\n{base}?t={r['invite_token']}")
+                (sent if status == 200 else failed).append(r["nickname"])
+
+        if not sent and not failed:
+            return {"ok": False, "error": "발송 대상이 없습니다(멤버가 카카오 로그인을 마쳐야 함)."}
+        return {"ok": True, "form_id": form_id, "sent_to": sent, "failed": failed, "count": len(sent)}

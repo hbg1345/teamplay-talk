@@ -49,3 +49,27 @@ def list_members_with_tokens(room_id: int) -> list[dict[str, Any]]:
                 (room_id,),
             )
             return cur.fetchall()
+
+
+async def send_with_refresh(member: dict[str, Any], message: str) -> int:
+    """member(kakao_access_token/refresh/kakao_id)에게 '나와의 채팅' 발송.
+
+    access token 만료(401)면 refresh 후 1회 재시도. HTTP status 반환(200=성공).
+    """
+    from . import kakao
+    from .config import settings
+
+    status, _ = await kakao.send_to_me(member["kakao_access_token"], message)
+    if status == 401 and member.get("kakao_refresh_token"):
+        refreshed = await kakao.refresh_access_token(
+            member["kakao_refresh_token"], settings.kakao_rest_api_key, settings.kakao_client_secret
+        )
+        if "access_token" in refreshed:
+            set_kakao_token(
+                member["kakao_id"],
+                refreshed["access_token"],
+                refreshed.get("refresh_token") or member["kakao_refresh_token"],
+                refreshed.get("expires_in"),
+            )
+            status, _ = await kakao.send_to_me(refreshed["access_token"], message)
+    return status

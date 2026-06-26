@@ -342,6 +342,20 @@ def all_members_responded(form_id: int) -> bool:
     return members > 0 and responded >= members
 
 
+def list_form_recipients(form_id: int) -> list[dict[str, Any]]:
+    """식별 폼의 멤버별 (카카오 토큰 + 개인 링크 토큰). 카카오 로그인 한 멤버만."""
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                "SELECT u.id, u.nickname, u.kakao_id, u.kakao_access_token, "
+                "u.kakao_refresh_token, fi.token AS invite_token "
+                "FROM form_invites fi JOIN users u ON u.id = fi.member_id "
+                "WHERE fi.form_id = %s AND u.kakao_access_token IS NOT NULL",
+                (form_id,),
+            )
+            return cur.fetchall()
+
+
 # ── 방 조회/나가기 (카카오 통합) ───────────────────────────────────────
 
 def get_room_by_invite_code(invite_code: str) -> dict[str, Any] | None:
