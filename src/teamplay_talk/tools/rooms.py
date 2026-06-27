@@ -36,6 +36,20 @@ def _match_rooms(rooms: list[dict[str, Any]], query: str) -> list[dict[str, Any]
     return [r for r in rooms if q in r["name"].lower()]
 
 
+def _decision_payload(decision: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": decision["id"],
+        "kind": decision["kind"],
+        "title": decision["title"],
+        "summary": decision["summary"],
+        "payload": decision.get("payload") or {},
+        "source": decision.get("source"),
+        "created_at": decision["created_at"].isoformat()
+        if hasattr(decision.get("created_at"), "isoformat")
+        else decision.get("created_at"),
+    }
+
+
 def register(mcp: FastMCP) -> None:
     """방 도메인 도구를 등록한다."""
 
@@ -192,6 +206,10 @@ def register(mcp: FastMCP) -> None:
             if room is None:
                 return {"ok": False, "error": "유효하지 않은 초대 코드입니다."}
             members = storage.list_members(room["id"])
+            latest_decisions = {
+                kind: _decision_payload(decision)
+                for kind, decision in storage.latest_room_decisions(room["id"]).items()
+            }
             return {
                 "ok": True,
                 "room_id": room["id"],
@@ -199,6 +217,7 @@ def register(mcp: FastMCP) -> None:
                 "invite_code": room["invite_code"],
                 "member_count": len(members),
                 "members": [{"nickname": m["nickname"], "role": m["role"]} for m in members],
+                "latest_decisions": latest_decisions,
             }
         my = storage.list_user_rooms(caller["id"])
         return {
@@ -214,6 +233,114 @@ def register(mcp: FastMCP) -> None:
                 }
                 for r in my
             ],
+        }
+
+    @mcp.tool(
+        name="delete_room",
+        annotations={
+            "title": "팀플 방 삭제 예약",
+            "readOnlyHint": False,
+            "destructiveHint": True,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        },
+    )
+    async def delete_room(invite_code: str | None = None) -> dict[str, Any]:
+        """Schedules a teamplay-talk(팀플톡) room for deletion with a 7-day recovery window.
+
+        팀플톡(teamplay-talk) 방장이 방을 삭제 대기 상태로 전환한다. 즉시 데이터를
+        지우지 않고 7일 동안 복구 가능하며, 그 뒤 백엔드가 방/폼/응답/로드맵을
+        완전 삭제한다. 코드를 안 주면 현재 작업 방을 대상으로 한다.
+
+        Args:
+            invite_code: 삭제할 방의 초대 코드 (생략 시 현재 작업 방)
+        """
+        caller = await resolve_caller()
+        if caller is None:
+            return _NEED_AUTH
+        code = invite_code
+        if not code:
+            active = storage.get_active_room(caller["id"])
+            if active is None:
+                return {
+                    "ok": False,
+                    "error": "현재 작업 중인 방이 없습니다. 삭제할 방의 초대 코드를 지정하세요.",
+                }
+            code = active["invite_code"]
+
+        result = storage.delete_room(code, caller["id"])
+        if result is None:
+            return {"ok": False, "error": "유효하지 않은 초대 코드입니다."}
+        if result.get("reason") == "not_owner":
+            return {"ok": False, "error": "방장만 방을 삭제할 수 있습니다."}
+        room = result["room"]
+        if result.get("reason") == "already_deleting":
+            return {
+                "ok": True,
+                "room_id": room["id"],
+                "name": room["name"],
+                "status": "deleting",
+                "purge_after": room.get("purge_after"),
+                "message": f"'{room['name']}' 방은 이미 삭제 대기 중입니다.",
+            }
+        return {
+            "ok": True,
+            "room_id": room["id"],
+            "name": room["name"],
+            "status": "deleting",
+            "purge_after": room.get("purge_after"),
+            "restore": "7일 안에 restore_room(invite_code)으로 복구할 수 있습니다.",
+            "message": f"'{room['name']}' 방을 삭제 대기 상태로 전환했습니다. 7일 뒤 완전 삭제됩니다.",
+        }
+
+    @mcp.tool(
+        name="restore_room",
+        annotations={
+            "title": "팀플 방 삭제 복구",
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        },
+    )
+    async def restore_room(invite_code: str) -> dict[str, Any]:
+        """Restores a teamplay-talk(팀플톡) room during its 7-day deletion grace period.
+
+        팀플톡(teamplay-talk)에서 삭제 대기 중인 방을 방장이 복구한다. 복구되면
+        다시 현재 작업 방으로 설정된다.
+
+        Args:
+            invite_code: 복구할 방의 초대 코드
+        """
+        caller = await resolve_caller()
+        if caller is None:
+            return _NEED_AUTH
+        result = storage.restore_room(invite_code, caller["id"])
+        if result is None:
+            return {"ok": False, "error": "유효하지 않은 초대 코드입니다."}
+        if result.get("reason") == "not_owner":
+            return {"ok": False, "error": "방장만 방을 복구할 수 있습니다."}
+        room = result["room"]
+        if result.get("reason") == "already_active":
+            return {
+                "ok": True,
+                "room_id": room["id"],
+                "name": room["name"],
+                "active": True,
+                "message": f"'{room['name']}' 방은 이미 활성 상태입니다.",
+            }
+        if result.get("reason") == "expired":
+            return {
+                "ok": False,
+                "error": "복구 유예 기간이 지났습니다. 곧 완전 삭제 대상입니다.",
+                "purge_after": room.get("purge_after"),
+            }
+        return {
+            "ok": True,
+            "room_id": room["id"],
+            "name": room["name"],
+            "active": True,
+            "message": f"'{room['name']}' 방을 복구했고 현재 작업 방으로 설정했습니다.",
         }
 
     @mcp.tool(
@@ -255,7 +382,13 @@ def register(mcp: FastMCP) -> None:
         return {
             "ok": True,
             "name": result["room"]["name"],
-            "message": f"'{result['room']['name']}' 나가기 완료.",
+            "room_scheduled_for_deletion": result.get("empty_scheduled", False),
+            "purge_after": result.get("purge_after"),
+            "message": (
+                f"'{result['room']['name']}' 나가기 완료. 마지막 멤버가 나가서 7일 뒤 완전 삭제됩니다."
+                if result.get("empty_scheduled")
+                else f"'{result['room']['name']}' 나가기 완료."
+            ),
         }
 
     # (room_info·get_invite_code 는 rooms 도구로 통합됨)

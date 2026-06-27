@@ -19,6 +19,29 @@ CREATE TABLE IF NOT EXISTS rooms (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- 방 삭제는 즉시 hard delete 하지 않고 유예 기간을 둔다.
+-- active: 정상 사용, deleting: 사용자에게 숨김 + purge_after 이후 완전 삭제
+ALTER TABLE rooms ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
+ALTER TABLE rooms ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE rooms ADD COLUMN IF NOT EXISTS purge_after TIMESTAMPTZ;
+ALTER TABLE rooms ADD COLUMN IF NOT EXISTS deleted_by_user_id BIGINT REFERENCES users (id) ON DELETE SET NULL;
+ALTER TABLE rooms ADD COLUMN IF NOT EXISTS delete_reason TEXT;
+CREATE INDEX IF NOT EXISTS idx_rooms_active_invite ON rooms (invite_code) WHERE status = 'active';
+CREATE INDEX IF NOT EXISTS idx_rooms_purge_after ON rooms (purge_after) WHERE status = 'deleting';
+UPDATE rooms SET status = 'active' WHERE status NOT IN ('active', 'deleting');
+UPDATE rooms SET delete_reason = NULL
+WHERE delete_reason IS NOT NULL AND delete_reason NOT IN ('owner_deleted', 'empty_room');
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_rooms_status') THEN
+        ALTER TABLE rooms ADD CONSTRAINT chk_rooms_status CHECK (status IN ('active', 'deleting'));
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_rooms_delete_reason') THEN
+        ALTER TABLE rooms ADD CONSTRAINT chk_rooms_delete_reason
+        CHECK (delete_reason IS NULL OR delete_reason IN ('owner_deleted', 'empty_room'));
+    END IF;
+END $$;
+
 -- 방-사용자 연결 (다대다) + 역할
 CREATE TABLE IF NOT EXISTS room_members (
     room_id   BIGINT NOT NULL REFERENCES rooms (id) ON DELETE CASCADE,
@@ -104,6 +127,16 @@ ALTER TABLE forms ADD COLUMN IF NOT EXISTS nudge_sent      BOOLEAN NOT NULL DEFA
 ALTER TABLE form_responses ADD COLUMN IF NOT EXISTS member_id    BIGINT REFERENCES users (id) ON DELETE SET NULL;  -- identified면 누구
 ALTER TABLE form_responses ADD COLUMN IF NOT EXISTS answers_json JSONB;    -- SurveyJS 결과 {q1:..., q2:[...]}
 
+-- 식별 폼은 멤버당 최신 응답 1개만 유지한다.
+DELETE FROM form_responses old
+USING form_responses newer
+WHERE old.form_id = newer.form_id
+  AND old.member_id = newer.member_id
+  AND old.member_id IS NOT NULL
+  AND old.id < newer.id;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_form_responses_unique_member
+ON form_responses (form_id, member_id) WHERE member_id IS NOT NULL;
+
 -- 매직링크: 멤버별 고유 토큰 → 로그인 없이 신원 식별
 CREATE TABLE IF NOT EXISTS form_invites (
     form_id   BIGINT NOT NULL REFERENCES forms (id) ON DELETE CASCADE,
@@ -133,6 +166,20 @@ CREATE TABLE IF NOT EXISTS tasks (
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_tasks_room ON tasks (room_id, position);
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS task_type TEXT NOT NULL DEFAULT 'milestone';
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS parent_task_id BIGINT REFERENCES tasks (id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks (parent_task_id);
+UPDATE tasks SET status = 'todo' WHERE status NOT IN ('todo', 'doing', 'done');
+UPDATE tasks SET task_type = 'milestone' WHERE task_type NOT IN ('milestone', 'todo');
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_tasks_status') THEN
+        ALTER TABLE tasks ADD CONSTRAINT chk_tasks_status CHECK (status IN ('todo', 'doing', 'done'));
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_tasks_type') THEN
+        ALTER TABLE tasks ADD CONSTRAINT chk_tasks_type CHECK (task_type IN ('milestone', 'todo'));
+    END IF;
+END $$;
 
 -- 태스크 의존 엣지(그래프): from_task 선행 → to_task 후행
 CREATE TABLE IF NOT EXISTS task_deps (
@@ -142,3 +189,26 @@ CREATE TABLE IF NOT EXISTS task_deps (
     PRIMARY KEY (from_task_id, to_task_id)
 );
 CREATE INDEX IF NOT EXISTS idx_task_deps_room ON task_deps (room_id);
+
+-- 자동 개인별 할일 digest 중복 발송 방지
+CREATE TABLE IF NOT EXISTS task_digest_sends (
+    room_id     BIGINT NOT NULL REFERENCES rooms (id) ON DELETE CASCADE,
+    user_id     BIGINT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    digest_date DATE NOT NULL,
+    sent_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (room_id, user_id, digest_date)
+);
+
+-- 방의 확정 결정 기록. 회의 시간/장소/역할처럼 나중에 다시 꺼내야 하는 사실을 저장한다.
+CREATE TABLE IF NOT EXISTS room_decisions (
+    id          BIGSERIAL PRIMARY KEY,
+    room_id     BIGINT NOT NULL REFERENCES rooms (id) ON DELETE CASCADE,
+    kind        TEXT NOT NULL,
+    title       TEXT NOT NULL,
+    summary     TEXT NOT NULL,
+    payload     JSONB NOT NULL DEFAULT '{}'::jsonb,
+    source      TEXT,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_room_decisions_room_created ON room_decisions (room_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_room_decisions_room_kind ON room_decisions (room_id, kind, created_at DESC);

@@ -13,7 +13,17 @@ from fastmcp import FastMCP
 
 from .. import kakao, kakao_store, storage
 from ..config import settings
-from ..identity import resolve_caller
+from .guards import require_room
+
+
+def _decision_kind_from_message(message: str) -> str | None:
+    if any(token in message for token in ["회의 장소", "장소는", "장소가"]):
+        return "meeting_location"
+    if any(token in message for token in ["회의 일정", "회의 시간", "시간이", "시간은"]):
+        return "meeting_time"
+    if "확정" in message and any(token in message for token in ["투표", "결정", "선택"]):
+        return "decision"
+    return None
 
 
 def register(mcp: FastMCP) -> None:
@@ -40,20 +50,10 @@ def register(mcp: FastMCP) -> None:
             message: 보낼 메시지 내용
             room_id: 알림을 보낼 방 ID (생략 시 현재 작업 방)
         """
-        if room_id is None:
-            caller = await resolve_caller()
-            if caller is None:
-                return {
-                    "ok": False,
-                    "error": "방을 지정하거나 카카오 연결이 필요합니다.",
-                }
-            active = storage.get_active_room(caller["id"])
-            if active is None:
-                return {
-                    "ok": False,
-                    "error": "현재 작업 중인 방이 없습니다. switch_room으로 방을 정하거나 room_id를 지정하세요.",
-                }
-            room_id = active["id"]
+        _caller, room, error = await require_room(room_id)
+        if error:
+            return error
+        room_id = room["id"]
 
         members = kakao_store.list_members_with_tokens(room_id)
         if not members:
@@ -85,4 +85,38 @@ def register(mcp: FastMCP) -> None:
 
             (sent if status == 200 else failed).append(m["nickname"])
 
-        return {"ok": True, "sent_to": sent, "failed": failed, "count": len(sent)}
+        if not sent:
+            return {
+                "ok": False,
+                "sent_to": sent,
+                "failed": failed,
+                "count": 0,
+                "error": "모든 공지 발송이 실패했습니다. 카카오 인증/토큰 상태를 확인해야 합니다.",
+            }
+
+        decision_kind = _decision_kind_from_message(message)
+        decision = None
+        if decision_kind:
+            row = storage.record_room_decision(
+                room_id,
+                kind=decision_kind,
+                title="방 공지 기반 결정",
+                summary=message,
+                payload={"message": message, "sent_to": sent, "failed": failed},
+                source="notify_room",
+            )
+            decision = {
+                "id": row["id"],
+                "kind": row["kind"],
+                "title": row["title"],
+                "summary": row["summary"],
+            }
+
+        return {
+            "ok": True,
+            "sent_to": sent,
+            "failed": failed,
+            "count": len(sent),
+            "status": "partial" if failed else "sent",
+            "recorded_decision": decision,
+        }

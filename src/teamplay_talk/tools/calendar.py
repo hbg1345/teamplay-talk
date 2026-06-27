@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastmcp import FastMCP
@@ -23,6 +24,42 @@ _NEED_AUTH = {
     "ok": False,
     "error": "카카오 인증 정보가 없습니다. PlayMCP에서 카카오 계정 연결(talk_calendar 권한 동의)을 먼저 진행해 주세요.",
 }
+
+
+def _to_utc(value: Any) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        raw = str(value).strip()
+        if not raw:
+            return None
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _rfc3339(dt: datetime) -> str:
+    return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _task_window(task: dict[str, Any], default_minutes: int) -> tuple[str, str] | None:
+    start = _to_utc(task.get("start_at"))
+    end = _to_utc(task.get("end_at"))
+    duration = timedelta(minutes=max(5, int(default_minutes or 30)))
+    if start is None and end is None:
+        return None
+    if start is None and end is not None:
+        start = end - duration
+    if end is None and start is not None:
+        end = start + duration
+    if start is None or end is None:
+        return None
+    if end <= start:
+        end = start + duration
+    return _rfc3339(start), _rfc3339(end)
 
 
 def register(mcp: FastMCP) -> None:
@@ -142,6 +179,33 @@ def register(mcp: FastMCP) -> None:
             else:
                 failed.append({"nickname": member["nickname"], "error": res})
 
+        recorded_decision = None
+        if created:
+            row = storage.record_room_decision(
+                room_id,
+                kind="meeting_time",
+                title=title,
+                summary=f"{title}: {start_at} ~ {end_at}",
+                payload={
+                    "title": title,
+                    "start_at": start_at,
+                    "end_at": end_at,
+                    "all_day": all_day,
+                    "description": description,
+                    "time_zone": time_zone,
+                    "calendar_id": calendar_id,
+                    "created": created,
+                    "failed": failed,
+                },
+                source="calendar_create_room_event",
+            )
+            recorded_decision = {
+                "id": row["id"],
+                "kind": row["kind"],
+                "title": row["title"],
+                "summary": row["summary"],
+            }
+
         return {
             "ok": bool(created),
             "room_id": room_id,
@@ -150,7 +214,158 @@ def register(mcp: FastMCP) -> None:
             "failed": failed,
             "created_count": len(created),
             "failed_count": len(failed),
+            "recorded_decision": recorded_decision,
             "note": "실패한 멤버는 카카오 talk_calendar 권한이 없거나 토큰이 만료됐을 수 있습니다.",
+        }
+
+    @mcp.tool(
+        name="calendar_create_task_events",
+        annotations={
+            "title": "태스크 개인 캘린더 등록",
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": True,
+        },
+    )
+    async def calendar_create_task_events(
+        room_id: int | None = None,
+        task_ids: list[int] | None = None,
+        include_done: bool = False,
+        default_minutes: int = 30,
+        reminders: list[int] | None = None,
+        calendar_id: str = "primary",
+    ) -> dict[str, Any]:
+        """Creates personal KakaoTalk calendar events for assigned roadmap tasks.
+
+        팀플톡(teamplay-talk) 로드맵에서 담당자와 날짜(start_at/end_at)가 있는 태스크를
+        각 담당자의 톡캘린더에 등록한다. 역할분배 → 로드맵 → 개인 캘린더 연결용이다.
+
+        Args:
+            room_id: 대상 방 ID (생략 시 현재 작업 방)
+            task_ids: 특정 태스크만 등록할 때 ID 목록
+            include_done: 완료 태스크도 등록할지 여부
+            default_minutes: start/end 중 하나만 있을 때 사용할 기본 길이
+            reminders: 미리 알림(분 단위, 기본 [60])
+            calendar_id: 대상 캘린더 ID
+        """
+        caller = await resolve_caller()
+        if caller is None:
+            return _NEED_AUTH
+        if room_id is None:
+            active = storage.get_active_room(caller["id"])
+            if active is None:
+                return {"ok": False, "error": "현재 작업 방이 없습니다. switch_room으로 방을 선택하세요."}
+            room = active
+            room_id = active["id"]
+        elif not storage.is_room_member(room_id, caller["id"]):
+            return {"ok": False, "error": "이 방의 멤버만 태스크 캘린더 등록을 할 수 있습니다."}
+        else:
+            room = storage.get_room(room_id)
+            if room is None:
+                return {"ok": False, "error": f"방 {room_id}를 찾을 수 없습니다."}
+
+        selected = set(task_ids or [])
+        created: list[dict[str, Any]] = []
+        failed: list[dict[str, Any]] = []
+        skipped: list[dict[str, Any]] = []
+        for task in storage.get_roadmap(room_id)["tasks"]:
+            if selected and task["id"] not in selected:
+                continue
+            if (task.get("task_type") or "milestone") != "todo":
+                skipped.append({"task_id": task["id"], "title": task["title"], "reason": "로드맵 milestone은 개인 todo 캘린더 대상이 아님"})
+                continue
+            if task.get("status") == "done" and not include_done:
+                skipped.append({"task_id": task["id"], "title": task["title"], "reason": "완료 태스크"})
+                continue
+            if not task.get("assignee_user_id"):
+                skipped.append({"task_id": task["id"], "title": task["title"], "reason": "담당자 없음"})
+                continue
+            window = _task_window(task, default_minutes)
+            if window is None:
+                skipped.append({"task_id": task["id"], "title": task["title"], "reason": "일정 없음"})
+                continue
+
+            user = storage.get_user(task["assignee_user_id"])
+            if user is None or not user.get("kakao_access_token"):
+                failed.append({
+                    "task_id": task["id"],
+                    "title": task["title"],
+                    "nickname": task.get("assignee_nickname"),
+                    "error": "담당자의 카카오 인증 토큰이 없습니다.",
+                })
+                continue
+
+            start_at, end_at = window
+            description = "\n".join(
+                part for part in [
+                    f"팀플톡 방: {room['name']}",
+                    f"태스크 ID: {task['id']}",
+                    f"담당 역할: {task.get('assignee_role') or task.get('assignee_member_role') or ''}",
+                    f"상태: {task.get('status')}",
+                    task.get("details") or "",
+                ] if part
+            )
+            res = await kakao_calendar.create_event(
+                user["kakao_access_token"],
+                title=f"[팀플톡] {task['title']}",
+                start_at=start_at,
+                end_at=end_at,
+                description=description,
+                reminders=reminders if reminders is not None else [60],
+                time_zone="Asia/Seoul",
+                calendar_id=calendar_id,
+            )
+            if "event_id" not in res and user.get("kakao_refresh_token"):
+                refreshed = await kakao.refresh_access_token(
+                    user["kakao_refresh_token"],
+                    settings.kakao_rest_api_key,
+                    settings.kakao_client_secret,
+                )
+                if "access_token" in refreshed:
+                    kakao_store.set_kakao_token(
+                        user["kakao_id"],
+                        refreshed["access_token"],
+                        refreshed.get("refresh_token") or user["kakao_refresh_token"],
+                        refreshed.get("expires_in"),
+                    )
+                    res = await kakao_calendar.create_event(
+                        refreshed["access_token"],
+                        title=f"[팀플톡] {task['title']}",
+                        start_at=start_at,
+                        end_at=end_at,
+                        description=description,
+                        reminders=reminders if reminders is not None else [60],
+                        time_zone="Asia/Seoul",
+                        calendar_id=calendar_id,
+                    )
+
+            if "event_id" in res:
+                created.append({
+                    "task_id": task["id"],
+                    "title": task["title"],
+                    "nickname": task.get("assignee_nickname"),
+                    "event_id": res["event_id"],
+                    "start_at": start_at,
+                    "end_at": end_at,
+                })
+            else:
+                failed.append({
+                    "task_id": task["id"],
+                    "title": task["title"],
+                    "nickname": task.get("assignee_nickname"),
+                    "error": res,
+                })
+
+        return {
+            "ok": bool(created),
+            "room_id": room_id,
+            "created": created,
+            "failed": failed,
+            "skipped": skipped,
+            "created_count": len(created),
+            "failed_count": len(failed),
+            "next": "캘린더 등록 뒤에는 daily_task_digest로 담당자별 할일을 주기적으로 공지하면 좋습니다.",
         }
 
     @mcp.tool(

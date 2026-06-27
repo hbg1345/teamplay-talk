@@ -14,11 +14,13 @@ from __future__ import annotations
 import asyncio
 import threading
 import time
+from datetime import datetime, timedelta, timezone
 
 from . import kakao, kakao_store, storage
 from .config import settings
 
 _POLL_INTERVAL = 30  # 초
+_KST = timezone(timedelta(hours=9))
 
 
 async def _send_kakao(user_id: int, message: str) -> None:
@@ -55,17 +57,51 @@ async def process_closed_form(form_id: int) -> None:
     await _send_kakao(claimed["creator_user_id"], msg)
 
 
+async def process_daily_task_digests() -> None:
+    """옵션으로 켜는 개인별 로드맵 할일 digest. 기본은 비활성."""
+    if not settings.daily_task_digest_enabled:
+        return
+    now = datetime.now(_KST)
+    if now.hour != settings.daily_task_digest_hour_kst:
+        return
+
+    from .tools.roadmap import _format, _member_digest_message
+
+    digest_date = now.date()
+    for room in storage.list_active_rooms():
+        roadmap = _format(storage.get_roadmap(room["id"]))
+        members_by_token = {m["id"]: m for m in kakao_store.list_members_with_tokens(room["id"])}
+        for member in roadmap["by_member"]:
+            message = _member_digest_message(room["name"], member, include_done=False)
+            if message is None:
+                continue
+            token_member = members_by_token.get(member["member_id"])
+            if token_member is None:
+                continue
+            if not storage.claim_task_digest(room["id"], member["member_id"], digest_date):
+                continue
+            await kakao_store.send_with_refresh(token_member, message)
+
+
 def _scheduler_loop() -> None:
     while True:
         try:
             for f in storage.find_due_forms():
                 asyncio.run(process_closed_form(f["id"]))
+            for room in storage.find_rooms_to_purge():
+                purged = storage.purge_room(room["id"])
+                if purged:
+                    print(
+                        f"[scheduler] purged room {purged['id']} ({purged['name']})",
+                        flush=True,
+                    )
+            asyncio.run(process_daily_task_digests())
         except Exception as e:  # noqa: BLE001
             print(f"[scheduler] error: {e}", flush=True)
         time.sleep(_POLL_INTERVAL)
 
 
 def start_scheduler() -> None:
-    """백그라운드 마감 감지 스케줄러를 시작한다(데몬 스레드)."""
+    """백그라운드 마감 감지 + 삭제 유예 만료 청소 스케줄러를 시작한다."""
     threading.Thread(target=_scheduler_loop, daemon=True, name="form-scheduler").start()
-    print("[scheduler] form-close watcher started", flush=True)
+    print("[scheduler] form-close and room-purge watcher started", flush=True)

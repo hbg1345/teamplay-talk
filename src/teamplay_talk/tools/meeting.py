@@ -16,7 +16,7 @@ from typing import Any
 from fastmcp import FastMCP
 
 from .. import storage
-from ..identity import resolve_caller
+from .guards import require_room
 
 _KST = timezone(timedelta(hours=9))
 _WD = ["월", "화", "수", "목", "금", "토", "일"]
@@ -94,14 +94,10 @@ def register(mcp: FastMCP) -> None:
         if not slots:
             return {"ok": False, "error": "start_hour < end_hour 여야 합니다."}
 
-        caller = await resolve_caller()
-        if room_id is None:
-            if caller is None:
-                return {"ok": False, "error": "카카오 인증이 필요합니다."}
-            active = storage.get_active_room(caller["id"])
-            if active is None:
-                return {"ok": False, "error": "현재 작업 방이 없습니다."}
-            room_id = active["id"]
+        caller, room, error = await require_room(room_id)
+        if error:
+            return error
+        room_id = room["id"]
 
         closes_at = None
         if close_minutes:
@@ -139,7 +135,7 @@ def register(mcp: FastMCP) -> None:
             title="회의 가능 시간",
             schema_json=schema,
             anonymous=False,
-            creator_user_id=caller["id"] if caller else None,
+            creator_user_id=caller["id"],
             closes_at=closes_at,
             close_on_all=True,
         )
@@ -153,6 +149,10 @@ def register(mcp: FastMCP) -> None:
             "dates": date_cols,
             "time_slots": slots,
             "members": [m["nickname"] for m in members],
+            "sent": False,
+            "required_next_tool": "send_form",
+            "send_form_arguments": {"form_id": fid},
+            "do_not_claim_sent_before_send_form": True,
             "action_required": (
                 "⚠️ 아직 보내지 마세요. 그리드 범위(날짜·시간)를 팀장에게 보여주고 확인받은 "
                 "뒤에만 send_form(form_id) 하세요. 응답 모이면 get_poll_results로 best_slots 확인."

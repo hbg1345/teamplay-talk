@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 
 from .. import kakao_store, storage
 from ..config import settings
-from ..identity import resolve_caller
+from .guards import require_form, require_room
 
 
 class PollQuestion(BaseModel):
@@ -70,6 +70,64 @@ def _to_surveyjs(title: str, description: str | None, questions: list[PollQuesti
     return schema
 
 
+def _send_form_followup(form: dict[str, Any]) -> dict[str, Any]:
+    schema = form.get("schema_json") or {}
+    workflow = schema.get("_workflow_kind")
+    if any(e.get("type") == "ranking" and e.get("name") == "roles" for e in schema.get("elements", [])):
+        workflow = "role_assignment"
+    if any(e.get("type") == "matrixdropdown" and e.get("name") == "availability" for e in schema.get("elements", [])):
+        workflow = "meeting_time"
+    if workflow == "location":
+        return {
+            "next": "응답이 모이면 get_poll_results로 위치 후보를 읽고 정규화하세요. 카카오맵 MCP가 있으면 장소명/주소 확인에 보조적으로 쓰고, 없으면 제출 후보만 본투표로 넘기세요.",
+            "suggested_next_actions": [
+                "응답 대기 후 get_poll_results 호출",
+                "location_1~5 값을 같은 역·상권·동네 기준으로 정규화",
+                "카카오맵 MCP가 있으면 장소명·역명·주소 확인과 중복 후보 정규화에만 보조적으로 사용",
+                "카카오맵 MCP가 없으면 있으면 장소 확인이 더 정확해진다고 안내",
+                "create_poll 복수선택 본투표 생성",
+            ],
+        }
+    if workflow == "roadmap_decision":
+        return {
+            "next": "응답이 모이면 get_poll_results로 확인하고, decompose_roadmap/add_task/update_task 또는 create_poll로 후속 반영하세요.",
+            "suggested_next_actions": [
+                "응답 대기 후 get_poll_results 호출",
+                "답변을 태스크/담당/마감/리스크 후보로 정규화",
+                "여러 실행 항목은 decompose_roadmap으로 반영",
+                "갈리는 항목은 create_poll로 우선순위 투표",
+            ],
+        }
+    if workflow == "role_assignment":
+        return {
+            "next": "역할 선호 응답이 모이면 get_poll_results로 확인하고 finalize_roles로 배정안을 계산하세요.",
+            "suggested_next_actions": [
+                "응답 대기 후 get_poll_results 호출",
+                "finalize_roles로 난이도/slots 기반 배정 계산",
+                "팀장 확인 후 set_roles로 저장",
+            ],
+        }
+    if workflow == "meeting_time":
+        return {
+            "next": "응답이 모이면 get_poll_results의 best_slots를 보고 회의 시간을 확정하세요.",
+            "suggested_next_actions": [
+                "응답 대기 후 get_poll_results 호출",
+                "best_slots 중 시간 확정",
+                "notify_room으로 공지",
+                "calendar_create_room_event로 전원 캘린더 등록",
+            ],
+        }
+    return {
+        "next": "응답이 모이면 get_poll_results로 결과를 확인하고, 필요하면 notify_room 또는 후속 투표/로드맵 반영으로 이어가세요.",
+        "suggested_next_actions": [
+            "응답 대기 후 get_poll_results 호출",
+            "결과 요약",
+            "필요하면 notify_room으로 공지",
+            "갈리면 create_poll로 후속 투표",
+        ],
+    }
+
+
 def register(mcp: FastMCP) -> None:
     """의견 수렴 도메인 도구를 등록한다."""
 
@@ -118,19 +176,10 @@ def register(mcp: FastMCP) -> None:
             close_minutes: N분 뒤 자동 마감 (선택)
             close_on_all: 전원 응답 시 자동 마감 (선택)
         """
-        caller = await resolve_caller()
-        if caller is None:
-            return {"ok": False, "error": "인증이 필요합니다 — PlayMCP에서 이 MCP 인증을 먼저 해주세요."}
-        if room_id is None:
-            active = storage.get_active_room(caller["id"])
-            if active is None:
-                return {
-                    "ok": False,
-                    "error": "현재 작업 중인 방이 없습니다. create_room으로 방을 만들거나 switch_room으로 선택하세요.",
-                }
-            room_id = active["id"]
-        elif storage.get_room(room_id) is None:
-            return {"ok": False, "error": f"방 {room_id}를 찾을 수 없습니다. my_rooms로 방 목록을 확인하세요."}
+        caller, room, error = await require_room(room_id)
+        if error:
+            return error
+        room_id = room["id"]
         creator_id = caller["id"]
 
         closes_at = None
@@ -157,6 +206,10 @@ def register(mcp: FastMCP) -> None:
             "title": title,
             "anonymous": anonymous,
             "question_count": len(questions),
+            "sent": False,
+            "required_next_tool": "send_form",
+            "send_form_arguments": {"form_id": fid},
+            "do_not_claim_sent_before_send_form": True,
             "next": "send_form(form_id)으로 팀에 발송하세요 (notify_room ❌).",
         }
         if anonymous:
@@ -185,7 +238,8 @@ def register(mcp: FastMCP) -> None:
     ) -> dict[str, Any]:
         """Starts opinion gathering (stage 1 of 의견수렴형) — a free-text poll to the team.
 
-        팀의 의사결정(**회의 시간·약속 장소·주제 등 '뭘로 할까'**)을 시작한다.
+        팀의 의사결정(**주제·아이디어 등 '뭘로 할까'**)을 시작한다.
+        약속 장소/출발 위치는 긴 자유서술 대신 gather_locations를 우선 사용한다.
         **사용자에게 후보를 묻지 마라** — 이 도구로 팀원에게 자유의견을 모으는 게 시작이다.
 
         기본 2단계 흐름:
@@ -193,15 +247,8 @@ def register(mcp: FastMCP) -> None:
         (2) get_poll_results로 의견 읽고 **AI가 항목화** → create_poll(**복수선택** 본투표, 그
             항목들) → send_form → 결과 공지.
 
-        약속 장소 정하기:
-        (1) gather_opinions("각자 출발 위치(근처 역/동네)나 선호 장소를 적어주세요") →
-            send_form → get_poll_results.
-        (2) 팀원이 대충 쓴 장소를 AI가 정규화한다. 같은 역·상권·동네는 합치고
-            (예: "강남", "강남역", "신논현 근처" → "강남역/신논현역 일대"),
-            실제로 다를 수 있으면 억지로 합치지 말고 원문 의미를 보존한다.
-        (3) 카카오맵 MCP가 사용 가능하면 위치 검색으로 중간 후보/주변 장소를 추가한다.
-            사용 불가하면 새 장소를 만들지 말고 제출된 후보만 정규화한다.
-        (4) 정규화한 후보로 create_poll(복수선택 본투표)을 만든다.
+        약속 장소 정하기는 gather_locations → send_form → get_poll_results →
+        정규화/카카오맵 MCP 장소명 확인 보조 → create_poll 본투표 흐름을 사용한다.
 
         예: "회의 일정 잡자" → gather_opinions("회의 가능한 날짜·시간을 자유롭게 적어주세요").
 
@@ -211,14 +258,10 @@ def register(mcp: FastMCP) -> None:
             anonymous: 익명 여부 (기본 True)
             close_minutes: 마감까지 분 (기본 1일; 전원 응답 시 자동 마감)
         """
-        caller = await resolve_caller()
-        if room_id is None:
-            if caller is None:
-                return {"ok": False, "error": "카카오 인증이 필요합니다."}
-            active = storage.get_active_room(caller["id"])
-            if active is None:
-                return {"ok": False, "error": "현재 작업 방이 없습니다."}
-            room_id = active["id"]
+        caller, room, error = await require_room(room_id)
+        if error:
+            return error
+        room_id = room["id"]
 
         closes_at = None
         if close_minutes:
@@ -239,7 +282,7 @@ def register(mcp: FastMCP) -> None:
             title=question,
             schema_json=schema,
             anonymous=anonymous,
-            creator_user_id=caller["id"] if caller else None,
+            creator_user_id=caller["id"],
             closes_at=closes_at,
             close_on_all=True,
         )
@@ -250,12 +293,313 @@ def register(mcp: FastMCP) -> None:
             "ok": True,
             "form_id": fid,
             "stage": "1/2 (의견수렴)",
+            "sent": False,
+            "required_next_tool": "send_form",
+            "send_form_arguments": {"form_id": fid},
+            "do_not_claim_sent_before_send_form": True,
             "next": (
                 "send_form(form_id)으로 팀원에게 발송 → 응답 모이면(또는 마감 nudge) "
                 "get_poll_results로 의견을 읽고 **항목화**한 뒤, create_poll(복수선택 본투표)로 "
-                "2단계 투표를 만드세요. 약속 장소라면 같은 역·상권·동네를 정규화하고, "
-                "카카오맵 MCP가 있으면 중간 후보/주변 장소를 추가하되 없으면 제출 후보만 쓰세요."
+                "2단계 투표를 만드세요. 약속 장소는 gather_locations 전용 흐름을 쓰세요."
             ),
+        }
+
+    @mcp.tool(
+        name="gather_locations",
+        annotations={
+            "title": "약속 장소 후보 수집",
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": False,
+        },
+    )
+    async def gather_locations(
+        title: str = "약속 장소 후보와 출발 위치를 적어주세요",
+        room_id: int | None = None,
+        anonymous: bool = False,
+        close_minutes: int | None = 1440,
+    ) -> dict[str, Any]:
+        """Starts structured location gathering for meeting-place decisions.
+
+        약속 장소를 정하기 위한 전용 수집 폼을 만든다. 긴 자유서술 1칸 대신
+        짧은 위치 입력칸 5개와 기타 의견을 분리해 받아서 AI가 정규화하기 쉽게 한다.
+
+        기본 흐름:
+        gather_locations → send_form → get_poll_results →
+        AI가 위치 후보 정규화 →
+        카카오맵 MCP가 있으면 장소명/역명/주소 확인 보조 →
+        없으면 카카오맵 MCP 연결 시 장소 확인이 더 정확해진다고 안내하고 제출 후보만 사용 →
+        create_poll(복수선택 본투표) → send_form → get_poll_results → notify_room.
+
+        Args:
+            title: 폼 제목
+            room_id: 대상 방 (생략 시 현재 작업 방)
+            anonymous: 익명 여부. 기본 false(누가 어떤 후보를 냈는지 확인하기 쉬움)
+            close_minutes: 마감까지 분 (기본 1일; 전원 응답 시 자동 마감)
+        """
+        caller, room, error = await require_room(room_id)
+        if error:
+            return error
+        room_id = room["id"]
+
+        closes_at = None
+        if close_minutes:
+            from datetime import datetime, timedelta, timezone
+
+            closes_at = datetime.now(timezone.utc) + timedelta(minutes=int(close_minutes))
+
+        elements: list[dict[str, Any]] = [
+            {
+                "type": "text",
+                "name": "location_1",
+                "title": "위치 1",
+                "description": "출발지나 선호 후보를 역/동네/상호명처럼 짧게 적어주세요.",
+                "placeholder": "예: 강남역, 홍대입구역, 서초동, 카카오 판교아지트",
+                "isRequired": True,
+            }
+        ]
+        for i in range(2, 6):
+            elements.append({
+                "type": "text",
+                "name": f"location_{i}",
+                "title": f"위치 {i}",
+                "description": "추가 후보가 있으면 하나만 적어주세요.",
+                "placeholder": "예: 신논현역",
+                "isRequired": False,
+            })
+        elements.append({
+            "type": "comment",
+            "name": "location_note",
+            "title": "기타 의견",
+            "description": "이동수단, 피하고 싶은 지역, 시간 제약, 선호 분위기 등을 적어주세요.",
+            "isRequired": False,
+        })
+        schema = {
+            "title": title,
+            "description": "위치는 한 칸에 하나씩 짧게 적을수록 중복 정리와 지도 검색이 잘 됩니다.",
+            "completeText": "제출",
+            "showQuestionNumbers": "off",
+            "elements": elements,
+            "_workflow_kind": "location",
+            "_workflow_stage": "location_collection",
+            "_workflow_scope": "meeting_place",
+        }
+        form = storage.create_form(
+            room_id=room_id,
+            title=title,
+            description=schema["description"],
+            schema_json=schema,
+            anonymous=anonymous,
+            creator_user_id=caller["id"],
+            closes_at=closes_at,
+            close_on_all=True,
+        )
+        fid = form["id"]
+        if not anonymous:
+            storage.create_invites(fid, [m["id"] for m in storage.list_members(room_id)])
+        return {
+            "ok": True,
+            "form_id": fid,
+            "anonymous": anonymous,
+            "sent": False,
+            "required_next_tool": "send_form",
+            "send_form_arguments": {"form_id": fid},
+            "do_not_claim_sent_before_send_form": True,
+            "next": (
+                "send_form(form_id)으로 발송 → get_poll_results로 location_1~5 응답 확인 → "
+                "AI가 같은 역/상권/동네를 정규화 → 카카오맵 MCP가 있으면 장소명/주소 확인에 보조적으로 사용 → "
+                "지도 도구가 없으면 제출 후보만 create_poll 복수선택 본투표로 진행."
+            ),
+            "suggested_next_actions": [
+                "send_form으로 팀원에게 위치 입력 폼 발송",
+                "응답 후 get_poll_results로 위치 칸별 원문 확인",
+                "같은 장소 표현을 정규화하고 모호한 값은 원문 보존",
+                "카카오맵 MCP가 있으면 장소명·역명·주소 확인과 중복 후보 정규화에만 보조적으로 사용",
+                "카카오맵 MCP가 없으면 있으면 장소 확인이 더 정확하다는 멘트 후 제출 후보만 본투표",
+                "정규화 후보로 create_poll 복수선택 본투표 생성",
+            ],
+            "chat_response_hint": (
+                "사용자에게는 '위치 입력 폼을 만들었고 아직 발송 전입니다. 보낼까요?'처럼 말하세요. "
+                "발송 성공 전에는 팀원에게 물어봤다고 말하지 마세요."
+            ),
+            "optional_integration": {
+                "name": "카카오맵 MCP",
+                "when_available": "장소명·역명·주소 확인, 중복 후보 정규화 보조",
+                "fallback": "미설치/미사용이면 팀원이 제출한 후보만 정규화해서 본투표",
+            },
+        }
+
+    @mcp.tool(
+        name="gather_task_opinions",
+        annotations={
+            "title": "로드맵/할일 의견수렴",
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": False,
+        },
+    )
+    async def gather_task_opinions(
+        scope: Literal["roadmap", "todo", "blockers", "scope"] = "roadmap",
+        prompt: str | None = None,
+        room_id: int | None = None,
+        anonymous: bool = False,
+        close_minutes: int | None = 1440,
+    ) -> dict[str, Any]:
+        """Starts a structured roadmap/todo opinion loop in teamplay-talk(팀플톡).
+
+        로드맵 단계, 개인별 to-do, 병목/리스크, 스코프 조정을 정하기 전에 팀원 의견을
+        구조적으로 모은다. 결과 조회 뒤 AI가 답변을 정규화해 add_task/update_task 또는
+        create_poll 우선순위 투표로 이어가야 한다.
+
+        기본 흐름:
+        gather_task_opinions → send_form → get_poll_results →
+        AI가 태스크 후보/수정사항/리스크로 정규화 →
+        decompose_roadmap/add_task/update_task/create_poll → member_tasks/daily_task_digest.
+
+        Args:
+            scope: roadmap=로드맵 단계, todo=구체 할일, blockers=막힌 점, scope=범위 조정
+            prompt: 팀원에게 보여줄 질문 제목. 생략하면 scope별 기본 질문.
+            room_id: 대상 방 (생략 시 현재 작업 방)
+            anonymous: 익명 여부. 기본 false(누가 어떤 할일/제약을 말했는지 반영하기 좋음)
+            close_minutes: 마감까지 분 (기본 1일; 전원 응답 시 자동 마감)
+        """
+        caller, room, error = await require_room(room_id)
+        if error:
+            return error
+        room_id = room["id"]
+
+        closes_at = None
+        if close_minutes:
+            from datetime import datetime, timedelta, timezone
+
+            closes_at = datetime.now(timezone.utc) + timedelta(minutes=int(close_minutes))
+
+        titles = {
+            "roadmap": "로드맵에서 빠진 단계나 수정할 단계가 있나요?",
+            "todo": "이번 구간에 해야 할 구체적인 할일과 맡을 수 있는 일을 적어주세요.",
+            "blockers": "지금 막힌 점과 도움이 필요한 부분을 적어주세요.",
+            "scope": "이번 프로젝트 범위에서 유지/줄임/추가할 것을 적어주세요.",
+        }
+        title = prompt or titles[scope]
+        elements_by_scope: dict[str, list[dict[str, Any]]] = {
+            "roadmap": [
+                {
+                    "type": "comment",
+                    "name": "roadmap_changes",
+                    "title": "추가/수정/삭제하면 좋을 로드맵 단계",
+                    "isRequired": True,
+                },
+                {
+                    "type": "comment",
+                    "name": "reason",
+                    "title": "그렇게 생각한 이유나 기대 효과",
+                    "isRequired": False,
+                },
+                {
+                    "type": "comment",
+                    "name": "risk",
+                    "title": "걱정되는 리스크나 놓친 조건",
+                    "isRequired": False,
+                },
+            ],
+            "todo": [
+                {
+                    "type": "comment",
+                    "name": "todo_suggestions",
+                    "title": "이번 주/다음 회의 전까지 필요한 구체 할일",
+                    "isRequired": True,
+                },
+                {
+                    "type": "comment",
+                    "name": "owner_hint",
+                    "title": "본인이 맡을 수 있거나 도와줄 수 있는 일",
+                    "isRequired": False,
+                },
+                {
+                    "type": "comment",
+                    "name": "due_hint",
+                    "title": "가능한 마감일, 어려운 일정, 필요한 선행조건",
+                    "isRequired": False,
+                },
+            ],
+            "blockers": [
+                {
+                    "type": "comment",
+                    "name": "blocker",
+                    "title": "현재 막힌 점",
+                    "isRequired": True,
+                },
+                {
+                    "type": "comment",
+                    "name": "help_needed",
+                    "title": "누구의 어떤 도움이 필요한지",
+                    "isRequired": False,
+                },
+            ],
+            "scope": [
+                {
+                    "type": "comment",
+                    "name": "keep",
+                    "title": "유지해야 할 것",
+                    "isRequired": False,
+                },
+                {
+                    "type": "comment",
+                    "name": "cut",
+                    "title": "줄이거나 빼도 되는 것",
+                    "isRequired": False,
+                },
+                {
+                    "type": "comment",
+                    "name": "add",
+                    "title": "추가하면 좋은 것",
+                    "isRequired": False,
+                },
+            ],
+        }
+        schema = {
+            "title": title,
+            "completeText": "제출",
+            "showQuestionNumbers": "off",
+            "elements": elements_by_scope[scope],
+            "_workflow_kind": "roadmap_decision",
+            "_workflow_scope": scope,
+        }
+        form = storage.create_form(
+            room_id=room_id,
+            title=title,
+            schema_json=schema,
+            anonymous=anonymous,
+            creator_user_id=caller["id"],
+            closes_at=closes_at,
+            close_on_all=True,
+        )
+        fid = form["id"]
+        if not anonymous:
+            storage.create_invites(fid, [m["id"] for m in storage.list_members(room_id)])
+        return {
+            "ok": True,
+            "form_id": fid,
+            "scope": scope,
+            "anonymous": anonymous,
+            "sent": False,
+            "required_next_tool": "send_form",
+            "send_form_arguments": {"form_id": fid},
+            "do_not_claim_sent_before_send_form": True,
+            "next": (
+                "send_form(form_id)으로 팀에 발송 → get_poll_results로 응답 확인 → "
+                "AI가 태스크 후보/수정사항/리스크로 정규화 → decompose_roadmap/add_task/update_task 또는 "
+                "필요 시 create_poll 우선순위 투표 → member_tasks로 개인별 할일 확인."
+            ),
+            "suggested_next_actions": [
+                "send_form으로 팀원에게 발송",
+                "응답 후 get_poll_results로 원문 의견 조회",
+                "AI가 중복 표현을 합치고 태스크/담당/마감/리스크 후보로 정리",
+                "여러 실행 항목은 decompose_roadmap, 단건 수정은 add_task/update_task로 반영",
+                "갈리는 항목은 create_poll로 채택/우선순위 투표",
+            ],
         }
 
     @mcp.tool(
@@ -268,15 +612,23 @@ def register(mcp: FastMCP) -> None:
             "openWorldHint": False,
         },
     )
-    def get_poll_results(form_id: int) -> dict[str, Any]:
+    async def get_poll_results(form_id: int) -> dict[str, Any]:
         """Reads aggregated responses of a teamplay-talk(팀플톡) poll/form.
 
-        폼 응답을 질문별로 집계해 반환한다. 객관식=선택지별 카운트, rank=순위점수,
-        rating=평균, 주관식=답변 목록. 식별 폼이면 멤버별 raw 응답도 포함(역할 매칭용).
+        폼 응답을 질문별로 집계해 반환한다. 객관식=선택지별 카운트와 승자/동점,
+        rank=순위점수와 상위 후보, rating=평균, 주관식=답변 목록. 식별 폼이면
+        멤버별 raw 응답도 포함한다.
+
+        결과에는 workflow_kind와 suggested_next_actions가 포함된다. 역할분배는 일반
+        create_poll이 아니라 assign_roles가 만든 ranking 폼이며, 결과 조회 후
+        finalize_roles → set_roles로 이어진다.
 
         Args:
             form_id: 결과를 조회할 폼 ID
         """
+        _caller, _form, error = await require_form(form_id)
+        if error:
+            return error
         results = storage.get_results(form_id)
         if results is None:
             return {"ok": False, "error": "존재하지 않는 폼입니다."}
@@ -287,12 +639,12 @@ def register(mcp: FastMCP) -> None:
         annotations={
             "title": "폼/투표 마감",
             "readOnlyHint": False,
-            "destructiveHint": False,
+            "destructiveHint": True,
             "idempotentHint": True,
             "openWorldHint": False,
         },
     )
-    def close_poll(form_id: int) -> dict[str, Any]:
+    async def close_poll(form_id: int) -> dict[str, Any]:
         """Closes a teamplay-talk(팀플톡) poll and returns final results.
 
         폼을 마감(추가 응답 차단)하고 최종 결과를 반환한다.
@@ -300,6 +652,9 @@ def register(mcp: FastMCP) -> None:
         Args:
             form_id: 마감할 폼 ID
         """
+        _caller, _form, error = await require_form(form_id)
+        if error:
+            return error
         results = storage.get_results(form_id)
         if results is None:
             return {"ok": False, "error": "존재하지 않는 폼입니다."}
@@ -327,9 +682,9 @@ def register(mcp: FastMCP) -> None:
             form_id: 발송할 폼 ID
             message: 안내 문구 (생략 시 기본). 링크는 자동으로 뒤에 붙는다.
         """
-        form = storage.get_form(form_id)
-        if form is None:
-            return {"ok": False, "error": "존재하지 않는 폼입니다."}
+        _caller, form, error = await require_form(form_id)
+        if error:
+            return error
         base = f"{settings.public_base_url}/form/{form_id}"
         prefix = (message or f"📋 '{form['title']}' 폼에 응답해주세요").rstrip()
 
@@ -346,4 +701,26 @@ def register(mcp: FastMCP) -> None:
 
         if not sent and not failed:
             return {"ok": False, "error": "발송 대상이 없습니다(멤버가 카카오 로그인을 마쳐야 함)."}
-        return {"ok": True, "form_id": form_id, "sent_to": sent, "failed": failed, "count": len(sent)}
+        if not sent:
+            return {
+                "ok": False,
+                "form_id": form_id,
+                "sent_to": sent,
+                "failed": failed,
+                "count": 0,
+                "error": "모든 발송이 실패했습니다. 카카오 인증/토큰 상태를 확인해야 합니다.",
+            }
+        followup = _send_form_followup(form)
+        return {
+            "ok": True,
+            "form_id": form_id,
+            "sent_to": sent,
+            "failed": failed,
+            "count": len(sent),
+            "status": "partial" if failed else "sent",
+            **followup,
+            "chat_response_hint": (
+                "사용자에게 발송 성공 대상과 다음 행동을 함께 말하세요. "
+                "예: '박세원님에게 보냈고, 응답이 오면 get_poll_results로 확인한 뒤 본투표를 만들 수 있어요.'"
+            ),
+        }

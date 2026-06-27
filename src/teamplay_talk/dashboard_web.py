@@ -103,7 +103,11 @@ def _dashboard_data(room_id: int) -> dict[str, Any] | None:
     room = storage.get_room(room_id)
     if room is None:
         return None
+    from .tools.roadmap import _format as _format_roadmap
+
     members = storage.list_members(room_id)
+    roadmap = _format_roadmap(storage.get_roadmap(room_id))
+    latest_decisions = storage.latest_room_decisions(room_id)
     forms: list[dict[str, Any]] = []
     for form in storage.list_room_forms(room_id):
         schema = form.get("schema_json") or {"elements": []}
@@ -139,6 +143,8 @@ def _dashboard_data(room_id: int) -> dict[str, Any] | None:
             }
             for m in members
         ],
+        "latest_decisions": latest_decisions,
+        "roadmap": roadmap,
         "forms": forms,
     }
 
@@ -184,7 +190,7 @@ _PAGE = """<!doctype html>
   .eyebrow{margin:0 0 8px;color:var(--accent);font-size:.78rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase}
   h1{margin:0;font-size:clamp(2rem,4.2vw,4.5rem);line-height:.98;letter-spacing:0}
   .sub{margin:12px 0 0;color:var(--muted);line-height:1.55;max-width:680px}
-  .stats{display:grid;grid-template-columns:repeat(3,92px);gap:8px}
+  .stats{display:grid;grid-template-columns:repeat(4,92px);gap:8px}
   .stat{border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:12px}
   .stat strong{display:block;font-size:1.35rem;line-height:1;font-weight:950}
   .stat span{display:block;margin-top:7px;color:var(--muted);font-size:.78rem;font-weight:800}
@@ -192,6 +198,23 @@ _PAGE = """<!doctype html>
   .member{display:inline-flex;align-items:center;gap:7px;min-height:34px;border:1px solid var(--line);border-radius:999px;background:#fff;padding:0 11px;font-size:.88rem}
   .member b{font-weight:900}
   .member span{color:var(--muted);font-size:.8rem;font-weight:750}
+  .roadmap-panel{border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:18px;margin:0 0 24px}
+  .roadmap-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:start;margin-bottom:16px}
+  .roadmap-head h2{margin:0;font-size:1.25rem;line-height:1.25}
+  .roadmap-head p{margin:6px 0 0;color:var(--muted);line-height:1.5}
+  .progress-chip{display:inline-flex;align-items:center;min-height:34px;border-radius:999px;background:var(--accent);color:#fff;padding:0 12px;font-weight:950}
+  .progress-line{height:10px;background:#e9eee9;border-radius:999px;overflow:hidden;margin:10px 0 18px}
+  .progress-line span{display:block;height:100%;background:var(--accent);border-radius:999px}
+  .member-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .member-card{border:1px solid var(--line);border-radius:8px;background:#fff;padding:13px}
+  .member-card h3{margin:0;font-size:.98rem}
+  .member-card .role{margin:4px 0 10px;color:var(--muted);font-size:.82rem;font-weight:800}
+  .task-list{display:grid;gap:7px;margin:0;padding:0;list-style:none}
+  .task-item{border:1px solid #e7ece6;border-radius:8px;padding:9px;background:#fbfdfb}
+  .task-item.done{opacity:.72}
+  .task-title{font-weight:900;line-height:1.35}
+  .task-meta{margin-top:4px;color:var(--muted);font-size:.78rem;font-weight:800}
+  .roadmap-note{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
   .timeline{position:relative;display:grid;gap:18px}
   .timeline:before{content:"";position:absolute;left:142px;top:0;bottom:0;width:2px;background:var(--line)}
   .event{position:relative;display:grid;grid-template-columns:120px minmax(0,1fr);gap:42px;align-items:start}
@@ -225,7 +248,8 @@ _PAGE = """<!doctype html>
   .empty{border:1px dashed #bcc8bf;border-radius:8px;background:rgba(255,255,255,.55);padding:36px 22px;text-align:center;color:var(--muted)}
   @media (max-width:760px){
     .mast{display:block}
-    .stats{grid-template-columns:repeat(3,minmax(0,1fr));margin-top:18px}
+    .stats{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:18px}
+    .member-grid{grid-template-columns:1fr}
     .timeline:before{left:8px}
     .event{grid-template-columns:1fr;gap:8px;padding-left:28px}
     .event:before{left:1px}
@@ -253,15 +277,18 @@ _PAGE = """<!doctype html>
     <div class="stats">
       <div class="stat"><strong id="formCount">0</strong><span>기록</span></div>
       <div class="stat"><strong id="memberCount">0</strong><span>멤버</span></div>
+      <div class="stat"><strong id="taskCount">0</strong><span>태스크</span></div>
       <div class="stat"><strong id="responseCount">0</strong><span>응답</span></div>
     </div>
   </header>
   <div class="members" id="members"></div>
+  <section id="roadmapPanel"></section>
   <main class="timeline" id="timeline"></main>
 </div>
 <script>
 const dashboard = __DATA__;
 const forms = [...dashboard.forms].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+const roadmap = dashboard.roadmap || {progress:{done:0,total:0}, task_layer_summary:{milestones:0,todos:0}, by_member:[], unassigned_tasks:[], calendar_candidates:[]};
 
 function escapeText(value) {
   return String(value == null ? "" : value).replace(/[&<>"']/g, (ch) => ({
@@ -290,6 +317,65 @@ function kindLabel(kind) {
     retro: "회고",
     survey: "투표"
   }[kind] || "투표";
+}
+
+function statusLabel(status) {
+  return {todo: "대기", doing: "진행중", done: "완료"}[status] || status || "-";
+}
+
+function taskDate(task) {
+  if (task.end_at) return `마감 ${escapeText(task.end_at.slice(0, 10))}`;
+  if (task.start_at) return `시작 ${escapeText(task.start_at.slice(0, 10))}`;
+  return "일정 미정";
+}
+
+function renderTask(task) {
+  return `
+    <li class="task-item ${task.status === "done" ? "done" : ""}">
+      <div class="task-title">${escapeText(task.title)}</div>
+      <div class="task-meta">${escapeText(statusLabel(task.status))} · ${taskDate(task)}</div>
+    </li>
+  `;
+}
+
+function renderRoadmap() {
+  const total = Number((roadmap.progress && roadmap.progress.total) || 0);
+  const layer = roadmap.task_layer_summary || {};
+  const milestoneCount = Number(layer.milestones || 0);
+  if (!total && !milestoneCount) return "";
+  const done = Number((roadmap.progress && roadmap.progress.done) || 0);
+  const pct = total ? Math.round(done / total * 100) : 0;
+  const needsTodo = Boolean(layer.needs_todo_decomposition);
+  const members = (roadmap.by_member || []).map((member) => {
+    const tasks = (member.tasks || []).slice(0, 5);
+    const more = (member.tasks || []).length > tasks.length ? `<li class="task-item"><div class="task-meta">외 ${(member.tasks || []).length - tasks.length}개</div></li>` : "";
+    return `
+      <section class="member-card">
+        <h3>${escapeText(member.nickname)}</h3>
+        <div class="role">${escapeText(member.role || "역할 미정")} · ${escapeText((member.progress && member.progress.done) || 0)}/${escapeText((member.progress && member.progress.total) || 0)} 완료</div>
+        <ul class="task-list">${tasks.map(renderTask).join("") || `<li class="task-item"><div class="task-meta">아직 배정된 태스크가 없습니다.</div></li>`}${more}</ul>
+      </section>
+    `;
+  }).join("");
+  return `
+    <section class="roadmap-panel">
+      <div class="roadmap-head">
+        <div>
+          <h2>로드맵 진행</h2>
+          <p>${needsTodo ? "로드맵 단계는 준비됐고, 이제 개인별 실행 todo로 분해해야 합니다." : "역할분배와 연결된 개인별 할일, 마감 후보, 미배정 태스크를 한곳에 모았습니다."}</p>
+        </div>
+        <span class="progress-chip">${done}/${total} 완료</span>
+      </div>
+      <div class="progress-line"><span style="width:${Math.max(2, pct)}%"></span></div>
+      <div class="member-grid">${members}</div>
+      <div class="roadmap-note">
+        <span class="badge">${escapeText(milestoneCount)}개 단계</span>
+        <span class="badge ${needsTodo ? "open" : ""}">${escapeText(total)}개 todo</span>
+        <span class="badge">${escapeText((roadmap.calendar_candidates || []).length)}개 캘린더 후보</span>
+        <span class="badge ${roadmap.unassigned_tasks && roadmap.unassigned_tasks.length ? "open" : ""}">${escapeText((roadmap.unassigned_tasks || []).length)}개 미배정</span>
+      </div>
+    </section>
+  `;
 }
 
 function renderBars(scores) {
@@ -372,10 +458,12 @@ function render() {
   document.getElementById("subtitle").textContent = `초대 코드 ${dashboard.room.invite_code} · 방에서 만든 투표와 폼 결과를 최신순으로 모았습니다.`;
   document.getElementById("formCount").textContent = forms.length;
   document.getElementById("memberCount").textContent = dashboard.members.length;
+  document.getElementById("taskCount").textContent = (roadmap.task_layer_summary && roadmap.task_layer_summary.todos) || (roadmap.progress && roadmap.progress.total) || 0;
   document.getElementById("responseCount").textContent = forms.reduce((sum, form) => sum + Number(form.total_responses || 0), 0);
 
   const members = document.getElementById("members");
   members.innerHTML = dashboard.members.map((member) => `<span class="member"><b>${escapeText(member.nickname)}</b><span>${escapeText(member.role || "역할 미정")}</span></span>`).join("");
+  document.getElementById("roadmapPanel").innerHTML = renderRoadmap();
 
   const timeline = document.getElementById("timeline");
   timeline.innerHTML = forms.length

@@ -29,10 +29,13 @@ class Settings:
     kakao_rest_api_key: str
     kakao_client_secret: str | None
     kakao_redirect_uri: str
+    daily_task_digest_enabled: bool
+    daily_task_digest_hour_kst: int
 
     @classmethod
     def from_env(cls) -> "Settings":
         port = int(os.getenv("PORT", "8000"))
+        digest_hour = int(os.getenv("DAILY_TASK_DIGEST_HOUR_KST", "9"))
         return cls(
             host=os.getenv("HOST", "0.0.0.0"),
             port=port,
@@ -45,6 +48,9 @@ class Settings:
             kakao_redirect_uri=os.getenv(
                 "KAKAO_REDIRECT_URI", f"http://localhost:{port}/auth/kakao/callback"
             ),
+            daily_task_digest_enabled=os.getenv("DAILY_TASK_DIGEST_ENABLED", "").lower()
+            in {"1", "true", "yes", "on"},
+            daily_task_digest_hour_kst=max(0, min(23, digest_hour)),
         )
 
 

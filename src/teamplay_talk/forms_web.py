@@ -363,7 +363,7 @@ def _resolve(request: Request) -> tuple[int | None, int | None]:
 
 async def view_form(request: Request) -> HTMLResponse:
     """GET /form/<id>[?t=token] — SurveyJS 폼 렌더링."""
-    form_id, _member = _resolve(request)
+    form_id, member_id = _resolve(request)
     if form_id is None:
         return _message("잘못된 요청", "폼 ID가 올바르지 않습니다.", 400)
     form = storage.get_form(form_id)
@@ -371,6 +371,10 @@ async def view_form(request: Request) -> HTMLResponse:
         return _message("폼을 찾을 수 없음", "존재하지 않는 폼입니다.", 404)
     if form["closed"]:
         return _message("마감된 폼", "이 폼은 응답이 마감되었습니다.", 403)
+    if not form["anonymous"] and member_id is None:
+        return _message("개인 링크 필요", "이 폼은 개인별 링크로만 응답할 수 있습니다.", 403)
+    if member_id is not None and not storage.is_form_member(form_id, member_id):
+        return _message("권한이 없습니다", "이 방의 현재 멤버만 응답할 수 있습니다.", 403)
 
     schema = form.get("schema_json") or {"elements": []}
     schema_str = jsonlib.dumps(schema, ensure_ascii=False).replace("</", "<\\/")
@@ -388,6 +392,10 @@ async def submit_form(request: Request) -> JSONResponse:
         return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
     if form["closed"]:
         return JSONResponse({"ok": False, "error": "closed"}, status_code=403)
+    if not form["anonymous"] and member_id is None:
+        return JSONResponse({"ok": False, "error": "personal link required"}, status_code=403)
+    if member_id is not None and not storage.is_form_member(form_id, member_id):
+        return JSONResponse({"ok": False, "error": "not a current room member"}, status_code=403)
 
     try:
         answers = await request.json()

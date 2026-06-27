@@ -1,94 +1,293 @@
-# teamplay-talk 핸드오프 (2026-06-26)
+# teamplay-talk 핸드오프 (2026-06-27)
 
-> 다음 AI/세션이 이어받기 위한 문서. 박세원(PM)이 함봉구(hbg1345)와 만드는 **팀플 협업 MCP**.
-> Kakao PlayMCP 공모전(마감 **2026-07-14**). repo: `hbg1345/teamplay-talk` (private).
+> 다음 AI/세션이 이어받기 위한 최신 정리. 박세원(PM)이 함봉구(hbg1345)와 만드는 **팀플 협업 MCP**.
+> Kakao PlayMCP 공모전용. repo: `hbg1345/teamplay-talk` (private).
 
-## 지금 상태 (한 줄)
-회의 일정 조율(When2meet 그리드) + 방별 결과 타임라인까지 구현·배포 완료. **다음 할 일 = 사용자가 PlayMCP에서 MCP 재등록 후 실제 동작 QC**, 그리고 PM 로드맵의 남은 축(진척 추적 등).
+## 지금 상태
 
-## 인프라 / 배포 (중요)
-- **라이브**: `https://167.71.219.241.sslip.io` (DigitalOcean 드롭릿, Docker)
-- **MCP 엔드포인트**: `https://167.71.219.241.sslip.io/mcp/`
-- **배포 방법** (git 아님! rsync + docker):
-  ```bash
-  cd /Users/park/teamplay-talk
-  rsync -az -e "ssh -o StrictHostKeyChecking=accept-new" \
-    --exclude '.git' --exclude '.venv' --exclude '__pycache__' --exclude '.env' \
-    --exclude '*.pyc' --exclude 'data' ./ root@167.71.219.241:/root/teamplay-talk/
-  ssh root@167.71.219.241 'cd /root/teamplay-talk && docker compose up -d --build'
-  curl -s https://167.71.219.241.sslip.io/health   # → ok
-  ```
-- **라이브 도구 목록 확인** (MCP 핸드셰이크):
-  ```bash
-  B=https://167.71.219.241.sslip.io; M=$B/mcp/
-  H=(-H "Content-Type: application/json" -H "Accept: application/json, text/event-stream")
-  SID=$(curl -s -D - -o /dev/null "${H[@]}" -X POST "$M" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"c","version":"1"}}}' | grep -i 'mcp-session-id:' | awk '{print $2}' | tr -d '\r')
-  curl -s "${H[@]}" -H "mcp-session-id: $SID" -X POST "$M" -d '{"jsonrpc":"2.0","method":"notifications/initialized"}' >/dev/null
-  curl -s "${H[@]}" -H "mcp-session-id: $SID" -X POST "$M" -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
-  ```
+라이브 서버에 배포 완료. 팀 방, 카카오 OAuth, 폼/투표, 역할분배, 회의 일정, 약속 장소 후보 수집, 로드맵, 개인별 todo 분해, 카카오 공지/캘린더, 방별 대시보드, 방 삭제 유예까지 동작한다.
 
-## ⚠️ 가장 흔한 함정: PlayMCP 캐싱
-서버를 배포해도 **PlayMCP(또는 클라)는 도구목록·instructions를 캐싱**한다. 새 도구/지침이 안 보이면
-거의 항상 **PlayMCP에서 MCP를 삭제 후 재등록**해야 함. 라이브 서버는 위 핸드셰이크로 검증할 것
-(라이브엔 맞게 떠 있는데 클라엔 옛날 게 뜨는 경우가 잦았음).
+핵심 제품 방향은 **"팀원은 응답/실행만, 조율은 AI가 PM처럼"** 이다. 다만 AI 기억에 의존하지 않고 DB의 방/폼/역할/로드맵/todo 상태를 읽어 다음 행동을 이어가게 설계했다.
 
-## 인증 (함봉구 방식 채택)
-- PlayMCP가 카카오 OAuth를 직접 broker. 매 호출 `Authorization: Bearer <카카오 access_token>` 헤더.
-- `identity.resolve_caller()` 가 헤더 토큰 → `kakao.get_user_info` → user upsert. 로그인 불필요.
-- 핵심 픽스: PlayMCP가 /token에 client creds를 **Basic 헤더**로 보내는데 카카오는 **body**만 받음 →
-  `kakao_token_proxy.py`(`/kakao/token`)가 Basic→body 변환. (구글은 제거됨)
+## 인프라 / 배포
 
-## 현재 도구 16개
-- **방(5)**: create_room, join_room, switch_room, rooms(목록/상세 통합), leave_room
-- **폼/투표(5)**: create_poll, gather_opinions, get_poll_results, close_poll, send_form
-- **역할(3)**: assign_roles, finalize_roles, set_roles
-- **일정(1)**: schedule_meeting  ← 최신
-- **알림(1)**: notify_room
-- **대시보드(1)**: room_dashboard
+- 라이브: `https://167.71.219.241.sslip.io`
+- MCP 엔드포인트: `https://167.71.219.241.sslip.io/mcp/`
+- 서버: DigitalOcean 드롭릿 + Docker Compose + Caddy
+- DB: Postgres
+- 배포는 git pull이 아니라 로컬에서 rsync 후 docker rebuild.
 
-## 핵심 아키텍처
-- FastMCP v3 (Python), HTTP transport. 진입점 `teamplay-talk`→`server.main()`.
-- **폼 엔진**: SurveyJS. `storage.create_form(schema_json,...)` → `/form/<id>?t=<token>` 매직링크.
-  `forms_web.py`가 SurveyJS 임베드 페이지 렌더. 응답 `storage.save_response`(식별폼은 1인1표 upsert).
-- **집계**: `storage.get_results` — 객관식 카운트/ranking 점수/rating 평균/text 목록/
-  **matrixdropdown=O·X 그리드 집계(best_slots=X 0명 중 O 최다, 동점 전부)**.
-- **트리거**: `triggers.py` 백그라운드 스케줄러(30s) — 폼 마감(시간/전원) 감지 → 작성자에게 카톡 nudge.
-- **카톡 발송**: `kakao_store.send_with_refresh`(self-send + 401 시 토큰 refresh).
-- **DB**: DigitalOcean Postgres. `schema.sql`.
-- **방별 결과 타임라인**: `room_dashboard` → `/dashboard/rooms/{room_id}?token=...`.
-  새 DB 없이 `forms.schema_json` + `form_responses.answers_json` 집계를 시간순 결과 카드로 렌더한다.
+```bash
+cd /Users/park/teamplay-talk
+rsync -az -e "ssh -o StrictHostKeyChecking=accept-new" \
+  --exclude '.git' --exclude '.venv' --exclude '__pycache__' --exclude '.env' \
+  --exclude '*.pyc' --exclude 'data' ./ root@167.71.219.241:/root/teamplay-talk/
+ssh root@167.71.219.241 'cd /root/teamplay-talk && docker compose up -d --build'
+curl -fsS https://167.71.219.241.sslip.io/health
+```
 
-## 의사결정 흐름 3종 (server.py instructions에 가이드됨)
-1. **역할분배**: assign_roles → [팀장 확인] → send_form → finalize_roles → [확인] → set_roles
-   - LPT 균형배정(_balanced_assign): 모든 역할 커버, 난이도 균형(멤버엔 점수 숨김), 선호 tiebreak.
-2. **회의 일정**: `schedule_meeting()` (기본 오늘부터 14일×9~22시 O/X 그리드, 가로=날짜 스크롤,
-   세로=시간, 셀=O/X 드롭다운, 하단 기타건의사항) → [팀장 확인] → send_form →
-   get_poll_results의 **best_slots**(동점 전부) 공지. AI는 인자 없이 호출만 하면 됨.
-3. **의견수렴형(주제 등 막연한 것)**: gather_opinions(자유의견) → [nudge] → AI 항목화 →
-   create_poll(복수선택 본투표) → 결과. (회의·후보 뻔한 건 위 단일단계로)
-4. **방 결과 보기**: `room_dashboard()` → 결과 타임라인 링크. 방의 모든 투표/폼/일정 결과를
-   생성된 순서대로 보여준다. 회의 일정 폼은 `best_slots`도 별도 요약.
+`schema.sql` 변경 후 원격 DB 적용:
 
-## 반복된 교훈 (GPT-4.0이 클라 LLM이라 약함)
-- 지침(`instructions`)이 GPT-4.0에 잘 안 닿음 → **도구 설명(docstring)에 흐름을 박아야** 동작.
-  (회의가 떠넘겨지던 문제를 gather_opinions/schedule_meeting **진입 도구**로 해결한 패턴.)
-- "사용자에게 후보 묻지 마, AI/멤버가 생성" 을 docstring에 명시.
-- 확인 없이 발송/확정 금지(action_required로 게이트).
+```bash
+ssh root@167.71.219.241 'cd /root/teamplay-talk && docker compose exec -T app python - <<'"'"'PY'"'"'
+from pathlib import Path
+import psycopg
+from teamplay_talk.config import settings
+sql = Path("/app/src/teamplay_talk/schema.sql").read_text(encoding="utf-8")
+with psycopg.connect(settings.database_url) as conn:
+    with conn.cursor() as cur:
+        cur.execute(sql)
+    conn.commit()
+PY'
+```
 
-## 다음 할 일 (우선순위)
-1. **[사용자] PlayMCP 재등록 후 QC**: "회의 일정 잡자" → schedule_meeting() 호출되는지,
-   폼 그리드(가로 스크롤·O/X 드롭다운·기타칸) 렌더 정상인지. ← **지금 막힌 지점**
-2. 그리드가 모바일에서 너무 빽빽하면: 기본 시간 9~18로 축소, 또는 forms_web에 `overflow-x:auto` CSS.
-3. PM 로드맵 남은 축(`docs/PRODUCT_DIRECTION.md` 참고): **진척도 체크인**(스케줄러 재활용),
-   정기 브리핑, 약속장소(멤버 위치→최적 중심점, 카카오맵 MCP 조합).
-4. 기술부채: 카카오 토큰 평문 저장 → 암호화. 국외(DO 싱가포르) 개인정보 → PIPA 고지.
+## PlayMCP 주의
 
-## 작업 규칙 (사용자 선호 — 반드시 지킬 것)
-- **푸시는 명시적 허락 받고만** (이번엔 허락받아 푸시 완료, 미푸시 0).
-- **시각 QC/스크린샷은 사용자가 함** — AI가 브라우저 QC 하면 토큰 낭비라고 싫어함.
-- **토큰 의식적으로** — 과한 디버깅 금지. "키는 문제 없다"고 하면 그쪽 파지 말 것.
-- 한국어로 소통.
+- PlayMCP는 도구 목록/instructions를 캐싱하는 경우가 많다.
+- 서버에는 새 도구가 보이는데 PlayMCP 대화에서 안 보이면 MCP 삭제 후 재등록이 필요할 수 있다.
+- 현재 라이브 도구 수는 **35개**다. PlayMCP 가이드 권장/심사용으로는 나중에 도구 합치기 필요. 지금은 QC/데모 기능 완성 우선.
 
-## 메모리 파일
-`/Users/park/.claude/projects/-Users-park-teamplay-talk/memory/` 의 MEMORY.md +
-teamflow-mcp-project.md + teamplay-product-direction.md 참고.
+## 인증
+
+- PlayMCP가 카카오 OAuth를 broker하고, MCP 호출마다 `Authorization: Bearer <카카오 access_token>` 헤더가 들어온다.
+- `identity.resolve_caller()`가 카카오 사용자 정보를 조회해 `users` upsert.
+- 알림/캘린더용 카카오 토큰은 `users`에 저장.
+- PlayMCP `/token` 요청이 Basic auth로 오던 문제는 `kakao_token_proxy.py`가 Basic → Kakao body 방식으로 변환해 해결.
+
+## 현재 도구 35개
+
+방/멤버:
+- `create_room`, `join_room`, `switch_room`, `rooms`, `delete_room`, `restore_room`, `leave_room`
+
+공지:
+- `notify_room`
+
+폼/투표/의견수렴:
+- `create_poll`, `gather_opinions`, `gather_locations`, `gather_task_opinions`
+- `send_form`, `get_poll_results`, `close_poll`
+
+역할분배:
+- `assign_roles`, `finalize_roles`, `set_roles`
+
+회의 일정:
+- `schedule_meeting`
+
+로드맵/todo:
+- `build_roadmap`, `view_roadmap`
+- `add_task`, `delete_task`, `update_task`
+- `decompose_roadmap`, `member_tasks`, `daily_task_digest`
+
+대시보드:
+- `room_dashboard`
+
+카카오 톡캘린더:
+- `calendar_create_room_event`, `calendar_create_task_events`
+- `calendar_create_event`, `calendar_list_events`, `calendar_get_event`, `calendar_update_event`, `calendar_delete_event`
+
+## 핵심 워크플로우
+
+### 1. 팀 방
+
+기본은 현재 작업 방(active room)이다.
+
+```text
+create_room / join_room
+→ switch_room
+→ rooms 로 현재 방과 멤버 확인
+```
+
+방 삭제:
+- `delete_room`: soft delete, 유예 기간 후 purge
+- `restore_room`: 유예 기간 내 복구
+- `leave_room`: 마지막 멤버가 나가면 empty room 삭제 유예
+
+### 2. 역할분배
+
+역할은 로드맵 단계명이 아니라 책임영역/워크스트림이어야 한다.
+
+```text
+assign_roles
+→ 팀장 확인
+→ send_form
+→ get_poll_results
+→ finalize_roles
+→ 팀장 확인
+→ set_roles
+→ member_tasks(member='all') 확인
+```
+
+기능:
+- `Role.slots`: 핵심 구현처럼 2명이 필요한 역할은 `slots: 2`.
+- `finalize_roles`: 선호도 + 난이도 + slots로 균형 배정. 계산만 하고 저장하지 않음.
+- `set_roles`: DB에 역할 저장, 역할 결정 기록 저장, 기존 role-only todo를 실제 멤버에게 sync.
+- `assign_roles`는 `대회 주제 선정`, `최종 제출` 같은 로드맵 단계명을 역할로 쓰면 거절한다.
+
+### 3. 로드맵과 개인 todo
+
+이제 두 레이어가 분리되어 있다.
+
+- `build_roadmap`: 큰 단계, 즉 `task_type='milestone'`
+- `decompose_roadmap`: milestone 아래 실제 실행 todo, 즉 `task_type='todo'`
+- `member_tasks`: 실제 개인별 todo만 조회
+
+정상 흐름:
+
+```text
+build_roadmap
+→ set_roles
+→ decompose_roadmap
+→ member_tasks(member='all', window='week')
+→ 확인 후 daily_task_digest 또는 calendar_create_task_events
+```
+
+중요:
+- `daily_task_digest`는 분배 도구가 아니다. 이미 멤버에게 배정된 todo를 카톡으로 공지하는 도구다.
+- 사용자가 "팀원별로 나눠줘"라고 하면 `daily_task_digest`부터 호출하면 안 된다.
+- 먼저 `set_roles`가 끝났는지 확인하고, role-only todo가 있으면 sync 후 `member_tasks`로 사용자에게 보여준다.
+
+최근 보강:
+- `storage.sync_task_assignees_by_roles(room_id)` 추가.
+- 역할명으로만 저장된 todo를 현재 `room_members.role` 기준으로 실제 멤버에게 연결한다.
+- 같은 역할 담당자가 여러 명이면 현재 todo 수가 적은 멤버에게 분산한다.
+- role-only todo가 남으면 `needs_role_assignment: true`, `required_next_tool: set_roles`가 나온다.
+
+### 4. 회의 일정
+
+```text
+schedule_meeting
+→ 팀장 확인
+→ send_form
+→ get_poll_results
+→ best_slots 중 확정
+→ notify_room
+→ calendar_create_room_event
+```
+
+특징:
+- SurveyJS `matrixdropdown` O/X 그리드.
+- `best_slots`: X 0명 중 O 최다인 모든 동점 시간.
+- 모바일은 날짜 가로 스크롤, 시간 세로축.
+
+### 5. 약속 장소
+
+장소는 긴 자유서술 한 칸 대신 전용 폼을 쓴다.
+
+```text
+gather_locations
+→ send_form
+→ get_poll_results
+→ AI가 location_1~5 정규화
+→ create_poll 복수선택 본투표
+→ send_form
+→ get_poll_results
+→ notify_room
+```
+
+중요:
+- 카카오맵 MCP로 "두 출발지 사이 중간역/이동시간 자동 추천"을 약속하지 말 것.
+- 카카오맵/지도 MCP가 보이면 장소명·역명·주소 확인과 중복 후보 정규화에만 보조적으로 사용.
+- 없으면 "카카오맵 MCP가 있으면 장소명/주소 확인이 더 정확해지고, 지금은 제출된 텍스트 기준으로 후보를 정리해 투표할 수 있다"라고 말한다.
+
+### 6. 중간 의견수렴
+
+일반:
+
+```text
+gather_opinions
+→ send_form
+→ get_poll_results
+→ AI 항목화
+→ create_poll 본투표
+```
+
+로드맵/todo 전용:
+
+```text
+gather_task_opinions(scope='roadmap'|'todo'|'blockers'|'scope')
+→ send_form
+→ get_poll_results
+→ AI 정규화
+→ decompose_roadmap / add_task / update_task / create_poll
+→ member_tasks
+```
+
+### 7. 대시보드
+
+`room_dashboard`가 방별 대시보드 링크를 반환한다.
+
+보여주는 것:
+- 최신 폼/투표 결과 타임라인
+- role/todo/roadmap 상태
+- milestone 수, todo 수, 미배정/role-only todo 수
+- 캘린더 후보
+- latest decisions
+
+## DB/스키마 주요 추가
+
+- `rooms.status`, `deleted_at`, `purge_after`, `deleted_by_user_id`, `delete_reason`
+- `form_responses` 식별 폼 1인 1응답 unique upsert
+- `tasks.task_type`: `milestone` / `todo`
+- `tasks.parent_task_id`: todo가 속한 상위 milestone
+- `task_digest_sends`: 일일 todo digest 중복 방지
+- `room_decisions`: 회의시간/장소/역할 등 확정 결정 기록
+
+## 보안/권한
+
+- `tools/guards.py` 추가.
+- 주요 도구는 호출자가 해당 active room/form 멤버인지 검사.
+- 식별 폼은 멤버별 개인 링크 사용.
+- `send_form`/`notify_room`은 실제 `sent_to`가 없으면 성공처럼 말하지 않도록 보강.
+
+## 서버 instructions 원칙
+
+`server.py` instructions가 매우 중요하다. GPT-4.0이 도구 설명을 약하게 따르는 경향이 있어, 중요한 흐름은 docstring과 tool response의 `next`, `suggested_next_actions`, `chat_response_hint`에도 중복해 박아두었다.
+
+핵심 지침:
+- 도구 호출 뒤 사용자에게 **현재 상태 + 다음 선택지 2~4개**를 말하라.
+- `sent=false` 상태에서는 절대 "보냈다"라고 말하지 말라.
+- `finalize_roles`는 저장이 아니다. `set_roles` 전에는 역할 확정이라고 말하지 말라.
+- todo 분배와 digest를 혼동하지 말라.
+- 장소는 중간역 추천을 약속하지 말라.
+
+## 최근 QC에서 잡힌 문제와 해결
+
+1. 역할명 todo가 실제 멤버에게 배정되지 않아 `daily_task_digest`가 안 옴.
+   - 해결: `sync_task_assignees_by_roles`, `set_roles` 후 자동 sync, `daily_task_digest` 실패 이유 반환.
+
+2. AI가 todo 초안을 만들고 사용자에게 안 보여준 뒤 바로 공지하려 함.
+   - 해결: `decompose_roadmap` 응답에 `required_next_tool`, `needs_role_assignment`, `member_tasks` 유도.
+
+3. 장소 기능이 카카오맵 MCP로 중간역 추천을 과하게 약속.
+   - 해결: `gather_locations` 전용 폼 + 카카오맵은 장소명/주소 확인 보조로만 안내.
+
+4. PlayMCP에서 도구 생성만 하고 보냈다고 말함.
+   - 해결: `sent=false`, `required_next_tool='send_form'`, `do_not_claim_sent_before_send_form` 패턴 추가.
+
+## 다음 할 일
+
+1. PlayMCP에서 재등록 후 전체 워크플로우 QC:
+   - 역할분배 → set_roles → decompose_roadmap → member_tasks → daily_task_digest
+   - schedule_meeting → best_slots → calendar_create_room_event
+   - gather_locations → 본투표 → notify_room
+
+2. 도구 수 정리:
+   - 현재 35개라 심사 가이드(최대 20개, 권장 3~10개) 대비 많다.
+   - 캘린더 CRUD, room lifecycle, roadmap CRUD 등을 통합 도구로 묶는 작업 필요.
+
+3. 개인정보/운영:
+   - 카카오 토큰 평문 저장 암호화.
+   - 해외 서버(DO) 개인정보 고지.
+   - 로그/토큰 노출 점검.
+
+4. 제품 polish:
+   - 대시보드에서 role-only todo를 더 눈에 띄게 표시.
+   - `member_tasks` 결과를 더 예쁜 마크다운 요약으로 반환.
+   - 장소 투표 결과를 decision log에 더 명확히 기록.
+
+## 사용자 선호
+
+- 한국어로 짧고 실용적으로 소통.
+- 사용자가 "배포해/푸시해" 하면 실제로 끝까지 실행.
+- 시각 QC는 사용자가 직접 하는 편을 선호.
+- 토큰 낭비 싫어함. 이미 아니라고 한 원인을 계속 파지 말 것.
+- 욕이 섞여도 보통 답답해서 그러는 것. 감정적으로 받아치지 말고 바로 고치기.

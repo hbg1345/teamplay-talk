@@ -12,6 +12,20 @@ from ..dashboard_web import create_dashboard_token
 from ..identity import resolve_caller
 
 
+def _decision_payload(decision: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": decision["id"],
+        "kind": decision["kind"],
+        "title": decision["title"],
+        "summary": decision["summary"],
+        "payload": decision.get("payload") or {},
+        "source": decision.get("source"),
+        "created_at": decision["created_at"].isoformat()
+        if hasattr(decision.get("created_at"), "isoformat")
+        else decision.get("created_at"),
+    }
+
+
 def register(mcp: FastMCP) -> None:
     """리포트·대시보드 도메인 도구를 등록한다."""
 
@@ -51,6 +65,10 @@ def register(mcp: FastMCP) -> None:
 
         token = create_dashboard_token(room_id, caller["id"])
         forms = storage.list_room_forms(room_id)
+        latest_decisions = {
+            kind: _decision_payload(decision)
+            for kind, decision in storage.latest_room_decisions(room_id).items()
+        }
         url = f"{settings.public_base_url}/dashboard/rooms/{room_id}?token={token}"
         return {
             "ok": True,
@@ -59,5 +77,6 @@ def register(mcp: FastMCP) -> None:
             "dashboard_url": url,
             "form_count": len(forms),
             "total_responses": sum(int(f.get("total_responses") or 0) for f in forms),
+            "latest_decisions": latest_decisions,
             "expires_in_hours": 24,
         }

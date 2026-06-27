@@ -43,8 +43,11 @@ def list_members_with_tokens(room_id: int) -> list[dict[str, Any]]:
         with c.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 "SELECT u.id, u.kakao_id, u.nickname, u.kakao_access_token, u.kakao_refresh_token "
-                "FROM room_members rm JOIN users u ON u.id = rm.user_id "
-                "WHERE rm.room_id = %s AND u.kakao_access_token IS NOT NULL "
+                "FROM room_members rm "
+                "JOIN rooms r ON r.id = rm.room_id "
+                "JOIN users u ON u.id = rm.user_id "
+                "WHERE rm.room_id = %s AND r.status = 'active' "
+                "AND u.kakao_access_token IS NOT NULL "
                 "ORDER BY rm.joined_at",
                 (room_id,),
             )
