@@ -15,8 +15,9 @@ from typing import Any
 
 from fastmcp import FastMCP
 
-from .. import kakao_calendar
-from ..identity import bearer_token
+from .. import kakao, kakao_calendar, kakao_store, storage
+from ..config import settings
+from ..identity import bearer_token, resolve_caller
 
 _NEED_AUTH = {
     "ok": False,
@@ -26,6 +27,131 @@ _NEED_AUTH = {
 
 def register(mcp: FastMCP) -> None:
     """톡캘린더 일정 도메인 도구를 등록한다."""
+
+    @mcp.tool(
+        name="calendar_create_room_event",
+        annotations={
+            "title": "방 멤버 일정 생성",
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": True,
+        },
+    )
+    async def calendar_create_room_event(
+        title: str,
+        start_at: str,
+        end_at: str,
+        room_id: int | None = None,
+        all_day: bool = False,
+        description: str | None = None,
+        reminders: list[int] | None = None,
+        color: str | None = None,
+        time_zone: str = "Asia/Seoul",
+        rrule: str | None = None,
+        calendar_id: str = "primary",
+    ) -> dict[str, Any]:
+        """Creates the same KakaoTalk calendar event for every authenticated room member.
+
+        팀플톡(teamplay-talk) 현재 작업 방의 카카오 인증 완료 멤버 각각의 톡캘린더에
+        같은 일반 일정을 생성한다. 회의 시간 조율 후 **팀원 전원 캘린더 등록**이
+        필요할 때 사용한다. 각 멤버가 ``talk_calendar`` 권한으로 인증되어 있어야 한다.
+
+        Args:
+            title: 일정 제목
+            start_at: 시작 시각 (UTC RFC3339, 예: 2026-07-01T03:00:00Z)
+            end_at: 종료 시각 (UTC RFC3339)
+            room_id: 대상 방 ID (생략 시 현재 작업 방)
+            all_day: 종일 일정 여부
+            description: 일정 설명
+            reminders: 미리 알림(분 단위, 최대 2개 권장)
+            color: 일정 색상
+            time_zone: 타임존 (기본 Asia/Seoul)
+            rrule: 반복 규칙 RFC5545 RRULE
+            calendar_id: 대상 캘린더 ID (기본 primary)
+        """
+        caller = await resolve_caller()
+        if caller is None:
+            return _NEED_AUTH
+        if room_id is None:
+            active = storage.get_active_room(caller["id"])
+            if active is None:
+                return {"ok": False, "error": "현재 작업 방이 없습니다. switch_room으로 방을 선택하세요."}
+            room_id = active["id"]
+        elif not storage.is_room_member(room_id, caller["id"]):
+            return {"ok": False, "error": "이 방의 멤버만 방 캘린더 일정을 만들 수 있습니다."}
+
+        members = kakao_store.list_members_with_tokens(room_id)
+        all_members = storage.list_members(room_id)
+        token_member_ids = {m["id"] for m in members}
+        missing = [
+            {"nickname": m["nickname"], "error": "카카오 인증 토큰이 없습니다."}
+            for m in all_members
+            if m["id"] not in token_member_ids
+        ]
+        if not members and not missing:
+            return {
+                "ok": False,
+                "error": "방 멤버가 없습니다.",
+            }
+
+        created: list[dict[str, str]] = []
+        failed: list[dict[str, Any]] = missing
+        for member in members:
+            res = await kakao_calendar.create_event(
+                member["kakao_access_token"],
+                title=title,
+                start_at=start_at,
+                end_at=end_at,
+                all_day=all_day,
+                description=description,
+                reminders=reminders,
+                color=color,
+                time_zone=time_zone,
+                rrule=rrule,
+                calendar_id=calendar_id,
+            )
+            if "event_id" not in res and member.get("kakao_refresh_token"):
+                refreshed = await kakao.refresh_access_token(
+                    member["kakao_refresh_token"],
+                    settings.kakao_rest_api_key,
+                    settings.kakao_client_secret,
+                )
+                if "access_token" in refreshed:
+                    kakao_store.set_kakao_token(
+                        member["kakao_id"],
+                        refreshed["access_token"],
+                        refreshed.get("refresh_token") or member["kakao_refresh_token"],
+                        refreshed.get("expires_in"),
+                    )
+                    res = await kakao_calendar.create_event(
+                        refreshed["access_token"],
+                        title=title,
+                        start_at=start_at,
+                        end_at=end_at,
+                        all_day=all_day,
+                        description=description,
+                        reminders=reminders,
+                        color=color,
+                        time_zone=time_zone,
+                        rrule=rrule,
+                        calendar_id=calendar_id,
+                    )
+            if "event_id" in res:
+                created.append({"nickname": member["nickname"], "event_id": res["event_id"]})
+            else:
+                failed.append({"nickname": member["nickname"], "error": res})
+
+        return {
+            "ok": bool(created),
+            "room_id": room_id,
+            "title": title,
+            "created": created,
+            "failed": failed,
+            "created_count": len(created),
+            "failed_count": len(failed),
+            "note": "실패한 멤버는 카카오 talk_calendar 권한이 없거나 토큰이 만료됐을 수 있습니다.",
+        }
 
     @mcp.tool(
         name="calendar_create_event",
