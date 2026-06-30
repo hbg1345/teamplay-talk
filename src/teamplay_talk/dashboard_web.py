@@ -23,8 +23,6 @@ from .config import settings
 from .ui_theme import (
     APP_FONT_LINKS,
     APP_LUCIDE_SCRIPT,
-    APP_REACT_LIQUID_BOOTSTRAP,
-    APP_REACT_LIQUID_IMPORTS,
     APP_THEME_CSS,
 )
 
@@ -317,6 +315,18 @@ __APP_LUCIDE_SCRIPT__
   .decision-title{margin:0;color:var(--ink);font-weight:820;line-height:1.45}
   .decision-note{margin:0;color:var(--muted);font-size:.88rem;line-height:1.5}
   .empty{border:1px dashed rgba(33,24,8,.24);border-radius:var(--radius);background:rgba(255,251,241,.62);padding:36px 22px;text-align:center;color:var(--muted)}
+  body.dashboard-page:before{background:linear-gradient(rgba(255,255,255,.34) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.28) 1px,transparent 1px);background-size:56px 56px;mask-image:none;-webkit-mask-image:none;opacity:.58}
+  body.dashboard-page:after{display:none}
+  body.dashboard-page .glass-panel,
+  body.dashboard-page .roadmap-panel{
+    background:linear-gradient(180deg,rgba(255,253,247,.86),rgba(255,250,240,.66));
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.76),0 14px 36px rgba(45,36,18,.09);
+    backdrop-filter:none;
+    -webkit-backdrop-filter:none;
+  }
+  body.dashboard-page .glass-panel:before,
+  body.dashboard-page .glass-panel:after{opacity:.20;mix-blend-mode:normal}
+  body.dashboard-page .roadmap-panel{contain:layout paint style}
   @media (max-width:1180px){
     .shell{grid-template-columns:236px minmax(0,1fr);grid-template-areas:"workspace conversation" "workspace rail"}
     .workspace{grid-area:workspace}
@@ -356,7 +366,7 @@ __APP_LUCIDE_SCRIPT__
   }
 </style>
 </head>
-<body>
+<body class="dashboard-page">
 <div class="shell" id="dashboardShell">
   <aside class="workspace">
     <div class="workspace__top">
@@ -875,7 +885,6 @@ function renderFeed() {
     ? events.map(renderTimelineEvent).join("")
     : `<div class="empty"><h2>아직 기록이 없습니다</h2><p>${escapeText(emptyText)}</p></div>`;
   syncIcons();
-  if (window.enhanceLiquidGlass) window.enhanceLiquidGlass();
 }
 
 function setActiveNav(nav) {
@@ -936,7 +945,6 @@ function render() {
   bindNav();
   renderFeed();
   syncIcons();
-  if (window.enhanceLiquidGlass) window.enhanceLiquidGlass();
 }
 
 render();
@@ -962,9 +970,9 @@ async def view_room_dashboard(request: Request) -> HTMLResponse:
     page = (
         _PAGE.replace("__TITLE__", title)
         .replace("__APP_FONT_LINKS__", APP_FONT_LINKS)
-        .replace("__APP_REACT_LIQUID_IMPORTS__", APP_REACT_LIQUID_IMPORTS)
+        .replace("__APP_REACT_LIQUID_IMPORTS__", "")
         .replace("__APP_LUCIDE_SCRIPT__", APP_LUCIDE_SCRIPT)
-        .replace("__APP_REACT_LIQUID_BOOTSTRAP__", APP_REACT_LIQUID_BOOTSTRAP)
+        .replace("__APP_REACT_LIQUID_BOOTSTRAP__", "")
         .replace("__APP_THEME_CSS__", APP_THEME_CSS)
         .replace("__DATA__", safe_data)
     )
