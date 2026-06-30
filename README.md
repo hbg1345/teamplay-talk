@@ -11,7 +11,7 @@ KAKAO PlayMCP 공모전 출품용 — 팀플(팀 프로젝트) 협업 MCP 서버
 
 ## 제공 기능
 
-- **방(워크스페이스)**: 팀플 워크스페이스 생성 / 초대 코드·링크로 참여 / 온보딩 초대 링크 발급
+- **방(워크스페이스)**: 팀플 워크스페이스 생성 / 초대 코드로 참여 / 팀원 공유용 참여 문구 발급
 - **팀원·역할**: 역할 분배 / 랜덤 룰렛으로 무작위 배정
 - **로드맵**: 주제 분석 → 로드맵 형성 / 로드맵 수정
 - **리소스**: Google Forms/Docs/Drive/Calendar 등 외부 산출물 링크를 방에 등록·조회
@@ -40,14 +40,13 @@ KAKAO PlayMCP 공모전 출품용 — 팀플(팀 프로젝트) 협업 MCP 서버
 - `name`: string — 방 이름
 - `owner`: string — 생성자(방장) 닉네임
 - `description`: string — 방 설명 (선택)
+- 응답: `invite_code`, `join_command`, `invite_share_text`
 
 **join_room** ✅ — 초대 코드로 방에 참여합니다.
 - `invite_code`: string — 초대 코드
 - `nickname`: string — 참여자 닉네임
 
-**create_invite_link** — 온보딩용 초대 링크를 생성합니다. (계획)
-- `room_id`: string — 대상 방 ID
-- `expires_in`: integer — 만료 시간(분, 선택)
+초대 링크는 별도 웹 로그인 흐름 대신 `create_room`/`rooms(invite_code)` 응답의 `invite_share_text`를 공유하는 방식으로 운영합니다.
 
 ### 팀원·역할
 

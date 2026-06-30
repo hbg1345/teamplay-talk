@@ -303,13 +303,14 @@ def _format(roadmap: dict[str, Any]) -> dict[str, Any]:
         "role_only_tasks": role_only_tasks,
         "calendar_candidates": calendar_candidates,
         "next": (
-            "로드맵 단계와 실행 todo를 구분했습니다. todo가 비어 있으면 decompose_roadmap으로 "
-            "각 milestone을 멤버별 실행 항목으로 쪼개세요."
+            "로드맵 단계와 실행 todo를 구분했습니다. 다음 기본 순서는 역할분배(assign_roles → set_roles) 후 "
+            "decompose_roadmap으로 각 milestone을 역할별/멤버별 실행 todo로 쪼개는 것입니다."
         ),
         "suggested_next_actions": [
+            "역할분배가 필요하면 태스크명을 그대로 쓰지 말고 기획·PM/구현/연동/QA/문서·발표 같은 워크스트림 역할로 assign_roles",
+            "역할이 확정되면 set_roles로 저장",
             "todo가 없으면 decompose_roadmap으로 milestone 아래 실행 todo 2~5개씩 생성",
             "role_only_todos가 있으면 set_roles로 역할을 확정하거나 sync가 되도록 역할명을 맞춘 뒤 member_tasks 확인",
-            "역할분배가 필요하면 태스크명을 그대로 쓰지 말고 기획·PM/구현/연동/QA/문서·발표 같은 워크스트림 역할로 assign_roles",
             "notify_room으로 개인별 할일 요약 공지",
             "daily_task_digest로 담당자별 할일 개인 공지",
             "일정이 있는 태스크를 캘린더/리마인더 후보로 검토",
@@ -816,6 +817,9 @@ def register(mcp: FastMCP) -> None:
         roadmap = _format(storage.get_roadmap(room_id))
         layer = roadmap.get("task_layer_summary") or {}
         members_by_token = {m["id"]: m for m in kakao_store.list_members_with_tokens(room_id)}
+        from ..config import settings
+        from ..dashboard_web import create_dashboard_token
+
         previews: list[dict[str, Any]] = []
         sent: list[str] = []
         failed: list[dict[str, Any]] = []
@@ -833,7 +837,17 @@ def register(mcp: FastMCP) -> None:
                 continue
             if dry_run:
                 continue
-            status = await kakao_store.send_with_refresh(token_member, message)
+            token = create_dashboard_token(room_id, token_member["id"])
+            link = f"{settings.public_base_url}/dashboard/rooms/{room_id}?token={token}"
+            status = await kakao_store.send_feed_with_refresh(
+                token_member,
+                title=f"{member['nickname']}님 할일",
+                description="오늘 확인할 개인 todo를 정리했습니다. 전체 목록은 대시보드에서 볼 수 있습니다.",
+                link_url=link,
+                button_title="내 할일 보기",
+                items=[("방", room["name"]), ("미완료", str((member.get("progress") or {}).get("total", 0) - (member.get("progress") or {}).get("done", 0)))],
+                fallback_text=f"{message}\n{link}",
+            )
             if status == 200:
                 sent.append(member["nickname"])
             else:

@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teamplay Talk Dashboard Design Options</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<style>
+@font-face{font-family:"Kakao Big Sans";font-style:normal;font-display:swap;font-weight:400;src:url("https://cdn.jsdelivr.net/gh/kakao/kakao-font@main/Kakao-Big-Sans/fonts/KakaoBigSans-Regular.ttf") format("truetype")}
+@font-face{font-family:"Kakao Big Sans";font-style:normal;font-display:swap;font-weight:700;src:url("https://cdn.jsdelivr.net/gh/kakao/kakao-font@main/Kakao-Big-Sans/fonts/KakaoBigSans-Bold.ttf") format("truetype")}
+@font-face{font-family:"Kakao Small Sans";font-style:normal;font-display:swap;font-weight:400;src:url("https://cdn.jsdelivr.net/gh/kakao/kakao-font@main/Kakao-Small-Sans/fonts/KakaoSmallSans-Regular.ttf") format("truetype")}
+@font-face{font-family:"Kakao Small Sans";font-style:normal;font-display:swap;font-weight:700;src:url("https://cdn.jsdelivr.net/gh/kakao/kakao-font@main/Kakao-Small-Sans/fonts/KakaoSmallSans-Bold.ttf") format("truetype")}
+:root{
+  --font-display:"Kakao Big Sans","Apple SD Gothic Neo",sans-serif;
+  --font-body:"Kakao Small Sans","Apple SD Gothic Neo",sans-serif;
+  --yellow:#fee500;
+  --ink:#17140f;
+  --muted:#756f65;
+  --line:rgba(31,25,15,.13);
+  --paper:#f8f5ef;
+  --panel:#fffaf1;
+  --aqua:#37b7d8;
+  --rose:#e01e5a;
+  --amber:#d18b12;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#e9e5de;color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.45}
+.page{display:grid;gap:48px;padding:28px}
+.label{width:1360px;margin:0 auto 12px;font-size:14px;font-weight:700;color:#534d45}
+.label b{font-family:var(--font-display);font-size:20px;color:#17140f}
+.frame{
+  width:1360px;height:860px;margin:0 auto;overflow:hidden;position:relative;
+  border:1px solid rgba(0,0,0,.12);border-radius:14px;box-shadow:0 32px 90px rgba(34,27,19,.20);
+}
+.glass{background:rgba(255,252,245,.72);border:1px solid rgba(31,25,15,.12);box-shadow:inset 0 1px 0 rgba(255,255,255,.78),0 18px 50px rgba(45,36,22,.10);backdrop-filter:blur(24px) saturate(1.18);-webkit-backdrop-filter:blur(24px) saturate(1.18)}
+.card{background:rgba(255,250,241,.94);border:1px solid var(--line);border-radius:8px}
+.pill{display:inline-flex;align-items:center;min-height:26px;border:1px solid var(--line);border-radius:999px;padding:0 9px;font-size:12px;font-weight:700;background:rgba(255,250,241,.76);color:#4d473f}
+.pill.blue{border-color:rgba(55,183,216,.32);background:rgba(55,183,216,.12);color:#10627a}
+.pill.warn{border-color:rgba(209,139,18,.28);background:rgba(209,139,18,.13);color:#76500d}
+.pill.yellow{border-color:rgba(254,229,0,.42);background:rgba(254,229,0,.16);color:#5a4b00}
+.metric{display:grid;gap:4px;min-height:58px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:rgba(255,252,246,.80)}
+.metric strong{font-size:20px;line-height:1;font-weight:700;font-variant-numeric:tabular-nums}
+.metric span{font-size:12px;color:var(--muted);font-weight:700}
+.feed{display:grid;border:1px solid var(--line);border-radius:8px;background:rgba(255,252,246,.92);overflow:hidden}
+.msg{display:grid;grid-template-columns:38px minmax(0,1fr);gap:12px;padding:15px 18px;border-bottom:1px solid rgba(31,25,15,.10)}
+.msg:last-child{border-bottom:0}
+.avatar{display:grid;place-items:center;width:34px;height:34px;border-radius:8px;background:#25211d;color:#fff;font-size:13px;font-weight:700}
+.msg-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:5px}
+.msg h3{margin:0;font-family:var(--font-display);font-size:18px;line-height:1.28}
+.time{font-size:13px;color:var(--muted);font-weight:700}
+.summary{display:grid;gap:10px;margin-top:12px}
+.block{padding-top:11px;border-top:1px solid rgba(31,25,15,.10)}
+.block:first-child{padding-top:0;border-top:0}
+.block h4{margin:0 0 8px;font-size:14px}
+.rows{display:grid;gap:8px}
+.row{padding:9px 10px;border:1px solid rgba(31,25,15,.10);border-radius:8px;background:rgba(255,252,246,.72)}
+.bar{height:8px;border-radius:999px;background:rgba(31,25,15,.08);overflow:hidden}
+.bar span{display:block;height:100%;border-radius:999px;background:#25211d}
+
+/* Option A */
+.a{background:
+  linear-gradient(120deg,rgba(254,229,0,.08),transparent 32%,rgba(31,25,15,.04)),
+  linear-gradient(135deg,#f7f4ee,#f3f1ec 54%,#eef5f6)}
+.a .app{display:grid;grid-template-columns:246px minmax(0,1fr) 318px;gap:14px;height:100%;padding:16px}
+.a .side{display:flex;flex-direction:column;border-radius:8px;background:linear-gradient(180deg,#26221d,#1c1915);color:#fbf5e8;padding:14px}
+.brand{display:grid;grid-template-columns:38px 1fr;gap:10px;align-items:start;padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,.12)}
+.mark{display:grid;place-items:center;width:38px;height:38px;border-radius:8px;background:var(--yellow);color:#17140f;font-weight:700}
+.brand p{margin:0;color:rgba(255,250,240,.58);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.brand h2{margin:2px 0 0;font-family:var(--font-display);font-size:22px;line-height:1.14}
+.nav{display:grid;gap:4px;margin:14px 0 20px}
+.nav div{display:grid;grid-template-columns:26px 1fr auto;gap:8px;align-items:center;min-height:34px;border-radius:8px;padding:0 8px;color:rgba(255,250,240,.72);font-weight:700;font-size:14px}
+.nav div:first-child{background:rgba(255,255,255,.12);color:#fff}
+.nav i{display:grid;place-items:center;width:22px;height:22px;border-radius:6px;background:rgba(255,255,255,.10);font-style:normal;font-size:12px}
+.member-list{display:grid;gap:8px;margin-top:8px}
+.person{display:grid;grid-template-columns:28px 1fr;gap:8px;align-items:center;padding:7px;border-radius:8px;background:rgba(255,255,255,.08)}
+.person b{display:block;color:#fff;font-size:13px}
+.person span{display:block;color:rgba(255,250,240,.58);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.initial{display:grid;place-items:center;width:28px;height:28px;border-radius:7px;background:rgba(255,255,255,.13);font-size:12px;font-weight:700}
+.a .main{display:grid;grid-template-rows:auto 1fr;gap:12px;min-width:0}
+.a .head{padding:16px 18px;border-radius:8px}
+.head-grid{display:grid;grid-template-columns:1fr 330px;gap:18px;align-items:start}
+.kicker{margin:0 0 6px;color:#4a4035;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.head h1{margin:0;font-family:var(--font-display);font-size:31px;line-height:1.1}
+.head p{margin:8px 0 0;color:var(--muted)}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+.a .rail{padding:14px;border-radius:8px}
+.rail h2{margin:0;font-family:var(--font-display);font-size:19px}
+.rail p{margin:6px 0 12px;color:var(--muted)}
+.tasks{display:grid;gap:12px;margin-top:12px}
+.task-group{padding-top:12px;border-top:1px solid var(--line)}
+.task-group:first-child{border-top:0;padding-top:0}
+.task-group h3{margin:0 0 6px;font-size:14px}
+.task{padding:9px;border:1px solid var(--line);border-radius:8px;background:rgba(255,252,246,.72);font-weight:700}
+.task small{display:block;color:var(--muted);font-weight:700;margin-top:4px}
+
+/* Option B */
+.b{background:linear-gradient(135deg,#f8f6f1,#eef2f0)}
+.b .app{display:grid;grid-template-columns:220px minmax(0,1fr);grid-template-rows:auto 1fr;gap:14px;height:100%;padding:18px}
+.b .top{grid-column:1 / -1;display:grid;grid-template-columns:1fr auto;gap:18px;align-items:center;padding:14px 16px}
+.b .top h1{margin:0;font-family:var(--font-display);font-size:27px}
+.b .top p{margin:4px 0 0;color:var(--muted)}
+.b .side{padding:14px;border-radius:8px;background:rgba(255,252,246,.78)}
+.b .side h2{margin:0 0 12px;font-family:var(--font-display);font-size:16px}
+.b .nav div{color:#3f3830;background:rgba(31,25,15,.045)}
+.b .nav div:first-child{background:#25211d;color:#fff}
+.b .main-grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;min-width:0}
+.b .rail{padding:14px}
+.b .avatar{background:#25211d}
+.b .bar span{background:#25211d}
+
+/* Option C */
+.c{background:
+  linear-gradient(180deg,rgba(255,255,255,.36),transparent 28%),
+  linear-gradient(135deg,#fbf4dc,#eef2f4 54%,#f7edf4)}
+.c .app{display:grid;grid-template-rows:auto 1fr;gap:14px;height:100%;padding:18px}
+.c .topbar{display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center;padding:12px 14px;border-radius:8px}
+.c .topbar .mark{background:#17140f;color:var(--yellow)}
+.c .topbar h1{margin:0;font-family:var(--font-display);font-size:24px}
+.tabs{display:flex;gap:8px}
+.tab{display:inline-flex;align-items:center;min-height:34px;border-radius:999px;padding:0 13px;background:rgba(255,252,246,.56);border:1px solid var(--line);font-weight:700}
+.tab.active{background:#17140f;color:#fff}
+.c .board{display:grid;grid-template-columns:1fr 1fr;gap:14px;min-height:0}
+.panel{padding:16px;border-radius:8px;min-width:0}
+.panel h2{margin:0 0 12px;font-family:var(--font-display);font-size:22px}
+.c .feed{height:100%}
+.c .rail-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.large-card{padding:14px;border-radius:8px;background:rgba(255,252,246,.82);border:1px solid var(--line)}
+.large-card h3{margin:0 0 8px;font-size:15px}
+.large-card strong{font-family:var(--font-display);font-size:28px}
+</style>
+</head>
+<body>
+<div class="page">
+  <section id="option-a">
+    <div class="label"><b>A. Kakao Workbench</b> — Slack 구조는 가져오되 색은 charcoal + warm neutral. 노랑은 선택/CTA만.</div>
+    <div class="frame a">
+      <div class="app">
+        <aside class="side">
+          <div class="brand"><div class="mark">T</div><div><p>Teamplay room</p><h2>카카오 MCP 대회방</h2></div></div>
+          <nav class="nav">
+            <div><i>#</i><span>활동 피드</span><b>5</b></div>
+            <div><i>✓</i><span>태스크</span><b>10</b></div>
+            <div><i>↗</i><span>응답</span><b>8</b></div>
+            <div><i>◇</i><span>결정</span><b>1</b></div>
+          </nav>
+          <p class="kicker" style="color:rgba(255,250,240,.52)">Members</p>
+          <div class="member-list">
+            <div class="person"><div class="initial">세</div><div><b>세원</b><span>기획·PM</span></div></div>
+            <div class="person"><div class="initial">함</div><div><b>함봉구</b><span>MCP 서버·도구 구현</span></div></div>
+            <div class="person"><div class="initial">지</div><div><b>지윤</b><span>폼·대시보드 UX</span></div></div>
+          </div>
+        </aside>
+        <main class="main">
+          <header class="head glass">
+            <div class="head-grid">
+              <div><p class="kicker"># decision-timeline</p><h1>팀 진행 기록</h1><p>폼, 체크인, 리포트, 확정 결정을 채널 피드처럼 최신순으로 모았습니다.</p></div>
+              <div class="metrics"><div class="metric"><strong>5</strong><span>기록</span></div><div class="metric"><strong>3</strong><span>멤버</span></div><div class="metric"><strong>10</strong><span>태스크</span></div><div class="metric"><strong>8</strong><span>응답</span></div></div>
+            </div>
+          </header>
+          <section class="feed">
+            <article class="msg"><div class="avatar">리</div><div><div class="msg-top"><span class="pill yellow">01 · 데일리 리포트</span><span class="time">6.27 오후 09:00</span><span class="pill blue">진행 4/10 · 40%</span><span class="pill warn">밀림 1</span></div><h3>6월 27일 데일리 리포트</h3><div class="summary"><div class="block"><h4>오늘 볼 일</h4><div class="rows"><div class="row">OAuth 심사 로그 정리 · 세원</div><div class="row">회의 시간 폼 검수 · 지윤</div></div></div><div class="block"><h4>남은 밀린 일</h4><div class="row">로드맵 todo 분해 · 함봉구</div></div></div></div></article>
+            <article class="msg"><div class="avatar">시</div><div><div class="msg-top"><span class="pill yellow">02 · 회의 시간</span><span class="time">6.27 오전 09:12</span><span class="pill">3응답</span></div><h3>가능한 회의 시간</h3><p style="margin:8px 0;color:var(--muted)">최적 후보 2개 · O 3</p><span class="pill yellow">6/29(월) 14:00</span> <span class="pill yellow">6/30(화) 10:00</span></div></article>
+            <article class="msg"><div class="avatar">확</div><div><div class="msg-top"><span class="pill">03 · 역할 확정</span><span class="time">6.26 오후 08:00</span><span class="pill blue">확정</span></div><h3>역할 확정</h3><p style="margin:8px 0 0;color:var(--muted)">세원은 PM, 함봉구는 MCP 서버, 지윤은 폼/대시보드 UX를 맡는다.</p></div></article>
+          </section>
+        </main>
+        <aside class="rail glass">
+          <h2>로드맵 진행</h2><p>역할분배와 연결된 개인별 할일, 마감 후보, 미배정 태스크를 모았습니다.</p>
+          <div class="bar"><span style="width:40%"></span></div>
+          <div class="tasks">
+            <div class="task-group"><h3>세원 · 2/3 완료</h3><div class="task">기획서 초안<small>진행중 · 마감 2026-07-01</small></div></div>
+            <div class="task-group"><h3>함봉구 · 1/4 완료</h3><div class="task">로드맵 todo 분해<small>대기 · 마감 2026-06-27</small></div></div>
+            <div class="task-group"><h3>지윤 · 1/3 완료</h3><div class="task">모바일 폼 QC<small>진행중 · 마감 2026-06-27</small></div></div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <section id="option-b">
+    <div class="label"><b>B. Neutral Slack Structure</b> — Slack 레이아웃만 가져오고 브랜드색은 거의 제거. 가장 조용하고 제품형.</div>
+    <div class="frame b">
+      <div class="app">
+        <header class="top glass"><div><h1>카카오 MCP 대회방</h1><p># decision-timeline · 최신순 진행 기록</p></div><div class="metrics"><div class="metric"><strong>5</strong><span>기록</span></div><div class="metric"><strong>10</strong><span>태스크</span></div><div class="metric"><strong>8</strong><span>응답</span></div></div></header>
+        <aside class="side glass"><h2>Workspace</h2><nav class="nav"><div><i>#</i><span>활동 피드</span><b>5</b></div><div><i>✓</i><span>태스크</span><b>10</b></div><div><i>◇</i><span>결정</span><b>1</b></div></nav><p class="kicker">Members</p><div class="member-list"><div class="person" style="background:rgba(31,25,15,.05)"><div class="initial">세</div><div><b style="color:#17140f">세원</b><span style="color:var(--muted)">기획·PM</span></div></div><div class="person" style="background:rgba(31,25,15,.05)"><div class="initial">함</div><div><b style="color:#17140f">함봉구</b><span style="color:var(--muted)">MCP 서버</span></div></div></div></aside>
+        <div class="main-grid">
+          <section class="feed">
+            <article class="msg"><div class="avatar">리</div><div><div class="msg-top"><span class="pill">01 · 데일리 리포트</span><span class="time">6.27 오후 09:00</span><span class="pill blue">진행 40%</span></div><h3>오늘 볼 일과 밀린 일</h3><div class="summary"><div class="row">OAuth 심사 로그 정리 · 세원</div><div class="row">회의 시간 폼 검수 · 지윤</div><div class="row">로드맵 todo 분해 · 함봉구</div></div></div></article>
+            <article class="msg"><div class="avatar">시</div><div><div class="msg-top"><span class="pill">02 · 회의 시간</span><span class="time">6.27 오전 09:12</span></div><h3>가능한 회의 시간</h3><p style="margin:8px 0 0;color:var(--muted)">6/29(월) 14:00, 6/30(화) 10:00 후보</p></div></article>
+          </section>
+          <aside class="rail glass"><h2>Project state</h2><p>전체 상태를 작게 붙이고, 피드를 방해하지 않습니다.</p><div class="bar"><span style="width:40%"></span></div><div class="tasks"><div class="task">세원 · 기획서 초안<small>진행중</small></div><div class="task">함봉구 · 로드맵 todo 분해<small>대기</small></div></div></aside>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="option-c">
+    <div class="label"><b>C. Liquid Glass Board</b> — 가장 화려한 안. 대시보드보다 쇼케이스/홈페이지에 더 어울림.</div>
+    <div class="frame c">
+      <div class="app">
+        <header class="topbar glass"><div class="mark">T</div><h1>카카오 MCP 대회방</h1><div class="tabs"><span class="tab active">피드</span><span class="tab">로드맵</span><span class="tab">리포트</span></div></header>
+        <main class="board">
+          <section class="panel glass"><h2>Decision feed</h2><div class="feed"><article class="msg"><div class="avatar">리</div><div><div class="msg-top"><span class="pill yellow">데일리 리포트</span><span class="time">6.27</span></div><h3>오늘 볼 일과 밀린 일</h3><div class="summary"><div class="row">OAuth 심사 로그 정리</div><div class="row">회의 시간 폼 검수</div></div></div></article><article class="msg"><div class="avatar">시</div><div><div class="msg-top"><span class="pill yellow">회의 시간</span><span class="time">6.27</span></div><h3>가능한 회의 시간</h3><span class="pill yellow">6/29 14:00</span></div></article></div></section>
+          <section class="panel glass"><h2>Team command</h2><div class="rail-grid"><div class="large-card"><h3>진행률</h3><strong>40%</strong><div class="bar"><span style="width:40%"></span></div></div><div class="large-card"><h3>응답</h3><strong>8</strong></div><div class="large-card"><h3>밀린 일</h3><strong>1</strong></div><div class="large-card"><h3>확정 결정</h3><strong>1</strong></div></div><div class="tasks" style="margin-top:14px"><div class="task">로드맵 todo 분해<small>함봉구 · 대기</small></div><div class="task">모바일 폼 QC<small>지윤 · 진행중</small></div></div></section>
+        </main>
+      </div>
+    </div>
+  </section>
+</div>
+</body>
+</html>

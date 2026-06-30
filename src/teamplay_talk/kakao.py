@@ -96,6 +96,11 @@ async def send_to_me(
         "text": text,
         "link": {"web_url": link_url, "mobile_web_url": link_url},
     }
+    return await send_template_to_me(access_token, template)
+
+
+async def send_template_to_me(access_token: str, template: dict) -> tuple[int, str]:
+    """토큰 주인의 '나와의 채팅방'으로 카카오 기본 템플릿 객체를 발송한다."""
     async with httpx.AsyncClient(timeout=10) as client:
         resp = await client.post(
             MEMO_SEND_URL,
@@ -103,3 +108,32 @@ async def send_to_me(
             data={"template_object": json.dumps(template, ensure_ascii=False)},
         )
     return resp.status_code, resp.text
+
+
+async def send_feed_to_me(
+    access_token: str,
+    title: str,
+    description: str,
+    link_url: str,
+    *,
+    button_title: str = "열기",
+    image_url: str | None = None,
+    items: list[tuple[str, str]] | None = None,
+    fallback_text: str | None = None,
+) -> tuple[int, str]:
+    """운영 알림은 링크 가시성이 중요하므로 텍스트 템플릿으로 보낸다.
+
+    카카오 feed 템플릿은 실제 카톡에서 description/link가 말줄임 처리되기 쉬워
+    폼/대시보드 알림에는 부적합했다. URL을 본문 앞쪽에 명시해 클라이언트가
+    줄여도 링크가 보이게 한다.
+    """
+    lines = [f"[팀플톡] {title}".strip(), link_url]
+    clean_description = " ".join(str(description or "").split())
+    if clean_description:
+        lines.extend(["", clean_description[:140]])
+    if items:
+        for label, value in items[:3]:
+            text = f"- {label}: {value}".strip()
+            lines.append(text[:80])
+    text = "\n".join(line for line in lines if line is not None)
+    return await send_to_me(access_token, text, link_url)

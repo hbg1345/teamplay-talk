@@ -346,7 +346,7 @@ def _infer_workflow_kind(form: dict[str, Any], elements: list[dict[str, Any]]) -
         ]
     )
     lowered = text.lower()
-    if any(k in text for k in ["장소", "위치", "출발", "역", "상권", "약속"]):
+    if any(k in text for k in ["장소", "위치", "역", "상권", "약속"]):
         return "location"
     if any(k in text for k in ["우선순위", "먼저", "기능", "범위", "스코프", "중요"]):
         return "priority"
@@ -411,6 +411,13 @@ def _suggest_next_actions(
             "의견이 갈린 항목은 create_poll로 우선순위/채택 여부를 투표",
             "역할이 확정돼 있으면 태스크 assignee에 역할명이나 닉네임을 넣어 담당자 자동 연결",
             "member_tasks로 개인별 이번 주 할일을 확인하고 daily_task_digest로 공지",
+        ]
+    if workflow_kind == "daily_checkin":
+        return [
+            f"apply_daily_checkin(form_id={form_id}, dry_run=true)로 밀린 일/오늘 일/앞으로 예정된 일 완료 반영안 확인",
+            f"확정되면 apply_daily_checkin(form_id={form_id}, dry_run=false)로 todo 상태 반영",
+            "daily_report로 팀 전체 상태/남은 밀린 일/기타 메모 리포트 생성",
+            "밀린 항목은 update_task로 일정/담당 조정",
         ]
     if workflow_kind == "retro":
         return [
@@ -904,7 +911,7 @@ def list_active_rooms() -> list[dict[str, Any]]:
     """스케줄러용 active room 목록."""
     with conn() as c:
         with c.cursor(row_factory=dict_row) as cur:
-            cur.execute("SELECT id, name FROM rooms WHERE status = 'active' ORDER BY id")
+            cur.execute("SELECT id, name, owner_id FROM rooms WHERE status = 'active' ORDER BY id")
             return cur.fetchall()
 
 
@@ -916,6 +923,91 @@ def claim_task_digest(room_id: int, user_id: int, digest_date: Any) -> bool:
                 "INSERT INTO task_digest_sends (room_id, user_id, digest_date) "
                 "VALUES (%s, %s, %s) ON CONFLICT DO NOTHING",
                 (room_id, user_id, digest_date),
+            )
+            claimed = cur.rowcount > 0
+        c.commit()
+    return claimed
+
+
+def get_daily_checkin_send(room_id: int, checkin_date: Any) -> dict[str, Any] | None:
+    """room/date 체크인 폼 발송 기록을 조회한다."""
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                "SELECT room_id, checkin_date, form_id, sent_at "
+                "FROM daily_checkin_sends WHERE room_id = %s AND checkin_date = %s",
+                (room_id, checkin_date),
+            )
+            return cur.fetchone()
+
+
+def record_daily_checkin_send(room_id: int, checkin_date: Any, form_id: int) -> bool:
+    """room/date 체크인 폼 생성/발송 기록을 1회만 남긴다."""
+    with conn() as c:
+        with c.cursor() as cur:
+            cur.execute(
+                "INSERT INTO daily_checkin_sends (room_id, checkin_date, form_id) "
+                "VALUES (%s, %s, %s) ON CONFLICT DO NOTHING",
+                (room_id, checkin_date, form_id),
+            )
+            created = cur.rowcount > 0
+        c.commit()
+    return created
+
+
+def upsert_daily_report(
+    room_id: int,
+    *,
+    report_date: Any,
+    title: str,
+    summary: str,
+    payload: dict[str, Any],
+    created_by_user_id: int | None = None,
+) -> dict[str, Any]:
+    """방의 일일 리포트를 저장/갱신한다."""
+    from psycopg.types.json import Json
+
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                "INSERT INTO daily_reports "
+                "(room_id, report_date, title, summary, payload, created_by_user_id) "
+                "VALUES (%s, %s, %s, %s, %s, %s) "
+                "ON CONFLICT (room_id, report_date) DO UPDATE SET "
+                "title = EXCLUDED.title, summary = EXCLUDED.summary, "
+                "payload = EXCLUDED.payload, created_by_user_id = EXCLUDED.created_by_user_id, "
+                "created_at = now() "
+                "RETURNING id, room_id, report_date, title, summary, payload, "
+                "created_by_user_id, created_at",
+                (room_id, report_date, title, summary, Json(payload), created_by_user_id),
+            )
+            row = cur.fetchone()
+        c.commit()
+    return row
+
+
+def list_daily_reports(room_id: int, limit: int = 7) -> list[dict[str, Any]]:
+    """방의 일일 리포트를 최신순으로 반환한다."""
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                "SELECT id, room_id, report_date, title, summary, payload, "
+                "created_by_user_id, created_at "
+                "FROM daily_reports WHERE room_id = %s "
+                "ORDER BY report_date DESC, created_at DESC LIMIT %s",
+                (room_id, limit),
+            )
+            return cur.fetchall()
+
+
+def claim_daily_report_send(room_id: int, report_date: Any) -> bool:
+    """room/date daily report 발송권을 1회만 획득한다."""
+    with conn() as c:
+        with c.cursor() as cur:
+            cur.execute(
+                "INSERT INTO daily_report_sends (room_id, report_date) "
+                "VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                (room_id, report_date),
             )
             claimed = cur.rowcount > 0
         c.commit()

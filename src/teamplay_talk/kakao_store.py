@@ -31,7 +31,8 @@ def set_kakao_token(
             cur.execute(
                 "UPDATE users SET kakao_access_token = %s, "
                 "kakao_refresh_token = COALESCE(%s, kakao_refresh_token), "
-                "kakao_token_expires_at = %s WHERE kakao_id = %s",
+                "kakao_token_expires_at = COALESCE(%s, kakao_token_expires_at) "
+                "WHERE kakao_id = %s",
                 (access_token, refresh_token, expires_at, kakao_id),
             )
         c.commit()
@@ -75,4 +76,50 @@ async def send_with_refresh(member: dict[str, Any], message: str) -> int:
                 refreshed.get("expires_in"),
             )
             status, _ = await kakao.send_to_me(refreshed["access_token"], message)
+    return status
+
+
+async def send_feed_with_refresh(
+    member: dict[str, Any],
+    *,
+    title: str,
+    description: str,
+    link_url: str,
+    button_title: str = "열기",
+    items: list[tuple[str, str]] | None = None,
+    fallback_text: str | None = None,
+) -> int:
+    """member에게 카카오 feed 템플릿을 보내고 만료 토큰이면 갱신 후 1회 재시도."""
+    from . import kakao
+    from .config import settings
+
+    status, _ = await kakao.send_feed_to_me(
+        member["kakao_access_token"],
+        title,
+        description,
+        link_url,
+        button_title=button_title,
+        items=items,
+        fallback_text=fallback_text,
+    )
+    if status == 401 and member.get("kakao_refresh_token"):
+        refreshed = await kakao.refresh_access_token(
+            member["kakao_refresh_token"], settings.kakao_rest_api_key, settings.kakao_client_secret
+        )
+        if "access_token" in refreshed:
+            set_kakao_token(
+                member["kakao_id"],
+                refreshed["access_token"],
+                refreshed.get("refresh_token") or member["kakao_refresh_token"],
+                refreshed.get("expires_in"),
+            )
+            status, _ = await kakao.send_feed_to_me(
+                refreshed["access_token"],
+                title,
+                description,
+                link_url,
+                button_title=button_title,
+                items=items,
+                fallback_text=fallback_text,
+            )
     return status

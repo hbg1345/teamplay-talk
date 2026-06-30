@@ -21,7 +21,30 @@ import httpx
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from .kakao import TOKEN_URL
+from . import kakao_store, storage
+from .kakao import TOKEN_URL, get_user_info
+
+
+async def _store_kakao_token_response(body: dict) -> None:
+    """OAuth token 응답을 사용자별로 저장한다.
+
+    PlayMCP는 토큰 교환 결과를 자기 쪽에 보관하지만, 팀원별 캘린더/알림을
+    서버가 나중에 반복 실행하려면 우리 DB에도 refresh_token이 필요하다.
+    저장 실패가 OAuth 자체 실패가 되면 안 되므로 호출부에서 예외를 삼킨다.
+    """
+    access_token = body.get("access_token")
+    if not access_token:
+        return
+    kakao_id, nickname = await get_user_info(access_token)
+    if not kakao_id or kakao_id == "unknown":
+        return
+    storage.upsert_user(kakao_id, nickname)
+    kakao_store.set_kakao_token(
+        kakao_id,
+        access_token,
+        body.get("refresh_token"),
+        body.get("expires_in"),
+    )
 
 
 async def kakao_token_proxy(request: Request) -> JSONResponse:
@@ -55,6 +78,11 @@ async def kakao_token_proxy(request: Request) -> JSONResponse:
             {"error": "invalid_kakao_response", "raw": resp.text},
             status_code=resp.status_code,
         )
+    if resp.status_code == 200:
+        try:
+            await _store_kakao_token_response(body)
+        except Exception as exc:
+            print(f"[kakao_token_proxy] token store failed: {type(exc).__name__}: {exc}")
     return JSONResponse(body, status_code=resp.status_code)
 
 

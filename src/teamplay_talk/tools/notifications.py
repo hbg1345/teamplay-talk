@@ -11,8 +11,9 @@ from typing import Any
 
 from fastmcp import FastMCP
 
-from .. import kakao, kakao_store, storage
+from .. import kakao_store, storage
 from ..config import settings
+from ..dashboard_web import create_dashboard_token
 from .guards import require_room
 
 
@@ -64,24 +65,19 @@ def register(mcp: FastMCP) -> None:
 
         sent: list[str] = []
         failed: list[str] = []
+        first_line = next((line.strip() for line in message.splitlines() if line.strip()), "팀 공지가 도착했습니다.")
         for m in members:
-            status, _ = await kakao.send_to_me(m["kakao_access_token"], message)
-
-            # access token 만료(401) 시 refresh 후 1회 재시도
-            if status == 401 and m.get("kakao_refresh_token"):
-                refreshed = await kakao.refresh_access_token(
-                    m["kakao_refresh_token"],
-                    settings.kakao_rest_api_key,
-                    settings.kakao_client_secret,
-                )
-                if "access_token" in refreshed:
-                    kakao_store.set_kakao_token(
-                        m["kakao_id"],
-                        refreshed["access_token"],
-                        refreshed.get("refresh_token") or m["kakao_refresh_token"],
-                        refreshed.get("expires_in"),
-                    )
-                    status, _ = await kakao.send_to_me(refreshed["access_token"], message)
+            token = create_dashboard_token(room_id, m["id"])
+            link = f"{settings.public_base_url}/dashboard/rooms/{room_id}?token={token}"
+            status = await kakao_store.send_feed_with_refresh(
+                m,
+                title=f"{room['name']} 공지",
+                description=first_line,
+                link_url=link,
+                button_title="방 보기",
+                items=[("방", room["name"])],
+                fallback_text=f"{message}\n{link}",
+            )
 
             (sent if status == 200 else failed).append(m["nickname"])
 
@@ -119,4 +115,15 @@ def register(mcp: FastMCP) -> None:
             "count": len(sent),
             "status": "partial" if failed else "sent",
             "recorded_decision": decision,
+            "next": (
+                "공지 발송이 끝났습니다. 확정 결정이면 room_dashboard에서 타임라인에 기록됐는지 확인하고, "
+                "후속 작업이 있으면 로드맵/todo나 캘린더에 반영하세요."
+            ),
+            "suggested_next_actions": [
+                "room_dashboard로 공지/결정 기록 확인",
+                "결정된 일이 작업이면 add_task/update_task로 로드맵 반영",
+                "회의/마감 일정이면 calendar_create_room_event 또는 calendar_create_task_events로 캘린더 등록",
+                "팀원별 실행 항목은 daily_task_digest로 개인 공지",
+            ],
+            "chat_response_hint": "sent_to/count를 기준으로 공지 성공 여부를 말하고, 다음 행동은 대시보드 확인/로드맵 반영/캘린더 등록 중 필요한 것만 짧게 안내하세요.",
         }

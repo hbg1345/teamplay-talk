@@ -83,6 +83,84 @@ async def process_daily_task_digests() -> None:
             await kakao_store.send_with_refresh(token_member, message)
 
 
+async def _send_identified_form(form_id: int, message: str) -> None:
+    """식별 폼의 개인 링크를 각 멤버에게 보낸다."""
+    form = storage.get_form(form_id)
+    if form is None:
+        return
+    from .tools.feedback import _form_feed_copy
+
+    base = f"{settings.public_base_url}/form/{form_id}"
+    title, description = _form_feed_copy(form)
+    room = storage.get_room(form["room_id"])
+    items = [
+        ("방", room["name"] if room else str(form["room_id"])),
+        ("상태", "진행중" if not form.get("closed") else "마감"),
+    ]
+    for recipient in storage.list_form_recipients(form_id):
+        url = f"{base}?t={recipient['invite_token']}"
+        await kakao_store.send_feed_with_refresh(
+            recipient,
+            title=title,
+            description=description,
+            link_url=url,
+            button_title="내 링크 열기",
+            items=items,
+            fallback_text=f"{message.rstrip()}\n{description}\n{url}",
+        )
+
+
+async def process_daily_checkins() -> None:
+    """옵션으로 켜는 밤 9시 체크인 폼 발송. 기본은 비활성."""
+    if not settings.daily_checkin_enabled:
+        return
+    now = datetime.now(_KST)
+    if now.hour != settings.daily_checkin_hour_kst:
+        return
+
+    from .tools.daily import create_daily_checkin_form
+
+    checkin_date = now.date()
+    for room in storage.list_active_rooms():
+        created = create_daily_checkin_form(
+            room["id"],
+            creator_user_id=room.get("owner_id"),
+            checkin_date=checkin_date,
+            close_minutes=720,
+            skip_existing=True,
+        )
+        if created.get("ok") and created.get("status") == "created":
+            await _send_identified_form(
+                int(created["form_id"]),
+                f"[팀플톡] '{created['title']}' 응답 요청",
+            )
+
+
+async def process_daily_reports() -> None:
+    """옵션으로 켜는 아침 9시 팀 리포트 생성/공지. 기본은 비활성."""
+    if not settings.daily_report_enabled:
+        return
+    now = datetime.now(_KST)
+    if now.hour != settings.daily_report_hour_kst:
+        return
+
+    from .tools.daily import build_daily_report_for_room, send_daily_report
+
+    report_date = now.date()
+    for room in storage.list_active_rooms():
+        if not storage.claim_daily_report_send(room["id"], report_date):
+            continue
+        report = build_daily_report_for_room(
+            room["id"],
+            report_date=report_date,
+            checkin_date=report_date - timedelta(days=1),
+            created_by_user_id=room.get("owner_id"),
+            apply_checkin=True,
+        )
+        if report.get("ok"):
+            await send_daily_report(room["id"], report["summary"])
+
+
 def _scheduler_loop() -> None:
     while True:
         try:
@@ -96,6 +174,8 @@ def _scheduler_loop() -> None:
                         flush=True,
                     )
             asyncio.run(process_daily_task_digests())
+            asyncio.run(process_daily_checkins())
+            asyncio.run(process_daily_reports())
         except Exception as e:  # noqa: BLE001
             print(f"[scheduler] error: {e}", flush=True)
         time.sleep(_POLL_INTERVAL)

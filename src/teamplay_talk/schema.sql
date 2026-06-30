@@ -199,6 +199,36 @@ CREATE TABLE IF NOT EXISTS task_digest_sends (
     PRIMARY KEY (room_id, user_id, digest_date)
 );
 
+-- 데일리 체크인/리포트 운영 루프. 기본 스케줄러는 환경변수로 켤 때만 발송한다.
+CREATE TABLE IF NOT EXISTS daily_checkin_sends (
+    room_id      BIGINT NOT NULL REFERENCES rooms (id) ON DELETE CASCADE,
+    checkin_date DATE NOT NULL,
+    form_id      BIGINT REFERENCES forms (id) ON DELETE SET NULL,
+    sent_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (room_id, checkin_date)
+);
+CREATE INDEX IF NOT EXISTS idx_daily_checkin_form ON daily_checkin_sends (form_id);
+
+CREATE TABLE IF NOT EXISTS daily_reports (
+    id                 BIGSERIAL PRIMARY KEY,
+    room_id            BIGINT NOT NULL REFERENCES rooms (id) ON DELETE CASCADE,
+    report_date        DATE NOT NULL,
+    title              TEXT NOT NULL,
+    summary            TEXT NOT NULL,
+    payload            JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_by_user_id BIGINT REFERENCES users (id) ON DELETE SET NULL,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (room_id, report_date)
+);
+CREATE INDEX IF NOT EXISTS idx_daily_reports_room_date ON daily_reports (room_id, report_date DESC);
+
+CREATE TABLE IF NOT EXISTS daily_report_sends (
+    room_id     BIGINT NOT NULL REFERENCES rooms (id) ON DELETE CASCADE,
+    report_date DATE NOT NULL,
+    sent_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (room_id, report_date)
+);
+
 -- 방의 확정 결정 기록. 회의 시간/장소/역할처럼 나중에 다시 꺼내야 하는 사실을 저장한다.
 CREATE TABLE IF NOT EXISTS room_decisions (
     id          BIGSERIAL PRIMARY KEY,

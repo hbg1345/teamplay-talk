@@ -44,6 +44,13 @@ _SJS_TYPE = {
 }
 
 
+def _location_form_title(title: str | None) -> str:
+    value = (title or "").strip()
+    if not value or "출발" in value or "출발지" in value:
+        return "약속 장소 후보를 적어주세요"
+    return value
+
+
 def _to_surveyjs(title: str, description: str | None, questions: list[PollQuestion]) -> dict[str, Any]:
     """우리 타입드 질문 → SurveyJS 폼 JSON."""
     elements = []
@@ -98,6 +105,16 @@ def _send_form_followup(form: dict[str, Any]) -> dict[str, Any]:
                 "갈리는 항목은 create_poll로 우선순위 투표",
             ],
         }
+    if workflow == "daily_checkin":
+        return {
+            "next": "응답이 모이면 apply_daily_checkin으로 밀린 일/오늘 일/앞으로 예정된 일 완료 반영안을 확인하고 daily_report로 팀 리포트를 만드세요.",
+            "suggested_next_actions": [
+                "응답 대기 후 apply_daily_checkin(form_id, dry_run=true)로 완료 반영안 확인",
+                "확정되면 apply_daily_checkin(form_id, dry_run=false)로 todo 상태 반영",
+                "daily_report로 팀 전체 상태/남은 밀린 일/기타 메모 리포트 생성",
+                "필요하면 daily_report(publish=true) 또는 daily_task_digest로 공지",
+            ],
+        }
     if workflow == "role_assignment":
         return {
             "next": "역할 선호 응답이 모이면 get_poll_results로 확인하고 finalize_roles로 배정안을 계산하세요.",
@@ -126,6 +143,25 @@ def _send_form_followup(form: dict[str, Any]) -> dict[str, Any]:
             "갈리면 create_poll로 후속 투표",
         ],
     }
+
+
+def _form_feed_copy(form: dict[str, Any]) -> tuple[str, str]:
+    schema = form.get("schema_json") or {}
+    workflow = schema.get("_workflow_kind")
+    if any(e.get("type") == "ranking" and e.get("name") == "roles" for e in schema.get("elements", [])):
+        workflow = "role_assignment"
+    if any(e.get("type") == "matrixdropdown" and e.get("name") == "availability" for e in schema.get("elements", [])):
+        workflow = "meeting_time"
+    descriptions = {
+        "role_assignment": "역할 선호도를 순서대로 골라주세요. 응답이 모이면 팀장이 확정합니다.",
+        "meeting_time": "가능한 시간은 O, 절대 안 되는 시간은 X로 표시해주세요.",
+        "location": "선호하는 약속 장소 후보만 한 칸에 하나씩 적어주세요.",
+        "daily_checkin": "밀린 일과 오늘 끝낸 일을 체크하고, 필요한 메모만 남겨주세요.",
+        "roadmap_decision": "로드맵에 반영할 의견을 짧게 남겨주세요.",
+    }
+    return str(form.get("title") or "팀플톡 폼"), descriptions.get(
+        str(workflow), "팀 의사결정을 위해 짧게 응답해주세요."
+    )
 
 
 def register(mcp: FastMCP) -> None:
@@ -180,6 +216,7 @@ def register(mcp: FastMCP) -> None:
         if error:
             return error
         room_id = room["id"]
+        title = _location_form_title(title)
         creator_id = caller["id"]
 
         closes_at = None
@@ -239,7 +276,7 @@ def register(mcp: FastMCP) -> None:
         """Starts opinion gathering (stage 1 of 의견수렴형) — a free-text poll to the team.
 
         팀의 의사결정(**주제·아이디어 등 '뭘로 할까'**)을 시작한다.
-        약속 장소/출발 위치는 긴 자유서술 대신 gather_locations를 우선 사용한다.
+        약속 장소 후보 수집은 긴 자유서술 대신 gather_locations를 우선 사용한다.
         **사용자에게 후보를 묻지 마라** — 이 도구로 팀원에게 자유의견을 모으는 게 시작이다.
 
         기본 2단계 흐름:
@@ -315,7 +352,7 @@ def register(mcp: FastMCP) -> None:
         },
     )
     async def gather_locations(
-        title: str = "약속 장소 후보와 출발 위치를 적어주세요",
+        title: str = "약속 장소 후보를 적어주세요",
         room_id: int | None = None,
         anonymous: bool = False,
         close_minutes: int | None = 1440,
@@ -353,8 +390,8 @@ def register(mcp: FastMCP) -> None:
             {
                 "type": "text",
                 "name": "location_1",
-                "title": "위치 1",
-                "description": "출발지나 선호 후보를 역/동네/상호명처럼 짧게 적어주세요.",
+                "title": "장소 후보 1",
+                "description": "추천하고 싶은 약속 장소를 역/동네/상호명처럼 짧게 적어주세요.",
                 "placeholder": "예: 강남역, 홍대입구역, 서초동, 카카오 판교아지트",
                 "isRequired": True,
             }
@@ -363,7 +400,7 @@ def register(mcp: FastMCP) -> None:
             elements.append({
                 "type": "text",
                 "name": f"location_{i}",
-                "title": f"위치 {i}",
+                "title": f"장소 후보 {i}",
                 "description": "추가 후보가 있으면 하나만 적어주세요.",
                 "placeholder": "예: 신논현역",
                 "isRequired": False,
@@ -377,7 +414,7 @@ def register(mcp: FastMCP) -> None:
         })
         schema = {
             "title": title,
-            "description": "위치는 한 칸에 하나씩 짧게 적을수록 중복 정리와 지도 검색이 잘 됩니다.",
+            "description": "선호하는 약속 장소 후보를 한 칸에 하나씩 짧게 적어주세요.",
             "completeText": "제출",
             "showQuestionNumbers": "off",
             "elements": elements,
@@ -686,17 +723,40 @@ def register(mcp: FastMCP) -> None:
         if error:
             return error
         base = f"{settings.public_base_url}/form/{form_id}"
-        prefix = (message or f"📋 '{form['title']}' 폼에 응답해주세요").rstrip()
+        title, description = _form_feed_copy(form)
+        prefix = (message or f"[팀플톡] '{form['title']}' 응답 요청").rstrip()
+        room = storage.get_room(form["room_id"])
+        items = [
+            ("방", room["name"] if room else str(form["room_id"])),
+            ("상태", "진행중" if not form.get("closed") else "마감"),
+        ]
 
         sent: list[str] = []
         failed: list[str] = []
         if form["anonymous"]:
             for m in kakao_store.list_members_with_tokens(form["room_id"]):
-                status = await kakao_store.send_with_refresh(m, f"{prefix}\n{base}")
+                status = await kakao_store.send_feed_with_refresh(
+                    m,
+                    title=title,
+                    description=description,
+                    link_url=base,
+                    button_title="폼 열기",
+                    items=items,
+                    fallback_text=f"{prefix}\n{description}\n{base}",
+                )
                 (sent if status == 200 else failed).append(m["nickname"])
         else:
             for r in storage.list_form_recipients(form_id):
-                status = await kakao_store.send_with_refresh(r, f"{prefix}\n{base}?t={r['invite_token']}")
+                url = f"{base}?t={r['invite_token']}"
+                status = await kakao_store.send_feed_with_refresh(
+                    r,
+                    title=title,
+                    description=description,
+                    link_url=url,
+                    button_title="내 링크 열기",
+                    items=items,
+                    fallback_text=f"{prefix}\n{description}\n{url}",
+                )
                 (sent if status == 200 else failed).append(r["nickname"])
 
         if not sent and not failed:

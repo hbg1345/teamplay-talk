@@ -20,6 +20,13 @@ from starlette.responses import HTMLResponse
 
 from . import storage
 from .config import settings
+from .ui_theme import (
+    APP_FONT_LINKS,
+    APP_LUCIDE_SCRIPT,
+    APP_REACT_LIQUID_BOOTSTRAP,
+    APP_REACT_LIQUID_IMPORTS,
+    APP_THEME_CSS,
+)
 
 
 _TOKEN_TTL_SECONDS = 60 * 60 * 24
@@ -87,6 +94,16 @@ def _schema_elements(schema: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _form_kind(schema: dict[str, Any], title: str) -> str:
+    explicit = schema.get("_workflow_kind")
+    explicit_map = {
+        "daily_checkin": "checkin",
+        "location": "location",
+        "roadmap_decision": "roadmap_input",
+        "meeting_time": "schedule",
+        "role_assignment": "roles",
+    }
+    if explicit in explicit_map:
+        return explicit_map[str(explicit)]
     elements = _schema_elements(schema)
     if any(el.get("type") == "matrixdropdown" and el.get("name") == "availability" for el in elements):
         return "schedule"
@@ -124,6 +141,7 @@ def _dashboard_data(room_id: int) -> dict[str, Any] | None:
                 "close_on_all": form.get("close_on_all"),
                 "total_responses": form.get("total_responses", 0),
                 "summary": result.get("results", []),
+                "responses": result.get("responses", []),
                 "kind": _form_kind(schema, str(form["title"])),
             }
         )
@@ -144,7 +162,9 @@ def _dashboard_data(room_id: int) -> dict[str, Any] | None:
             for m in members
         ],
         "latest_decisions": latest_decisions,
+        "decisions": storage.list_room_decisions(room_id, limit=30),
         "roadmap": roadmap,
+        "daily_reports": storage.list_daily_reports(room_id, limit=7),
         "forms": forms,
     }
 
@@ -167,128 +187,218 @@ _PAGE = """<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>__TITLE__</title>
+__APP_FONT_LINKS__
+__APP_REACT_LIQUID_IMPORTS__
+__APP_LUCIDE_SCRIPT__
 <style>
-  :root{
-    color-scheme:light;
-    --ink:#18221d;
-    --muted:#657069;
-    --soft:#eef3ef;
-    --paper:#f7f8f5;
-    --panel:#fffffb;
-    --line:#dfe5de;
-    --accent:#23785a;
-    --accent-soft:#e3f2eb;
-    --amber:#9a650c;
-    --amber-soft:#fff3d8;
-    --red:#9b2f3b;
-    --red-soft:#fde9eb;
-  }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--paper);color:var(--ink);font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-  .wrap{width:min(1120px,100%);margin:0 auto;padding:28px clamp(14px,3vw,38px) 56px}
-  .mast{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:start;margin-bottom:28px}
-  .eyebrow{margin:0 0 8px;color:var(--accent);font-size:.78rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase}
-  h1{margin:0;font-size:clamp(2rem,4.2vw,4.5rem);line-height:.98;letter-spacing:0}
-  .sub{margin:12px 0 0;color:var(--muted);line-height:1.55;max-width:680px}
-  .stats{display:grid;grid-template-columns:repeat(4,92px);gap:8px}
-  .stat{border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:12px}
-  .stat strong{display:block;font-size:1.35rem;line-height:1;font-weight:950}
-  .stat span{display:block;margin-top:7px;color:var(--muted);font-size:.78rem;font-weight:800}
-  .members{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 34px}
-  .member{display:inline-flex;align-items:center;gap:7px;min-height:34px;border:1px solid var(--line);border-radius:999px;background:#fff;padding:0 11px;font-size:.88rem}
-  .member b{font-weight:900}
-  .member span{color:var(--muted);font-size:.8rem;font-weight:750}
-  .roadmap-panel{border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:18px;margin:0 0 24px}
+  __APP_THEME_CSS__
+  .shell{position:relative;z-index:1;display:grid;grid-template-columns:260px minmax(0,1fr) 336px;gap:16px;width:min(1440px,100%);margin:0 auto;padding:16px clamp(12px,2vw,24px) 44px;align-items:start}
+  .workspace{position:sticky;top:16px;min-height:calc(100vh - 32px);display:flex;flex-direction:column;padding:14px;background:linear-gradient(180deg,var(--workspace),var(--workspace-2));color:#fff8e8;box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 28px 80px rgba(37,33,29,.20)}
+  .workspace__top{display:grid;gap:12px;padding:4px 4px 14px;border-bottom:1px solid rgba(255,255,255,.14)}
+  .workspace__mark{display:grid;place-items:center;width:38px;height:38px;border-radius:8px;background:var(--kakao-yellow);color:var(--kakao-black);box-shadow:0 12px 30px rgba(254,229,0,.18);font-family:var(--font-display);font-weight:800}
+  .eyebrow{margin:0;color:rgba(255,248,232,.62);font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+  h1{margin:2px 0 0;font-family:var(--font-display);font-size:1.55rem;line-height:1.12;letter-spacing:0;font-weight:800;color:#fff8e8}
+  .workspace__sub{margin:7px 0 0;color:rgba(255,248,232,.66);line-height:1.45;font-size:.88rem}
+  .workspace__nav{display:grid;gap:3px;margin:14px 0;padding:0;list-style:none}
+  .nav-item{position:relative;display:grid;grid-template-columns:26px minmax(0,1fr) auto;align-items:center;gap:8px;width:100%;min-height:36px;border:0;border-radius:var(--radius);padding:0 8px;background:transparent;color:rgba(255,248,232,.78);font-weight:700;font-size:.9rem;text-align:left;overflow:hidden;transition:background .16s ease,color .16s ease,transform .16s cubic-bezier(.2,.8,.2,1)}
+  .nav-item:before{content:"";position:absolute;inset:1px;border-radius:7px;background:linear-gradient(135deg,rgba(255,255,255,.15),transparent 48%,rgba(255,255,255,.06));opacity:0;pointer-events:none}
+  .nav-item:hover{background:rgba(255,255,255,.08);color:#fff8e8;transform:translateY(-1px)}
+  .nav-item:focus-visible{outline:2px solid var(--kakao-yellow);outline-offset:2px}
+  .nav-item.is-active{background:rgba(255,255,255,.13);color:#fff8e8;box-shadow:inset 0 1px 0 rgba(255,255,255,.10)}
+  .nav-item.is-active:before{opacity:1}
+  .nav-item:disabled{cursor:not-allowed;opacity:.48}
+  .nav-icon{display:grid;place-items:center;width:22px;height:22px;border-radius:6px;background:linear-gradient(180deg,rgba(255,255,255,.16),rgba(255,255,255,.07));color:rgba(255,248,232,.86);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -1px 0 rgba(0,0,0,.14)}
+  .nav-icon svg{display:block;width:14px;height:14px;stroke:currentColor;stroke-width:2.15;stroke-linecap:round;stroke-linejoin:round;fill:none}
+  .nav-item b{font-variant-numeric:tabular-nums;font-size:.78rem;color:rgba(255,248,232,.68)}
+  .side-section{padding:13px 4px 0;border-top:1px solid rgba(255,255,255,.12)}
+  .side-label{margin:0 0 8px;color:rgba(255,248,232,.52);font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+  .members{display:grid;gap:7px;margin:0}
+  .member{display:grid;grid-template-columns:26px minmax(0,1fr);gap:8px;align-items:center;min-height:38px;border-radius:var(--radius);padding:5px 7px;background:rgba(255,255,255,.08)}
+  .member:before{content:attr(data-initial);display:grid;place-items:center;width:26px;height:26px;border-radius:7px;background:rgba(255,255,255,.16);color:#fff;font-weight:800;font-size:.76rem}
+  .member b{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:760;color:#fff8e8}
+  .member-copy{display:block;min-width:0}
+  .member-role{display:block;min-width:0;color:rgba(255,248,232,.62);font-size:.76rem;font-weight:650;line-height:1.25;white-space:normal;overflow-wrap:anywhere}
+  .conversation{min-width:0;display:grid;gap:12px}
+  .channel-header{padding:16px 18px 14px}
+  .channel-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:start}
+  .channel-kicker{margin:0 0 6px;color:var(--workspace);font-size:.76rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+  .channel-header h2{margin:0;font-family:var(--font-display);font-size:1.9rem;line-height:1.1;font-weight:800}
+  .sub{margin:8px 0 0;color:var(--muted);line-height:1.5;max-width:68ch}
+  .stats{display:grid;grid-template-columns:repeat(4,82px);gap:6px}
+  .stat{min-height:58px;border:1px solid rgba(33,24,8,.10);border-radius:var(--radius);background:rgba(255,252,244,.74);padding:9px 10px;box-shadow:inset 0 1px 0 rgba(255,255,255,.72)}
+  .stat strong{display:block;font-size:1.08rem;line-height:1;font-weight:800;font-variant-numeric:tabular-nums;color:var(--ink)}
+  .stat span{display:block;margin-top:6px;color:var(--muted);font-size:.72rem;font-weight:700}
+  .project-rail{position:sticky;top:16px;min-width:0}
+  #roadmapPanel[hidden]{display:none}
+  .shell.is-feed-only{grid-template-columns:260px minmax(0,1fr)}
+  .roadmap-panel{border:1px solid var(--glass-line);border-radius:var(--radius);background:linear-gradient(180deg,rgba(255,255,255,.76),rgba(255,250,237,.52));padding:15px;box-shadow:inset 0 1px 0 var(--glass-hi),var(--shadow-lg);backdrop-filter:blur(12px) saturate(1.12);-webkit-backdrop-filter:blur(12px) saturate(1.12);transition:box-shadow .18s ease,border-color .18s ease}
+  .roadmap-panel.is-focused{border-color:rgba(254,229,0,.58);box-shadow:inset 0 1px 0 var(--glass-hi),0 0 0 3px rgba(254,229,0,.24),var(--shadow-lg)}
   .roadmap-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:start;margin-bottom:16px}
-  .roadmap-head h2{margin:0;font-size:1.25rem;line-height:1.25}
+  .roadmap-head h2{margin:0;font-size:1.12rem;line-height:1.25;font-weight:820}
   .roadmap-head p{margin:6px 0 0;color:var(--muted);line-height:1.5}
-  .progress-chip{display:inline-flex;align-items:center;min-height:34px;border-radius:999px;background:var(--accent);color:#fff;padding:0 12px;font-weight:950}
-  .progress-line{height:10px;background:#e9eee9;border-radius:999px;overflow:hidden;margin:10px 0 18px}
-  .progress-line span{display:block;height:100%;background:var(--accent);border-radius:999px}
-  .member-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-  .member-card{border:1px solid var(--line);border-radius:8px;background:#fff;padding:13px}
-  .member-card h3{margin:0;font-size:.98rem}
-  .member-card .role{margin:4px 0 10px;color:var(--muted);font-size:.82rem;font-weight:800}
+  .progress-chip{display:inline-flex;align-items:center;min-height:32px;border-radius:999px;background:var(--workspace);color:#fff8e8;padding:0 11px;font-weight:820;box-shadow:0 12px 28px rgba(37,33,29,.18);font-variant-numeric:tabular-nums}
+  .progress-line{height:9px;background:rgba(255,255,255,.64);border:1px solid rgba(255,255,255,.62);border-radius:999px;overflow:hidden;margin:10px 0 16px}
+  .progress-line span{display:block;height:100%;background:linear-gradient(90deg,var(--workspace),var(--warning));border-radius:999px}
+  .member-grid{display:grid;grid-template-columns:1fr;gap:10px}
+  .member-card{border-top:1px solid rgba(33,24,8,.12);padding:12px 0 0}
+  .member-card:first-child{border-top:0;padding-top:0}
+  .member-card h3{margin:0;font-size:.95rem;font-weight:820}
+  .member-card .role{margin:4px 0 10px;color:var(--muted);font-size:.8rem;font-weight:720;line-height:1.35;white-space:normal;overflow-wrap:anywhere}
   .task-list{display:grid;gap:7px;margin:0;padding:0;list-style:none}
-  .task-item{border:1px solid #e7ece6;border-radius:8px;padding:9px;background:#fbfdfb}
+  .task-item{border:1px solid rgba(33,24,8,.10);border-radius:var(--radius);padding:9px;background:rgba(255,252,244,.72)}
   .task-item.done{opacity:.72}
-  .task-title{font-weight:900;line-height:1.35}
-  .task-meta{margin-top:4px;color:var(--muted);font-size:.78rem;font-weight:800}
+  .task-title{font-weight:760;line-height:1.35}
+  .task-meta{margin-top:4px;color:var(--muted);font-size:.78rem;font-weight:680}
   .roadmap-note{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
-  .timeline{position:relative;display:grid;gap:18px}
-  .timeline:before{content:"";position:absolute;left:142px;top:0;bottom:0;width:2px;background:var(--line)}
-  .event{position:relative;display:grid;grid-template-columns:120px minmax(0,1fr);gap:42px;align-items:start}
-  .event:before{content:"";position:absolute;left:136px;top:22px;width:14px;height:14px;border:3px solid var(--accent);border-radius:50%;background:var(--paper);z-index:1}
-  .when{padding-top:14px;text-align:right;color:var(--muted)}
-  .when b{display:block;color:var(--ink);font-size:.92rem;font-weight:950}
-  .when span{display:block;margin-top:5px;font-size:.78rem;font-weight:800}
-  .card{border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:18px;box-shadow:0 1px 0 rgba(24,34,29,.03)}
-  .card-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:start;margin-bottom:14px}
-  .kind{display:inline-flex;align-items:center;min-height:26px;border-radius:999px;background:var(--accent-soft);color:#195a43;padding:0 9px;font-size:.76rem;font-weight:900}
-  .title{margin:8px 0 0;font-size:1.18rem;line-height:1.25;font-weight:950;word-break:keep-all}
+  .timeline{min-width:0;border:1px solid rgba(33,24,8,.10);border-radius:var(--radius);background:rgba(255,252,244,.88);box-shadow:var(--shadow-md);overflow:hidden}
+  .event{position:relative;display:grid;grid-template-columns:42px minmax(0,1fr);gap:12px;padding:16px 18px}
+  .event:after{content:"";position:absolute;left:72px;right:18px;bottom:0;height:1px;background:rgba(33,24,8,.10)}
+  .event:last-child:after{display:none}
+  .event-avatar{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border:1px solid rgba(37,33,29,.13);border-radius:8px;background:linear-gradient(180deg,rgba(255,255,255,.78),rgba(255,250,240,.54));color:var(--workspace);box-shadow:inset 0 1px 0 rgba(255,255,255,.86),0 8px 20px rgba(45,36,18,.08);text-align:center}
+  .event-avatar svg{display:block;width:18px;height:18px;stroke:currentColor;stroke-width:2.15;stroke-linecap:round;stroke-linejoin:round;fill:none}
+  .event-avatar.schedule,.event-avatar.daily_report{background:linear-gradient(180deg,rgba(254,229,0,.22),rgba(255,250,240,.70));color:#5d4e00;border-color:rgba(254,229,0,.25)}
+  .event-avatar.roles,.event-avatar.decision_roles{background:linear-gradient(180deg,rgba(37,33,29,.12),rgba(255,250,240,.62));color:var(--workspace)}
+  .event-avatar.location,.event-avatar.roadmap_input,.event-avatar.decision_meeting_location{background:linear-gradient(180deg,rgba(18,100,163,.15),rgba(255,250,240,.64));color:var(--slack-blue);border-color:rgba(18,100,163,.18)}
+  .event-avatar.retro,.event-avatar.opinion{background:linear-gradient(180deg,rgba(224,30,90,.14),rgba(255,250,240,.64));color:var(--slack-red);border-color:rgba(224,30,90,.18)}
+  .event-avatar.liquid-react-mounted{background:rgba(255,251,241,.16)}
+  .card{min-width:0;background:transparent;padding:0}
+  .card-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:start;margin-bottom:12px}
+  .message-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px}
+  .when{display:inline-flex;gap:5px;align-items:center;color:var(--muted);font-size:.78rem;font-weight:680;font-variant-numeric:tabular-nums}
+  .when b{display:inline;color:var(--muted);font-size:inherit;font-weight:760}
+  .when span{display:inline;margin:0}
+  .kind{position:relative;isolation:isolate;overflow:hidden;display:inline-flex;align-items:center;min-height:22px;border-radius:999px;background:var(--workspace-soft);color:var(--workspace);border:1px solid rgba(37,33,29,.13);padding:0 8px;font-size:.72rem;font-weight:760}
+  .kind.schedule,.kind.daily_report{background:rgba(254,229,0,.12);color:#5d4e00;border-color:rgba(254,229,0,.22)}
+  .kind.roles,.kind.decision_roles{background:var(--slack-aubergine-soft);color:var(--slack-aubergine);border-color:rgba(74,21,75,.18)}
+  .kind.location,.kind.roadmap_input{background:var(--slack-blue-soft);color:var(--slack-blue);border-color:rgba(18,100,163,.16)}
+  .kind.retro,.kind.opinion{background:var(--slack-red-soft);color:var(--slack-red);border-color:rgba(224,30,90,.15)}
+  .title{margin:0;font-size:1.05rem;line-height:1.34;font-weight:820;word-break:keep-all}
   .meta{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
-  .badge{display:inline-flex;align-items:center;min-height:30px;border:1px solid var(--line);border-radius:999px;background:#fff;padding:0 10px;font-size:.8rem;font-weight:850;color:#3f4b43}
-  .badge.open{background:var(--amber-soft);color:#714807;border-color:#eed29a}
-  .badge.private{background:var(--red-soft);color:#7c2530;border-color:#f0bec5}
+  .badge{position:relative;isolation:isolate;overflow:hidden;display:inline-flex;align-items:center;min-height:26px;border:1px solid rgba(33,24,8,.11);border-radius:999px;background:rgba(255,251,241,.64);padding:0 9px;font-size:.76rem;font-weight:720;color:var(--ink-soft)}
+  .badge.open{background:var(--amber-soft);color:#82500b;border-color:rgba(216,132,24,.28)}
+  .badge.private{background:var(--rose-soft);color:#8b2639;border-color:rgba(191,64,88,.24)}
+  .badge.report{background:var(--slack-blue-soft);color:var(--slack-blue);border-color:rgba(18,100,163,.22)}
   .summary{display:grid;gap:13px}
-  .block{border-top:1px solid var(--line);padding-top:13px}
+  .block{border-top:1px solid var(--glass-line);padding-top:13px}
   .block:first-child{border-top:0;padding-top:0}
-  .block h3{margin:0 0 9px;font-size:.92rem;line-height:1.3}
+  .block h3{margin:0 0 9px;font-size:.9rem;line-height:1.3;font-weight:800}
   .block p{margin:0;color:var(--muted);line-height:1.5}
+  .inline-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .mini{position:relative;isolation:isolate;overflow:hidden;display:inline-flex;align-items:center;border:1px solid var(--glass-line);border-radius:999px;background:rgba(255,251,241,.68);padding:6px 9px;color:var(--ink-soft);font-size:.8rem;font-weight:700}
   .best-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}
-  .best{display:inline-flex;align-items:center;border-radius:999px;background:var(--accent);color:#fff;padding:7px 10px;font-weight:950;font-size:.86rem}
+  .best{position:relative;isolation:isolate;overflow:hidden;display:inline-flex;align-items:center;gap:7px;border:1px solid rgba(254,229,0,.28);border-radius:999px;background:rgba(255,251,241,.82);color:var(--ink);padding:7px 10px;font-weight:800;font-size:.84rem}
+  .best:before{content:"";position:relative;z-index:2;flex:0 0 auto;width:7px;height:7px;border-radius:999px;background:var(--kakao-yellow);box-shadow:0 0 0 3px rgba(254,229,0,.16)}
   .bars{display:grid;gap:8px;margin-top:8px}
   .bar{display:grid;grid-template-columns:minmax(92px,1fr) 42px;gap:10px;align-items:center}
-  .bar-label{font-size:.86rem;color:#364039;font-weight:850;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .bar-value{text-align:right;font-weight:950;color:var(--accent)}
-  .track{height:8px;background:#e9eee9;border-radius:999px;overflow:hidden}
-  .fill{height:100%;background:var(--accent);border-radius:999px}
+  .bar-label{font-size:.86rem;color:var(--ink-soft);font-weight:720;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bar-value{text-align:right;font-weight:820;color:var(--workspace);font-variant-numeric:tabular-nums}
+  .track{height:8px;background:rgba(255,255,255,.76);border-radius:999px;overflow:hidden;border:1px solid rgba(33,24,8,.08)}
+  .fill{height:100%;background:linear-gradient(90deg,var(--workspace),var(--warning));border-radius:999px}
   .answers{display:grid;gap:8px;margin:8px 0 0;padding:0;list-style:none}
-  .answers li{padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;line-height:1.45;word-break:break-word}
-  .empty{border:1px dashed #bcc8bf;border-radius:8px;background:rgba(255,255,255,.55);padding:36px 22px;text-align:center;color:var(--muted)}
-  @media (max-width:760px){
-    .mast{display:block}
-    .stats{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:18px}
-    .member-grid{grid-template-columns:1fr}
-    .timeline:before{left:8px}
-    .event{grid-template-columns:1fr;gap:8px;padding-left:28px}
-    .event:before{left:1px}
-    .when{text-align:left;padding-top:0;display:flex;gap:8px;align-items:center}
-    .when span{margin-top:0}
+  .answers li{padding:9px 10px;border:1px solid rgba(33,24,8,.10);border-radius:var(--radius);background:rgba(255,252,244,.76);line-height:1.45;word-break:break-word}
+  .preference-grid,.assignment-grid{display:grid;gap:8px;margin-top:9px}
+  .assignment-grid{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+  .preference-card,.assignment-card{border:1px solid rgba(33,24,8,.10);border-radius:var(--radius);background:rgba(255,252,244,.74);padding:10px;box-shadow:inset 0 1px 0 rgba(255,255,255,.58)}
+  .assignment-card{padding:12px 14px}
+  .preference-card b,.assignment-card b{display:block;color:var(--ink);font-size:.86rem;font-weight:820;line-height:1.35}
+  .preference-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+  .preference-chip{display:inline-flex;align-items:center;gap:5px;border:1px solid rgba(33,24,8,.10);border-radius:999px;background:rgba(255,251,241,.76);padding:5px 8px;color:var(--ink-soft);font-size:.78rem;font-weight:720;line-height:1.25}
+  .preference-rank{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:999px;background:var(--workspace);color:#fff8e8;font-size:.68rem;font-weight:820;font-variant-numeric:tabular-nums}
+  .assignment-role{display:block;margin-top:5px;color:var(--ink-soft);font-size:.86rem;font-weight:740;line-height:1.4;overflow-wrap:anywhere}
+  .decision-callout{display:grid;gap:10px;border:1px solid rgba(33,24,8,.10);border-radius:var(--radius);background:linear-gradient(180deg,rgba(255,253,247,.84),rgba(255,250,240,.58));padding:12px 14px;box-shadow:inset 0 1px 0 rgba(255,255,255,.72)}
+  .decision-time{display:inline-flex;width:max-content;max-width:100%;align-items:center;min-height:30px;border:1px solid rgba(33,24,8,.11);border-radius:999px;background:rgba(255,251,241,.78);padding:0 10px;color:var(--ink);font-size:.86rem;font-weight:820;line-height:1.2;box-shadow:inset 0 1px 0 rgba(255,255,255,.68)}
+  .decision-title{margin:0;color:var(--ink);font-weight:820;line-height:1.45}
+  .decision-note{margin:0;color:var(--muted);font-size:.88rem;line-height:1.5}
+  .empty{border:1px dashed rgba(33,24,8,.24);border-radius:var(--radius);background:rgba(255,251,241,.62);padding:36px 22px;text-align:center;color:var(--muted)}
+  @media (max-width:1180px){
+    .shell{grid-template-columns:236px minmax(0,1fr);grid-template-areas:"workspace conversation" "workspace rail"}
+    .workspace{grid-area:workspace}
+    .conversation{grid-area:conversation}
+    .project-rail{grid-area:rail;position:relative;top:auto}
+  }
+  @media (max-width:840px){
+    .shell{display:grid;grid-template-columns:1fr;grid-template-areas:"workspace" "conversation" "rail";gap:12px;padding:12px 10px 36px}
+    .workspace{position:relative;top:auto;min-height:auto}
+    .workspace__top{grid-template-columns:38px minmax(0,1fr);align-items:start}
+    .workspace__copy{min-width:0}
+    .workspace__nav{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .side-section{display:block}
+    .members{grid-template-columns:repeat(auto-fit,minmax(142px,1fr))}
+    .channel-row{display:block}
+    .stats{grid-template-columns:repeat(4,minmax(0,1fr));margin-top:14px}
+    .project-rail{position:relative;top:auto}
     .card-head{display:block}
-    .meta{justify-content:flex-start;margin-top:12px}
+    .meta{justify-content:flex-start;margin-top:10px}
   }
   @media (max-width:480px){
-    .wrap{padding-top:20px}
-    .stats{grid-template-columns:1fr}
-    .card{padding:15px}
-    h1{font-size:2rem}
+    .workspace{padding:12px}
+    .workspace__top{padding-bottom:10px}
+    h1{font-size:1.28rem}
+    .workspace__sub{margin-top:5px}
+    .workspace__nav{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin:10px 0 0}
+    .nav-item{grid-template-columns:1fr;justify-items:center;gap:3px;min-height:46px;padding:5px 4px}
+    .nav-item span:not(.nav-icon){display:none}
+    .nav-item b{font-size:.75rem}
+    .side-section{display:none}
+    .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .event{grid-template-columns:34px minmax(0,1fr);gap:10px;padding:14px 12px}
+    .event:after{left:54px;right:12px}
+    .event-avatar{width:32px;height:32px}
+    .event-avatar svg{width:16px;height:16px}
+    .channel-header h2{font-size:1.52rem}
   }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header class="mast">
-    <div>
-      <p class="eyebrow">Decision Timeline</p>
-      <h1 id="roomName"></h1>
-      <p class="sub" id="subtitle"></p>
+<div class="shell" id="dashboardShell">
+  <aside class="workspace">
+    <div class="workspace__top">
+      <div class="workspace__mark">T</div>
+      <div class="workspace__copy">
+        <p class="eyebrow">Teamplay room</p>
+        <h1 id="roomName"></h1>
+        <p class="workspace__sub" id="roomInvite"></p>
+      </div>
     </div>
-    <div class="stats">
-      <div class="stat"><strong id="formCount">0</strong><span>기록</span></div>
-      <div class="stat"><strong id="memberCount">0</strong><span>멤버</span></div>
-      <div class="stat"><strong id="taskCount">0</strong><span>태스크</span></div>
-      <div class="stat"><strong id="responseCount">0</strong><span>응답</span></div>
+    <nav class="workspace__nav" aria-label="방 요약">
+      <button class="nav-item is-active" type="button" data-nav="all"><span class="nav-icon"><i data-lucide="list"></i></span><span>활동 피드</span><b id="sideEventCount">0</b></button>
+      <button class="nav-item" type="button" data-nav="tasks"><span class="nav-icon"><i data-lucide="clipboard-check"></i></span><span>태스크</span><b id="sideTaskCount">0</b></button>
+      <button class="nav-item" type="button" data-nav="responses"><span class="nav-icon"><i data-lucide="message-circle"></i></span><span>응답</span><b id="sideResponseCount">0</b></button>
+      <button class="nav-item" type="button" data-nav="decisions"><span class="nav-icon"><i data-lucide="badge-check"></i></span><span>결정</span><b id="sideDecisionCount">0</b></button>
+    </nav>
+    <div class="side-section">
+      <p class="side-label">Members</p>
+      <div class="members" id="members"></div>
     </div>
-  </header>
-  <div class="members" id="members"></div>
-  <section id="roadmapPanel"></section>
-  <main class="timeline" id="timeline"></main>
+  </aside>
+  <main class="conversation">
+    <header class="channel-header glass-panel">
+      <div class="channel-row">
+        <div>
+          <p class="channel-kicker"># teamplay-feed</p>
+          <h2>MCP 작업 기록</h2>
+          <p class="sub" id="subtitle"></p>
+        </div>
+        <div class="stats">
+          <div class="stat"><strong id="formCount">0</strong><span>기록</span></div>
+          <div class="stat"><strong id="memberCount">0</strong><span>멤버</span></div>
+          <div class="stat"><strong id="taskCount">0</strong><span>태스크</span></div>
+          <div class="stat"><strong id="responseCount">0</strong><span>응답</span></div>
+        </div>
+      </div>
+    </header>
+    <section class="timeline" id="timeline"></section>
+  </main>
+  <aside id="roadmapPanel" class="project-rail"></aside>
 </div>
 <script>
 const dashboard = __DATA__;
 const forms = [...dashboard.forms].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+const dailyReports = [...(dashboard.daily_reports || [])].sort((a, b) => new Date(b.report_date) - new Date(a.report_date));
+const decisions = [...(dashboard.decisions || [])].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 const roadmap = dashboard.roadmap || {progress:{done:0,total:0}, task_layer_summary:{milestones:0,todos:0}, by_member:[], unassigned_tasks:[], calendar_candidates:[]};
+let activeNav = "all";
+let currentEvents = [];
 
 function escapeText(value) {
   return String(value == null ? "" : value).replace(/[&<>"']/g, (ch) => ({
@@ -309,14 +419,99 @@ function dt(value) {
   };
 }
 
+function taskScheduleLabel(task) {
+  const raw = task.end_at || task.start_at;
+  if (!raw) return "일정 미정";
+  const text = String(raw);
+  return text.length >= 10 ? text.slice(0, 10) : text;
+}
+
 function kindLabel(kind) {
   return {
     schedule: "회의 시간",
     roles: "역할 분배",
     opinion: "의견수렴",
     retro: "회고",
+    checkin: "데일리 체크인",
+    location: "장소 수집",
+    roadmap_input: "로드맵 의견",
+    daily_report: "데일리 리포트",
+    decision_roles: "역할 확정",
+    decision_meeting_time: "회의 확정",
+    decision_meeting_location: "장소 확정",
+    decision_general: "결정 기록",
     survey: "투표"
   }[kind] || "투표";
+}
+
+function kindClass(kind) {
+  return String(kind || "survey").toLowerCase().replace(/[^a-z0-9_-]/g, "_");
+}
+
+function eventNumber(sequence) {
+  const n = Number(sequence);
+  return String(Number.isFinite(n) && n > 0 ? n : 1).padStart(2, "0");
+}
+
+function eventTime(event) {
+  const time = new Date(event.at).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function collapseDecisionEvents(events) {
+  return events.filter((event) => {
+    const decision = event.data || {};
+    if (decision.kind !== "meeting_time" || decision.source !== "notify_room") return true;
+    return !events.some((other) => {
+      const otherDecision = other.data || {};
+      if (other === event || otherDecision.kind !== "meeting_time") return false;
+      if (otherDecision.source !== "calendar_create_room_event") return false;
+      return Math.abs(eventTime(other) - eventTime(event)) <= 15 * 60 * 1000;
+    });
+  });
+}
+
+function visibleEventsForNav(events, nav) {
+  if (nav === "responses") return events.filter((event) => event.type === "form");
+  if (nav === "decisions") return events.filter((event) => event.type === "decision");
+  return events;
+}
+
+function syncIcons() {
+  if (!window.lucide || !window.lucide.createIcons) return;
+  window.lucide.createIcons({
+    attrs: {
+      "aria-hidden": "true",
+      "stroke-width": "2.1"
+    }
+  });
+}
+
+function eventIconName(kind) {
+  return {
+    schedule: "calendar-days",
+    roles: "users",
+    opinion: "message-circle",
+    retro: "rotate-ccw",
+    checkin: "circle-check-big",
+    location: "map-pin",
+    roadmap_input: "map",
+    daily_report: "clipboard-list",
+    decision_roles: "circle-check-big",
+    decision_meeting_time: "calendar-days",
+    decision_meeting_location: "map-pin",
+    decision_general: "badge-check",
+    survey: "vote"
+  }[kind] || "vote";
+}
+
+function eventIcon(kind) {
+  return `<i data-lucide="${eventIconName(kind)}"></i>`;
+}
+
+function memberInitial(name) {
+  const chars = Array.from(String(name || "?").trim());
+  return chars[0] || "?";
 }
 
 function statusLabel(status) {
@@ -394,12 +589,31 @@ function renderBars(scores) {
   }).join("")}</div>`;
 }
 
+function renderRolePreferences(form) {
+  const responses = form && Array.isArray(form.responses) ? form.responses : [];
+  if (!responses.length) return "";
+  const cards = responses.map((response) => {
+    const answers = response.answers || {};
+    const prefs = Array.isArray(answers.roles) ? answers.roles : [];
+    const chips = prefs.length
+      ? prefs.map((role, index) => `<span class="preference-chip"><span class="preference-rank">${index + 1}</span>${escapeText(role)}</span>`).join("")
+      : `<span class="preference-chip">응답 없음</span>`;
+    return `
+      <article class="preference-card">
+        <b>${escapeText(response.nickname || "익명 응답")}</b>
+        <div class="preference-list">${chips}</div>
+      </article>
+    `;
+  }).join("");
+  return `<div class="preference-grid">${cards}</div>`;
+}
+
 function topCount(counts) {
   const entries = Object.entries(counts || {}).sort((a, b) => Number(b[1]) - Number(a[1]));
   return entries[0] || null;
 }
 
-function renderResult(result) {
+function renderResult(result, form) {
   if (result.type === "grid") {
     const best = result.best_slots || (result.best_slot ? [result.best_slot] : []);
     const chips = best.length
@@ -413,7 +627,8 @@ function renderResult(result) {
     return `<section class="block"><h3>${escapeText(result.question)}</h3><p>${lead}</p>${renderBars(result.counts)}</section>`;
   }
   if (result.ranking_scores) {
-    return `<section class="block"><h3>${escapeText(result.question)}</h3>${renderBars(result.ranking_scores)}</section>`;
+    const details = form && form.kind === "roles" ? renderRolePreferences(form) : "";
+    return `<section class="block"><h3>${escapeText(result.question)}</h3>${renderBars(result.ranking_scores)}${details}</section>`;
   }
   if (result.type === "rating") {
     const avg = result.average == null ? "없음" : Number(result.average).toFixed(1);
@@ -428,21 +643,24 @@ function renderResult(result) {
   return `<section class="block"><h3>${escapeText(result.question || "질문")}</h3><p>요약할 응답이 없습니다.</p></section>`;
 }
 
-function renderEvent(form, index) {
+function renderFormEvent(form, sequence) {
   const when = dt(form.created_at);
   const badges = [
     form.closed ? "마감" : "진행중",
     form.anonymous ? "익명" : "식별",
     `${form.total_responses}응답`
   ];
-  const summary = (form.summary || []).map(renderResult).join("") || "<section class='block'><p>아직 응답이 없습니다.</p></section>";
+  const summary = (form.summary || []).map((result) => renderResult(result, form)).join("") || "<section class='block'><p>아직 응답이 없습니다.</p></section>";
   return `
     <article class="event">
-      <time class="when"><b>${escapeText(when.day)}</b><span>${escapeText(when.time)}</span></time>
+      <div class="event-avatar ${escapeText(kindClass(form.kind))}" aria-hidden="true">${eventIcon(form.kind)}</div>
       <section class="card">
         <div class="card-head">
           <div>
-            <span class="kind">${index + 1}. ${escapeText(kindLabel(form.kind))}</span>
+            <div class="message-meta">
+              <span class="kind ${escapeText(kindClass(form.kind))}">${eventNumber(sequence)} · ${escapeText(kindLabel(form.kind))}</span>
+              <time class="when"><b>${escapeText(when.day)}</b><span>${escapeText(when.time)}</span></time>
+            </div>
             <h2 class="title">${escapeText(form.title)}</h2>
           </div>
           <div class="meta">${badges.map((b) => `<span class="badge ${b === "진행중" ? "open" : b === "식별" ? "private" : ""}">${escapeText(b)}</span>`).join("")}</div>
@@ -453,26 +671,270 @@ function renderEvent(form, index) {
   `;
 }
 
+function renderReportEvent(report, sequence) {
+  const when = dt(report.created_at || report.report_date);
+  const payload = report.payload || {};
+  const progress = payload.progress || {};
+  const counts = payload.status_counts || {};
+  const overdue = (payload.overdue_tasks || []).slice(0, 5);
+  const notes = (payload.notes || []).slice(0, 5);
+  const dueToday = (payload.due_today_tasks || []).slice(0, 5);
+  const future = (payload.future_tasks || []).slice(0, 5);
+  const progressText = `${progress.done || 0}/${progress.total || 0} · ${progress.percent || 0}%`;
+  return `
+    <article class="event">
+      <div class="event-avatar daily_report" aria-hidden="true">${eventIcon("daily_report")}</div>
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <div class="message-meta">
+              <span class="kind daily_report">${eventNumber(sequence)} · ${escapeText(kindLabel("daily_report"))}</span>
+              <time class="when"><b>${escapeText(when.day)}</b><span>${escapeText(when.time || report.report_date)}</span></time>
+            </div>
+            <h2 class="title">${escapeText(report.title || "데일리 리포트")}</h2>
+          </div>
+          <div class="meta">
+            <span class="badge report">진행 ${escapeText(progressText)}</span>
+            <span class="badge ${counts.overdue ? "open" : ""}">밀림 ${escapeText(counts.overdue || 0)}</span>
+            <span class="badge">오늘 ${escapeText(counts.due_today || 0)}</span>
+            <span class="badge">예정 ${escapeText(counts.future || 0)}</span>
+          </div>
+        </div>
+        <div class="summary">
+          <section class="block">
+            <h3>상태</h3>
+            <div class="inline-list">
+              <span class="mini">완료 ${escapeText(counts.done || 0)}</span>
+              <span class="mini">진행 ${escapeText(counts.doing || 0)}</span>
+              <span class="mini">대기 ${escapeText(counts.todo || 0)}</span>
+              <span class="mini">응답 ${escapeText(payload.checkin_response_count || 0)}</span>
+            </div>
+          </section>
+          <section class="block">
+            <h3>오늘 볼 일</h3>
+            <ul class="answers">${dueToday.length ? dueToday.map((task) => `<li>${escapeText(task.title)}${task.assignee ? ` · ${escapeText(task.assignee)}` : ""}</li>`).join("") : "<li>오늘 날짜에 걸린 미완료 todo가 없습니다.</li>"}</ul>
+          </section>
+          <section class="block">
+            <h3>남은 밀린 일</h3>
+            <ul class="answers">${overdue.length ? overdue.map((task) => `<li>${escapeText(task.title)}${task.assignee ? ` · ${escapeText(task.assignee)}` : ""}</li>`).join("") : "<li>남은 밀린 일이 없습니다.</li>"}</ul>
+          </section>
+          <section class="block">
+            <h3>앞으로 예정된 일</h3>
+            <ul class="answers">${future.length ? future.map((task) => `<li>${escapeText(taskScheduleLabel(task))} · ${escapeText(task.title)}${task.assignee ? ` · ${escapeText(task.assignee)}` : ""}</li>`).join("") : "<li>앞으로 예정된 미완료 todo가 없습니다.</li>"}</ul>
+          </section>
+          ${notes.length ? `<section class="block"><h3>기타 메모</h3><ul class="answers">${notes.map((note) => `<li>${escapeText(note.member)}: ${escapeText(note.text)}</li>`).join("")}</ul></section>` : ""}
+        </div>
+      </section>
+    </article>
+  `;
+}
+
+function formatDateTime(value) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("ko-KR", {
+    month: "numeric",
+    day: "numeric",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function formatTime(value) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatDecisionRange(startAt, endAt) {
+  const start = startAt ? new Date(startAt) : null;
+  const end = endAt ? new Date(endAt) : null;
+  if (!start || Number.isNaN(start.getTime())) return "";
+  if (!end || Number.isNaN(end.getTime())) return formatDateTime(startAt);
+  const sameDay = start.toDateString() === end.toDateString();
+  return sameDay ? `${formatDateTime(startAt)} - ${formatTime(endAt)}` : `${formatDateTime(startAt)} - ${formatDateTime(endAt)}`;
+}
+
+function decisionDisplayTitle(decision) {
+  if (decision.kind === "roles") return "역할 분배 확정";
+  if (decision.kind === "meeting_time" && decision.source === "notify_room") return "회의 시간 공지";
+  if (decision.kind === "meeting_time") return decision.title || "회의 확정";
+  if (decision.kind === "meeting_location") return decision.title || "장소 확정";
+  return decision.title || "결정 기록";
+}
+
+function renderDecisionSummary(decision) {
+  const payload = decision && typeof decision.payload === "object" && decision.payload ? decision.payload : {};
+  const assignments = Array.isArray(payload.assignments) ? payload.assignments : [];
+  if (decision.kind === "roles" && assignments.length) {
+    const cards = assignments.map((assignment) => `
+      <article class="assignment-card">
+        <b>${escapeText(assignment.nickname || "멤버")}</b>
+        <span class="assignment-role">${escapeText(assignment.role || "역할 미정")}</span>
+      </article>
+    `).join("");
+    return `
+      <section class="block">
+        <h3>확정된 역할</h3>
+        <div class="assignment-grid">${cards}</div>
+      </section>
+    `;
+  }
+  if (decision.kind === "meeting_time") {
+    const range = formatDecisionRange(payload.start_at, payload.end_at);
+    const createdCount = Array.isArray(payload.created) ? payload.created.length : null;
+    const failedCount = Array.isArray(payload.failed) ? payload.failed.length : null;
+    const status = [
+      createdCount != null ? `캘린더 등록 ${createdCount}명` : "",
+      failedCount ? `실패 ${failedCount}명` : ""
+    ].filter(Boolean).join(" · ");
+    const note = payload.message || (!range ? decision.summary : "");
+    return `
+      <section class="block">
+        <div class="decision-callout">
+          ${range ? `<span class="decision-time">${escapeText(range)}</span>` : ""}
+          <p class="decision-title">${escapeText(payload.title || decision.title || "회의 시간이 확정되었습니다.")}</p>
+          ${status ? `<p class="decision-note">${escapeText(status)}</p>` : ""}
+          ${note ? `<p class="decision-note">${escapeText(note)}</p>` : ""}
+        </div>
+      </section>
+    `;
+  }
+  return `<section class="block"><p>${escapeText(decision.summary || "요약이 없습니다.")}</p></section>`;
+}
+
+function renderDecisionEvent(decision, sequence) {
+  const when = dt(decision.created_at);
+  const kind = `decision_${decision.kind || "general"}`;
+  return `
+    <article class="event">
+      <div class="event-avatar ${escapeText(kindClass(kind))}" aria-hidden="true">${eventIcon(kind)}</div>
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <div class="message-meta">
+              <span class="kind ${escapeText(kindClass(kind))}">${eventNumber(sequence)} · ${escapeText(kindLabel(kind))}</span>
+              <time class="when"><b>${escapeText(when.day)}</b><span>${escapeText(when.time)}</span></time>
+            </div>
+            <h2 class="title">${escapeText(decisionDisplayTitle(decision))}</h2>
+          </div>
+          <div class="meta"><span class="badge report">확정</span></div>
+        </div>
+        <div class="summary">${renderDecisionSummary(decision)}</div>
+      </section>
+    </article>
+  `;
+}
+
+function timelineEvents() {
+  const formEvents = forms.map((form) => ({type: "form", at: form.created_at, data: form}));
+  const reportEvents = dailyReports.map((report) => ({type: "report", at: report.created_at || report.report_date, data: report}));
+  const decisionEvents = collapseDecisionEvents(decisions.map((decision) => ({type: "decision", at: decision.created_at, data: decision})));
+  const events = [...formEvents, ...reportEvents, ...decisionEvents].map((event, order) => ({...event, order}));
+  const chronological = events.slice().sort((a, b) => {
+    const diff = eventTime(a) - eventTime(b);
+    return diff || a.order - b.order;
+  });
+  chronological.forEach((event, index) => {
+    event.sequence = index + 1;
+  });
+  return chronological.slice().sort((a, b) => {
+    const diff = eventTime(b) - eventTime(a);
+    return diff || b.order - a.order;
+  });
+}
+
+function filteredEvents(events) {
+  return visibleEventsForNav(events, activeNav);
+}
+
+function renderTimelineEvent(event) {
+  const sequence = event.sequence || 1;
+  if (event.type === "report") return renderReportEvent(event.data, sequence);
+  if (event.type === "decision") return renderDecisionEvent(event.data, sequence);
+  return renderFormEvent(event.data, sequence);
+}
+
+function renderFeed() {
+  const timeline = document.getElementById("timeline");
+  const events = filteredEvents(currentEvents);
+  const emptyText = {
+    responses: "아직 투표/폼 기록이 없습니다.",
+    decisions: "아직 확정 결정이 없습니다.",
+    all: "투표, 체크인, 리포트, 확정 결정이 이곳에 최신순으로 쌓입니다."
+  }[activeNav] || "투표, 체크인, 리포트, 확정 결정이 이곳에 최신순으로 쌓입니다.";
+  timeline.innerHTML = events.length
+    ? events.map(renderTimelineEvent).join("")
+    : `<div class="empty"><h2>아직 기록이 없습니다</h2><p>${escapeText(emptyText)}</p></div>`;
+  syncIcons();
+  if (window.enhanceLiquidGlass) window.enhanceLiquidGlass();
+}
+
+function setActiveNav(nav) {
+  activeNav = nav;
+  document.querySelectorAll(".nav-item").forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.nav === nav);
+  });
+  if (nav === "tasks") {
+    renderFeed();
+    const panel = document.querySelector("#roadmapPanel:not([hidden]) .roadmap-panel");
+    if (panel) {
+      panel.scrollIntoView({behavior: "smooth", block: "start"});
+      panel.classList.add("is-focused");
+      window.setTimeout(() => panel.classList.remove("is-focused"), 1200);
+    }
+    return;
+  }
+  renderFeed();
+}
+
+function bindNav() {
+  document.querySelectorAll(".nav-item").forEach((button) => {
+    button.onclick = function() {
+      if (button.disabled) return;
+      setActiveNav(button.dataset.nav || "all");
+    };
+  });
+}
+
 function render() {
+  currentEvents = timelineEvents();
+  const taskTotal = (roadmap.task_layer_summary && roadmap.task_layer_summary.todos) || (roadmap.progress && roadmap.progress.total) || 0;
+  const responseTotal = forms.reduce((sum, form) => sum + Number(form.total_responses || 0), 0);
+  const visibleAllEvents = visibleEventsForNav(currentEvents, "all");
+  const visibleDecisionEvents = visibleEventsForNav(currentEvents, "decisions");
   document.getElementById("roomName").textContent = dashboard.room.name;
-  document.getElementById("subtitle").textContent = `초대 코드 ${dashboard.room.invite_code} · 방에서 만든 투표와 폼 결과를 최신순으로 모았습니다.`;
-  document.getElementById("formCount").textContent = forms.length;
+  document.getElementById("roomInvite").textContent = `초대 코드 ${dashboard.room.invite_code}`;
+  document.getElementById("subtitle").textContent = `방에서 만든 투표, 체크인, 리포트, 확정 결정을 최신순으로 모았습니다.`;
+  document.getElementById("formCount").textContent = visibleAllEvents.length;
   document.getElementById("memberCount").textContent = dashboard.members.length;
-  document.getElementById("taskCount").textContent = (roadmap.task_layer_summary && roadmap.task_layer_summary.todos) || (roadmap.progress && roadmap.progress.total) || 0;
-  document.getElementById("responseCount").textContent = forms.reduce((sum, form) => sum + Number(form.total_responses || 0), 0);
+  document.getElementById("taskCount").textContent = taskTotal;
+  document.getElementById("responseCount").textContent = responseTotal;
+  document.getElementById("sideEventCount").textContent = visibleAllEvents.length;
+  document.getElementById("sideTaskCount").textContent = taskTotal;
+  document.getElementById("sideResponseCount").textContent = responseTotal;
+  document.getElementById("sideDecisionCount").textContent = visibleDecisionEvents.length;
 
   const members = document.getElementById("members");
-  members.innerHTML = dashboard.members.map((member) => `<span class="member"><b>${escapeText(member.nickname)}</b><span>${escapeText(member.role || "역할 미정")}</span></span>`).join("");
-  document.getElementById("roadmapPanel").innerHTML = renderRoadmap();
-
-  const timeline = document.getElementById("timeline");
-  timeline.innerHTML = forms.length
-    ? forms.map(renderEvent).join("")
-    : `<div class="empty"><h2>아직 기록이 없습니다</h2><p>투표나 일정 조율을 만들면 이곳에 시간순으로 쌓입니다.</p></div>`;
+  members.innerHTML = dashboard.members.map((member) => `<span class="member" data-initial="${escapeText(memberInitial(member.nickname))}"><span class="member-copy"><b>${escapeText(member.nickname)}</b><span class="member-role">${escapeText(member.role || "역할 미정")}</span></span></span>`).join("");
+  const shell = document.getElementById("dashboardShell");
+  const roadmapPanel = document.getElementById("roadmapPanel");
+  const roadmapHtml = renderRoadmap();
+  roadmapPanel.innerHTML = roadmapHtml;
+  roadmapPanel.hidden = !roadmapHtml;
+  shell.classList.toggle("is-feed-only", !roadmapHtml);
+  const taskNav = document.querySelector('[data-nav="tasks"]');
+  if (taskNav) taskNav.disabled = !roadmapHtml;
+  bindNav();
+  renderFeed();
+  syncIcons();
+  if (window.enhanceLiquidGlass) window.enhanceLiquidGlass();
 }
 
 render();
 </script>
+__APP_REACT_LIQUID_BOOTSTRAP__
 </body>
 </html>"""
 
@@ -490,7 +952,16 @@ async def view_room_dashboard(request: Request) -> HTMLResponse:
         return _message("방을 찾을 수 없음", "존재하지 않는 방입니다.", 404)
     safe_data = json.dumps(_jsonable(data), ensure_ascii=False).replace("</", "<\\/")
     title = html.escape(f"{data['room']['name']} 결과 타임라인")
-    return HTMLResponse(_PAGE.replace("__TITLE__", title).replace("__DATA__", safe_data))
+    page = (
+        _PAGE.replace("__TITLE__", title)
+        .replace("__APP_FONT_LINKS__", APP_FONT_LINKS)
+        .replace("__APP_REACT_LIQUID_IMPORTS__", APP_REACT_LIQUID_IMPORTS)
+        .replace("__APP_LUCIDE_SCRIPT__", APP_LUCIDE_SCRIPT)
+        .replace("__APP_REACT_LIQUID_BOOTSTRAP__", APP_REACT_LIQUID_BOOTSTRAP)
+        .replace("__APP_THEME_CSS__", APP_THEME_CSS)
+        .replace("__DATA__", safe_data)
+    )
+    return HTMLResponse(page)
 
 
 def register_dashboard_routes(mcp) -> None:

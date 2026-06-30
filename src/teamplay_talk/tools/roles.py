@@ -289,6 +289,8 @@ def register(mcp: FastMCP) -> None:
             ],
             "_role_difficulty": difficulties,  # 멤버 폼엔 안 보임(SurveyJS 무시), finalize가 읽음
             "_role_slots": slots,
+            "_workflow_kind": "role_assignment",
+            "_workflow_stage": "role_preference_collection",
         }
         form = storage.create_form(
             room_id=room_id,
@@ -418,6 +420,14 @@ def register(mcp: FastMCP) -> None:
                 "⚠️ **각 멤버의 note(자유기입: 못 하는 역할·사정)를 반드시 팀장에게 보여주고**, "
                 "필요하면 조정한 뒤 set_roles로 확정. AI 단독 확정 X — 팀장이 note 보고 최종 판단."
             ),
+            "next": "배정안은 아직 저장되지 않았습니다. 팀장에게 member_notes와 배정안을 보여주고, 확인되면 set_roles로 확정하세요.",
+            "suggested_next_actions": [
+                "팀장에게 assignments와 member_notes 확인받기",
+                "조정이 필요하면 assignments를 수정",
+                "확정되면 set_roles로 저장 및 공지",
+                "저장 후 member_tasks 또는 decompose_roadmap으로 할일 연결",
+            ],
+            "chat_response_hint": "역할이 확정됐다고 말하지 마세요. '배정안'이며 set_roles 전에는 저장되지 않았다고 분명히 말하세요.",
         }
 
     @mcp.tool(
@@ -464,10 +474,25 @@ def register(mcp: FastMCP) -> None:
             }
 
         lines = "\n".join(f"· {a['nickname']}: {a['role']}" for a in written)
-        msg = message or f"🎭 역할 분배 결과\n{lines}"
+        msg = message or f"[팀플톡] 역할 분배 결과\n{lines}"
         sent = []
+        from ..config import settings
+        from ..dashboard_web import create_dashboard_token
+
+        items = [(a["nickname"], a["role"]) for a in written[:5]]
         for m in kakao_store.list_members_with_tokens(room_id):
-            if await kakao_store.send_with_refresh(m, msg) == 200:
+            token = create_dashboard_token(room_id, m["id"])
+            link = f"{settings.public_base_url}/dashboard/rooms/{room_id}?token={token}"
+            status = await kakao_store.send_feed_with_refresh(
+                m,
+                title="역할 분배가 확정됐습니다",
+                description="팀원별 역할을 저장했고, 역할명 todo가 있으면 실제 멤버에게 연결했습니다.",
+                link_url=link,
+                button_title="역할 보기",
+                items=items,
+                fallback_text=f"{msg}\n{link}",
+            )
+            if status == 200:
                 sent.append(m["nickname"])
         if written:
             synced = storage.sync_task_assignees_by_roles(room_id)

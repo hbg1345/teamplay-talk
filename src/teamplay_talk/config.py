@@ -31,11 +31,17 @@ class Settings:
     kakao_redirect_uri: str
     daily_task_digest_enabled: bool
     daily_task_digest_hour_kst: int
+    daily_checkin_enabled: bool
+    daily_checkin_hour_kst: int
+    daily_report_enabled: bool
+    daily_report_hour_kst: int
 
     @classmethod
     def from_env(cls) -> "Settings":
         port = int(os.getenv("PORT", "8000"))
         digest_hour = int(os.getenv("DAILY_TASK_DIGEST_HOUR_KST", "9"))
+        checkin_hour = int(os.getenv("DAILY_CHECKIN_HOUR_KST", "21"))
+        report_hour = int(os.getenv("DAILY_REPORT_HOUR_KST", "9"))
         return cls(
             host=os.getenv("HOST", "0.0.0.0"),
             port=port,
@@ -51,6 +57,12 @@ class Settings:
             daily_task_digest_enabled=os.getenv("DAILY_TASK_DIGEST_ENABLED", "").lower()
             in {"1", "true", "yes", "on"},
             daily_task_digest_hour_kst=max(0, min(23, digest_hour)),
+            daily_checkin_enabled=os.getenv("DAILY_CHECKIN_ENABLED", "").lower()
+            in {"1", "true", "yes", "on"},
+            daily_checkin_hour_kst=max(0, min(23, checkin_hour)),
+            daily_report_enabled=os.getenv("DAILY_REPORT_ENABLED", "").lower()
+            in {"1", "true", "yes", "on"},
+            daily_report_hour_kst=max(0, min(23, report_hour)),
         )
 
 

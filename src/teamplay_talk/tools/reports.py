@@ -79,4 +79,11 @@ def register(mcp: FastMCP) -> None:
             "total_responses": sum(int(f.get("total_responses") or 0) for f in forms),
             "latest_decisions": latest_decisions,
             "expires_in_hours": 24,
+            "next": "대시보드에서 폼/체크인/데일리 리포트/확정 결정 타임라인을 확인하세요.",
+            "suggested_next_actions": [
+                "미완료 todo가 많으면 member_tasks(member='all', window='overdue') 확인",
+                "오늘 상태가 필요하면 daily_report 생성",
+                "아직 응답 중인 폼이 있으면 마감 후 get_poll_results 확인",
+            ],
+            "chat_response_hint": "대시보드 링크와 만료 시간만 먼저 말하고, 다음 행동은 필요한 경우 2~3개만 덧붙이세요.",
         }

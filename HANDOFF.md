@@ -9,6 +9,17 @@
 
 핵심 제품 방향은 **"팀원은 응답/실행만, 조율은 AI가 PM처럼"** 이다. 다만 AI 기억에 의존하지 않고 DB의 방/폼/역할/로드맵/todo 상태를 읽어 다음 행동을 이어가게 설계했다.
 
+## 디자인 방향
+
+현재 앱 표면은 **Kakao Workbench × Liquid Glass** 로 잡았다. 생산성 도구처럼 조밀하고 빨리 읽히되, Apple Liquid Glass 원칙처럼 글래스는 헤더/스티키 요약/컨트롤 같은 기능 레이어에만 두고 실제 응답·태스크·리포트 내용은 평평한 content layer로 유지한다.
+
+- 먼저 적용된 표면: `ui_theme.py` 공통 테마, `forms_web.py` 투표/SurveyJS/회의시간 폼, `dashboard_web.py` 방별 타임라인 대시보드
+- 유지 원칙: Kakao Big Sans는 제목, Kakao Small Sans는 본문/폼에 사용. 카드 radius 8px, warm neutral canvas, Teamplay charcoal은 작업공간 chrome, Kakao yellow는 CTA/선택 상태에만 사용, blue/red/amber는 상태 강조에 소량 사용
+- Liquid Glass 원칙: glass-on-glass 금지, 리스트/테이블/반복 카드에는 blur를 걸지 않음, glass panel 안의 작은 배지는 투명 fill 수준으로만 처리
+- 피할 것: 과한 랜딩페이지식 히어로, 장식용 오브젝트/블롭, 한 가지 색만 반복하는 팔레트, 초록색 계열 기본 CTA
+- 홈페이지는 나중에 만들되, 현재 폼/대시보드 토큰을 기준으로 확장한다.
+- 자세한 토큰/레이어 규칙은 `docs/DESIGN_SYSTEM.md`를 따른다.
+
 ## 인프라 / 배포
 
 - 라이브: `https://167.71.219.241.sslip.io`
@@ -45,7 +56,7 @@ PY'
 
 - PlayMCP는 도구 목록/instructions를 캐싱하는 경우가 많다.
 - 서버에는 새 도구가 보이는데 PlayMCP 대화에서 안 보이면 MCP 삭제 후 재등록이 필요할 수 있다.
-- 현재 라이브 도구 수는 **35개**다. PlayMCP 가이드 권장/심사용으로는 나중에 도구 합치기 필요. 지금은 QC/데모 기능 완성 우선.
+- 현재 라이브 도구 수는 **38개**다. PlayMCP 가이드 권장/심사용으로는 나중에 도구 합치기 필요. 지금은 QC/데모 기능 완성 우선.
 
 ## 인증
 
@@ -53,6 +64,8 @@ PY'
 - `identity.resolve_caller()`가 카카오 사용자 정보를 조회해 `users` upsert.
 - 알림/캘린더용 카카오 토큰은 `users`에 저장.
 - PlayMCP `/token` 요청이 Basic auth로 오던 문제는 `kakao_token_proxy.py`가 Basic → Kakao body 방식으로 변환해 해결.
+- `kakao_token_proxy.py`는 성공한 token 응답을 카카오 `user/me`로 식별해 `users.kakao_access_token`/`kakao_refresh_token`에 저장한다. 팀원별 캘린더/알림 반복 실행은 이 저장 토큰에 의존한다.
+- 이 저장 로직 이전에 권한동의한 팀원은 refresh token이 없을 수 있으므로, 캘린더 실패 시 PlayMCP에서 카카오 권한을 다시 연결해야 한다.
 
 ## 현재 도구 35개
 
@@ -77,6 +90,9 @@ PY'
 - `add_task`, `delete_task`, `update_task`
 - `decompose_roadmap`, `member_tasks`, `daily_task_digest`
 
+데일리 운영:
+- `create_daily_checkin`, `apply_daily_checkin`, `daily_report`
+
 대시보드:
 - `room_dashboard`
 
@@ -100,6 +116,10 @@ create_room / join_room
 - `delete_room`: soft delete, 유예 기간 후 purge
 - `restore_room`: 유예 기간 내 복구
 - `leave_room`: 마지막 멤버가 나가면 empty room 삭제 유예
+
+방 생성 온보딩:
+- `create_room` 응답에 `invite_share_text`, `join_command`, `onboarding`, `recommended_flow`, `suggested_next_actions`가 들어간다.
+- 채팅 응답은 길게 설명하지 말고 “invite_share_text 공유 → 팀원 초대 → 역할분배/로드맵 시작” 정도만 짧게 안내한다.
 
 ### 2. 역할분배
 
@@ -151,6 +171,28 @@ build_roadmap
 - 같은 역할 담당자가 여러 명이면 현재 todo 수가 적은 멤버에게 분산한다.
 - role-only todo가 남으면 `needs_role_assignment: true`, `required_next_tool: set_roles`가 나온다.
 
+### 3-1. 데일리 체크인/리포트
+
+밤 체크인 → 아침 리포트 루프다. 기본 자동 스케줄러는 꺼져 있고, env로 켤 수 있다.
+
+```text
+create_daily_checkin
+→ send_form
+→ apply_daily_checkin(dry_run=true)
+→ 확인 후 apply_daily_checkin(dry_run=false)
+→ daily_report(publish=false/true)
+→ 필요하면 daily_task_digest
+```
+
+특징:
+- 체크인 폼은 식별 폼이다. 새 폼은 `밀린 일 중 오늘 처리한 것`, `오늘 해야 했던 일 중 끝낸 것`, `앞으로 예정된 일 중 미리 끝낸 것`, `기타 메모`만 받는다.
+- `apply_daily_checkin`은 두 체크박스에서 선택된 todo를 `done`으로 반영한다. 안 끝낸 오늘 일은 다음 날부터 overdue가 되어 다음 체크인의 밀린 일 목록에 잡힌다.
+- `daily_report`는 기본적으로 전날 체크인을 오늘 리포트에 반영하고 `daily_reports`에 저장한다.
+- 대시보드는 데일리 리포트를 별도 상단 패널이 아니라 폼/결정 기록과 같은 타임라인 이벤트로 보여준다.
+- 자동화 env:
+  - `DAILY_CHECKIN_ENABLED=true`, `DAILY_CHECKIN_HOUR_KST=21`
+  - `DAILY_REPORT_ENABLED=true`, `DAILY_REPORT_HOUR_KST=9`
+
 ### 4. 회의 일정
 
 ```text
@@ -184,7 +226,7 @@ gather_locations
 ```
 
 중요:
-- 카카오맵 MCP로 "두 출발지 사이 중간역/이동시간 자동 추천"을 약속하지 말 것.
+- 카카오맵 MCP로 "중간역/개인별 이동시간 자동 추천"을 약속하지 말 것.
 - 카카오맵/지도 MCP가 보이면 장소명·역명·주소 확인과 중복 후보 정규화에만 보조적으로 사용.
 - 없으면 "카카오맵 MCP가 있으면 장소명/주소 확인이 더 정확해지고, 지금은 제출된 텍스트 기준으로 후보를 정리해 투표할 수 있다"라고 말한다.
 
@@ -216,11 +258,11 @@ gather_task_opinions(scope='roadmap'|'todo'|'blockers'|'scope')
 `room_dashboard`가 방별 대시보드 링크를 반환한다.
 
 보여주는 것:
-- 최신 폼/투표 결과 타임라인
+- 최신 폼/투표/체크인/데일리 리포트/확정 결정 통합 타임라인
 - role/todo/roadmap 상태
 - milestone 수, todo 수, 미배정/role-only todo 수
 - 캘린더 후보
-- latest decisions
+- decision log
 
 ## DB/스키마 주요 추가
 
@@ -271,7 +313,7 @@ gather_task_opinions(scope='roadmap'|'todo'|'blockers'|'scope')
    - gather_locations → 본투표 → notify_room
 
 2. 도구 수 정리:
-   - 현재 35개라 심사 가이드(최대 20개, 권장 3~10개) 대비 많다.
+   - 현재 38개라 심사 가이드(최대 20개, 권장 3~10개) 대비 많다.
    - 캘린더 CRUD, room lifecycle, roadmap CRUD 등을 통합 도구로 묶는 작업 필요.
 
 3. 개인정보/운영:
