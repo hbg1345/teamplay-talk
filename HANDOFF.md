@@ -1,4 +1,4 @@
-# teamplay-talk 핸드오프 (2026-06-27)
+# teamplay-talk 핸드오프 (2026-06-30)
 
 > 다음 AI/세션이 이어받기 위한 최신 정리. 박세원(PM)이 함봉구(hbg1345)와 만드는 **팀플 협업 MCP**.
 > Kakao PlayMCP 공모전용. repo: `hbg1345/teamplay-talk` (private).
@@ -6,6 +6,14 @@
 ## 지금 상태
 
 라이브 서버에 배포 완료. 팀 방, 카카오 OAuth, 폼/투표, 역할분배, 회의 일정, 약속 장소 후보 수집, 로드맵, 개인별 todo 분해, 카카오 공지/캘린더, 방별 대시보드, 방 삭제 유예까지 동작한다.
+
+2026-06-30 현재 `main` 최신 배포 기준:
+- 정식 도메인: `https://teamplay-talk.tech`
+- 헬스체크: `https://teamplay-talk.tech/health`
+- MCP 엔드포인트: `https://teamplay-talk.tech/mcp/`
+- 대시보드는 React/liquid-glass 런타임을 주입하지 않도록 최적화했다.
+- Docker 이미지에 `.env`를 굽던 이전 방식은 제거했고, `.dockerignore`에 `.env`를 추가했다.
+- Codex Security diff scan 결과는 high 1건(`Dockerfile COPY .env`)이었고, 현재 main에서는 이미 수정된 상태다.
 
 핵심 제품 방향은 **"팀원은 응답/실행만, 조율은 AI가 PM처럼"** 이다. 다만 AI 기억에 의존하지 않고 DB의 방/폼/역할/로드맵/todo 상태를 읽어 다음 행동을 이어가게 설계했다.
 
@@ -22,8 +30,9 @@
 
 ## 인프라 / 배포
 
-- 라이브: `https://167.71.219.241.sslip.io`
-- MCP 엔드포인트: `https://167.71.219.241.sslip.io/mcp/`
+- 라이브: `https://teamplay-talk.tech`
+- MCP 엔드포인트: `https://teamplay-talk.tech/mcp/`
+- 이전 임시 주소: `https://167.71.219.241.sslip.io`
 - 서버: DigitalOcean 드롭릿 + Docker Compose + Caddy
 - DB: Postgres
 - 배포는 git pull이 아니라 로컬에서 rsync 후 docker rebuild.
@@ -34,7 +43,7 @@ rsync -az -e "ssh -o StrictHostKeyChecking=accept-new" \
   --exclude '.git' --exclude '.venv' --exclude '__pycache__' --exclude '.env' \
   --exclude '*.pyc' --exclude 'data' ./ root@167.71.219.241:/root/teamplay-talk/
 ssh root@167.71.219.241 'cd /root/teamplay-talk && docker compose up -d --build'
-curl -fsS https://167.71.219.241.sslip.io/health
+curl -fsS https://teamplay-talk.tech/health
 ```
 
 `schema.sql` 변경 후 원격 DB 적용:
@@ -192,6 +201,9 @@ create_daily_checkin
 - 자동화 env:
   - `DAILY_CHECKIN_ENABLED=true`, `DAILY_CHECKIN_HOUR_KST=21`
   - `DAILY_REPORT_ENABLED=true`, `DAILY_REPORT_HOUR_KST=9`
+  - `DAILY_TASK_DIGEST_ENABLED=true`, `DAILY_TASK_DIGEST_HOUR_KST=9`
+- 2026-06-30 기준 서버 env는 위 세 자동화가 모두 켜진 상태로 확인했다.
+- 자동화가 조용히 스킵돼 원인 파악이 어려웠기 때문에, scheduler 로그에 daily_task_digest/daily_checkin/daily_report별 sent/failed/missing_token/skipped 수를 남기도록 보강했다.
 
 ### 4. 회의 일정
 
@@ -317,7 +329,8 @@ gather_task_opinions(scope='roadmap'|'todo'|'blockers'|'scope')
    - 캘린더 CRUD, room lifecycle, roadmap CRUD 등을 통합 도구로 묶는 작업 필요.
 
 3. 개인정보/운영:
-   - 카카오 토큰 평문 저장 암호화.
+   - 카카오 토큰 저장 암호화는 구현됨(`TOKEN_ENC_KEY`).
+   - 이전에 `.env`를 Docker 이미지에 굽던 방식은 제거됨. 이미 외부에 올라간 이미지가 있다면 관련 secret 회전 필요.
    - 해외 서버(DO) 개인정보 고지.
    - 로그/토큰 노출 점검.
 

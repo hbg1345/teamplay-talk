@@ -15,12 +15,25 @@ import asyncio
 import threading
 import time
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 from . import kakao, kakao_store, storage
 from .config import settings
 
 _POLL_INTERVAL = 30  # 초
 _KST = timezone(timedelta(hours=9))
+_LOG_ONCE_KEYS: set[str] = set()
+
+
+def _log(message: str) -> None:
+    print(f"[scheduler] {message}", flush=True)
+
+
+def _log_once(key: str, message: str) -> None:
+    if key in _LOG_ONCE_KEYS:
+        return
+    _LOG_ONCE_KEYS.add(key)
+    _log(message)
 
 
 async def _send_kakao(user_id: int, message: str) -> None:
@@ -71,23 +84,46 @@ async def process_daily_task_digests() -> None:
     for room in storage.list_active_rooms():
         roadmap = _format(storage.get_roadmap(room["id"]))
         members_by_token = {m["id"]: m for m in kakao_store.list_members_with_tokens(room["id"])}
+        sent: list[str] = []
+        failed: list[str] = []
+        missing_token: list[str] = []
+        skipped = 0
+        already_claimed = 0
         for member in roadmap["by_member"]:
             message = _member_digest_message(room["name"], member, include_done=False)
             if message is None:
+                skipped += 1
                 continue
             token_member = members_by_token.get(member["member_id"])
             if token_member is None:
+                missing_token.append(member["nickname"])
                 continue
             if not storage.claim_task_digest(room["id"], member["member_id"], digest_date):
+                already_claimed += 1
                 continue
-            await kakao_store.send_with_refresh(token_member, message)
+            status = await kakao_store.send_with_refresh(token_member, message)
+            (sent if status == 200 else failed).append(member["nickname"])
+        if sent or failed or missing_token:
+            _log(
+                "daily_task_digest "
+                f"date={digest_date} room={room['id']} sent={len(sent)} "
+                f"failed={len(failed)} missing_token={len(missing_token)} "
+                f"skipped_no_tasks={skipped} already_claimed={already_claimed}"
+            )
+        elif skipped or already_claimed:
+            _log_once(
+                f"digest:{digest_date}:{room['id']}:quiet",
+                "daily_task_digest "
+                f"date={digest_date} room={room['id']} sent=0 failed=0 "
+                f"skipped_no_tasks={skipped} already_claimed={already_claimed}",
+            )
 
 
-async def _send_identified_form(form_id: int, message: str) -> None:
+async def _send_identified_form(form_id: int, message: str) -> dict[str, Any]:
     """식별 폼의 개인 링크를 각 멤버에게 보낸다."""
     form = storage.get_form(form_id)
     if form is None:
-        return
+        return {"sent_to": [], "failed": [], "count": 0, "error": "form not found"}
     from .tools.feedback import _form_feed_copy
 
     base = f"{settings.public_base_url}/form/{form_id}"
@@ -97,9 +133,11 @@ async def _send_identified_form(form_id: int, message: str) -> None:
         ("방", room["name"] if room else str(form["room_id"])),
         ("상태", "진행중" if not form.get("closed") else "마감"),
     ]
+    sent: list[str] = []
+    failed: list[str] = []
     for recipient in storage.list_form_recipients(form_id):
         url = f"{base}?t={recipient['invite_token']}"
-        await kakao_store.send_feed_with_refresh(
+        status = await kakao_store.send_feed_with_refresh(
             recipient,
             title=title,
             description=description,
@@ -108,6 +146,8 @@ async def _send_identified_form(form_id: int, message: str) -> None:
             items=items,
             fallback_text=f"{message.rstrip()}\n{description}\n{url}",
         )
+        (sent if status == 200 else failed).append(recipient["nickname"])
+    return {"sent_to": sent, "failed": failed, "count": len(sent)}
 
 
 async def process_daily_checkins() -> None:
@@ -130,9 +170,27 @@ async def process_daily_checkins() -> None:
             skip_existing=True,
         )
         if created.get("ok") and created.get("status") == "created":
-            await _send_identified_form(
+            send_result = await _send_identified_form(
                 int(created["form_id"]),
                 f"[팀플톡] '{created['title']}' 응답 요청",
+            )
+            _log(
+                "daily_checkin "
+                f"date={checkin_date} room={room['id']} form={created['form_id']} "
+                f"sent={send_result['count']} failed={len(send_result['failed'])}"
+            )
+        elif created.get("ok"):
+            _log_once(
+                f"checkin:{checkin_date}:{room['id']}:existing",
+                "daily_checkin "
+                f"date={checkin_date} room={room['id']} status={created.get('status')} "
+                f"form={created.get('form_id')}",
+            )
+        else:
+            _log_once(
+                f"checkin:{checkin_date}:{room['id']}:error",
+                "daily_checkin "
+                f"date={checkin_date} room={room['id']} skipped error={created.get('error')}",
             )
 
 
@@ -158,7 +216,17 @@ async def process_daily_reports() -> None:
             apply_checkin=True,
         )
         if report.get("ok"):
-            await send_daily_report(room["id"], report["summary"])
+            send_result = await send_daily_report(room["id"], report["summary"])
+            _log(
+                "daily_report "
+                f"date={report_date} room={room['id']} report={report['report']['id']} "
+                f"sent={send_result['count']} failed={len(send_result['failed'])}"
+            )
+        else:
+            _log(
+                "daily_report "
+                f"date={report_date} room={room['id']} skipped error={report.get('error')}"
+            )
 
 
 def _scheduler_loop() -> None:
