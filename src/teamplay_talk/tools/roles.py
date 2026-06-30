@@ -319,8 +319,8 @@ def register(mcp: FastMCP) -> None:
             "action_required": (
                 "⚠️ 아직 보내지 마세요. 위 역할 **이름**을 사용자(팀장)에게 보여주고 "
                 "'이대로 보낼까요? 바꿀 역할 있나요?'라고 물어 **명시적 확인**을 받으세요. "
-                "(난이도 점수는 보여주지 마세요 — 내부 균형용입니다. slots는 필요 인원 설명용입니다.) 동의한 뒤에만 "
-                "send_form(form_id)을 호출하세요."
+                "(난이도 점수는 보여주지 마세요 — 내부 균형용입니다. slots는 필요 인원 설명용입니다.) "
+                "동의를 받은 뒤에만 역할 선호 폼을 발송하세요."
             ),
         }
 
@@ -418,16 +418,16 @@ def register(mcp: FastMCP) -> None:
             "note": (
                 "모든 역할을 난이도 균형 배분(workload=난이도 합, 비슷할수록 공평) + 선호 반영. "
                 "⚠️ **각 멤버의 note(자유기입: 못 하는 역할·사정)를 반드시 팀장에게 보여주고**, "
-                "필요하면 조정한 뒤 set_roles로 확정. AI 단독 확정 X — 팀장이 note 보고 최종 판단."
+                "필요하면 조정한 뒤 역할을 확정. AI 단독 확정 X — 팀장이 메모 보고 최종 판단."
             ),
-            "next": "배정안은 아직 저장되지 않았습니다. 팀장에게 member_notes와 배정안을 보여주고, 확인되면 set_roles로 확정하세요.",
+            "next": "배정안은 아직 저장되지 않았습니다. 팀장에게 멤버 메모와 배정안을 보여주고, 확인되면 역할을 확정하세요.",
             "suggested_next_actions": [
-                "팀장에게 assignments와 member_notes 확인받기",
-                "조정이 필요하면 assignments를 수정",
-                "확정되면 set_roles로 저장 및 공지",
-                "저장 후 member_tasks 또는 decompose_roadmap으로 할일 연결",
+                "팀장에게 배정안과 멤버 메모 확인받기",
+                "조정이 필요하면 배정안 수정하기",
+                "확정되면 역할 저장 및 공지하기",
+                "저장 후 팀원별 할일 확인하거나 역할별 실행 todo로 연결하기",
             ],
-            "chat_response_hint": "역할이 확정됐다고 말하지 마세요. '배정안'이며 set_roles 전에는 저장되지 않았다고 분명히 말하세요.",
+            "chat_response_hint": "역할이 확정됐다고 말하지 마세요. 아직 '배정안'이며 확정·저장 전에는 반영되지 않았다고 분명히 말하세요.",
         }
 
     @mcp.tool(
@@ -515,11 +515,11 @@ def register(mcp: FastMCP) -> None:
             "synced_todos": synced,
             "next": (
                 "역할이 확정됐습니다. 역할명으로 만들어둔 todo가 있으면 실제 멤버에게 연결했습니다. "
-                "다음으로 member_tasks(member='all')로 팀원별 할일을 확인하세요."
+                "다음으로 팀원별 할일을 확인하세요."
             ),
             "suggested_next_actions": [
-                "member_tasks(member='all')로 팀원별 todo 확인",
-                "todo가 없으면 decompose_roadmap으로 역할별 실행 todo 생성",
-                "날짜가 있는 태스크는 캘린더/리마인더 후보로 검토",
+                "팀원별 todo 확인하기",
+                "todo가 없으면 역할별 실행 todo 만들기",
+                "날짜가 있는 태스크는 캘린더 등록 후보로 검토하기",
             ],
         }

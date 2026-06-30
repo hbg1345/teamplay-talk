@@ -281,6 +281,40 @@ def _format(roadmap: dict[str, Any]) -> dict[str, Any]:
         if bucket["tasks"] or bucket.get("role")
     ]
     needs_todo_decomposition = bool(milestone_rows) and not bool(todo_rows)
+
+    # 로드맵 이후 다음 행동 안내는 상태에 따라 갈린다.
+    #  - 역할 미배정: 먼저 워크스트림 역할을 나눈다.
+    #  - 역할 배정됨: 개별 실행 태스크를 정하는 의견 폼을 만들거나, 일정이 잡힌
+    #    태스크를 카카오 캘린더에 등록하는 흐름으로 이어간다.
+    has_roles = any(m.get("role") for m in roadmap.get("members", []))
+    if not has_roles:
+        roadmap_next = (
+            "로드맵 단계와 실행 todo를 구분했습니다. 먼저 역할을 나눈 뒤, "
+            "각 단계를 역할별·멤버별 실행 todo로 쪼개세요."
+        )
+        roadmap_suggestions = [
+            "역할분배가 필요하면 단계명을 그대로 쓰지 말고 기획·PM/구현/연동/QA/문서·발표 같은 워크스트림 역할로 나누기",
+            "역할이 정해지면 확정·저장하기",
+            "todo가 없으면 각 단계 아래 실행 todo를 2~5개씩 만들기",
+            "진행 흐름을 대시보드에서 확인하기",
+        ]
+    else:
+        roadmap_next = (
+            "역할이 배정돼 있습니다. 이제 개별 실행 태스크를 정하는 의견 폼을 만들어 팀 의견을 모으거나, "
+            "일정이 잡힌 태스크를 카카오 캘린더에 등록하세요."
+        )
+        roadmap_suggestions = [
+            "개별 실행 태스크를 정하는 의견 폼 만들기",
+            (
+                "일정이 잡힌 태스크를 전원 카카오 캘린더에 등록하기"
+                if calendar_candidates
+                else "태스크에 마감·일정을 정해 캘린더 등록 후보 만들기"
+            ),
+            "단계별 실행 todo가 아직 없으면 역할별·멤버별로 todo 쪼개기",
+            "담당자별 오늘 할일을 개인 공지하기",
+            "진행 상황이 바뀌면 태스크 상태 갱신하기",
+            "진행 흐름을 대시보드에서 확인하기",
+        ]
     return {
         "tasks": formatted_tasks,
         "milestones": milestones,
@@ -302,25 +336,12 @@ def _format(roadmap: dict[str, Any]) -> dict[str, Any]:
         "unassigned_tasks": unassigned_tasks,
         "role_only_tasks": role_only_tasks,
         "calendar_candidates": calendar_candidates,
-        "next": (
-            "로드맵 단계와 실행 todo를 구분했습니다. 다음 기본 순서는 역할분배(assign_roles → set_roles) 후 "
-            "decompose_roadmap으로 각 milestone을 역할별/멤버별 실행 todo로 쪼개는 것입니다."
-        ),
-        "suggested_next_actions": [
-            "역할분배가 필요하면 태스크명을 그대로 쓰지 말고 기획·PM/구현/연동/QA/문서·발표 같은 워크스트림 역할로 assign_roles",
-            "역할이 확정되면 set_roles로 저장",
-            "todo가 없으면 decompose_roadmap으로 milestone 아래 실행 todo 2~5개씩 생성",
-            "role_only_todos가 있으면 set_roles로 역할을 확정하거나 sync가 되도록 역할명을 맞춘 뒤 member_tasks 확인",
-            "notify_room으로 개인별 할일 요약 공지",
-            "daily_task_digest로 담당자별 할일 개인 공지",
-            "일정이 있는 태스크를 캘린더/리마인더 후보로 검토",
-            "진행 상황이 바뀌면 update_task로 상태 갱신",
-            "room_dashboard로 투표/로드맵 흐름 확인",
-        ],
+        "next": roadmap_next,
+        "suggested_next_actions": roadmap_suggestions,
         "role_assignment_guidance": (
-            "로드맵 단계명은 역할이 아닙니다. 역할분배를 할 때는 여러 태스크를 책임지는 "
+            "로드맵 단계명은 역할이 아닙니다. 역할을 나눌 때는 여러 태스크를 책임지는 "
             "역량/워크스트림 역할(예: 기획·PM, MCP 서버·도구 구현, 카카오 API·OAuth 연동, "
-            "테스트·QA, 문서·데모·발표)을 만들어 assign_roles에 넣으세요."
+            "테스트·QA, 문서·데모·발표)로 만드세요."
         ),
     }
 
@@ -381,12 +402,12 @@ def register(mcp: FastMCP) -> None:
                 "ok": False,
                 "error": "이미 로드맵이 있습니다. build_roadmap은 전체 교체라 기본 실행을 막았습니다.",
                 "existing_task_count": len(existing["tasks"]),
-                "required_confirmation": "정말 전체 교체하려면 replace_existing=true로 다시 호출하세요.",
+                "required_confirmation": "정말 전체 교체하려면 교체를 확정해 다시 시도하세요(기존 로드맵은 사라집니다).",
                 "suggested_next_actions": [
-                    "기존 로드맵 확인은 view_roadmap",
-                    "일부 수정은 update_task",
-                    "새 할일 추가는 add_task",
-                    "역할 확정 뒤 담당자만 정리하려면 update_task의 assignee를 역할명/닉네임으로 수정",
+                    "기존 로드맵 확인하기",
+                    "일부만 수정하기",
+                    "새 할일 추가하기",
+                    "역할 확정 뒤 담당자만 정리하려면 각 할일의 담당자를 역할명·닉네임으로 수정하기",
                 ],
             }
         roadmap = storage.set_roadmap(room["id"], tasks, edges or [])
@@ -655,17 +676,17 @@ def register(mcp: FastMCP) -> None:
             "next": (
                 "todo 분해가 저장됐습니다. "
                 + (
-                    "다만 일부 todo가 역할명에만 묶여 있어 실제 팀원에게 아직 배정되지 않았습니다. set_roles로 역할을 확정한 뒤 member_tasks를 확인하세요."
+                    "다만 일부 todo가 역할명에만 묶여 있어 실제 팀원에게 아직 배정되지 않았습니다. 역할을 확정한 뒤 팀원별 할일을 확인하세요."
                     if needs_role_assignment else
-                    "member_tasks(member='all', window='week')로 조원별 실행 목록을 확인하고, 필요하면 daily_task_digest로 개인별 공지하세요."
+                    "팀원별 이번 주 실행 목록을 확인하고, 필요하면 개인별로 공지하세요."
                 )
             ),
             "suggested_next_actions": [
-                "role_only_todos가 있으면 set_roles로 역할 확정 또는 역할명 보정",
-                "member_tasks(member='all', window='week')로 조원별 todo 확인",
-                "누락/중복이 보이면 update_task/delete_task로 조정",
-                "팀원 의견이 더 필요하면 gather_task_opinions(scope='todo')",
-                "확정되면 daily_task_digest 또는 notify_room으로 공지",
+                "역할명에만 묶인 todo가 있으면 역할을 확정하거나 역할명 보정하기",
+                "이번 주 팀원별 todo 확인하기",
+                "누락·중복이 보이면 할일 조정·삭제하기",
+                "팀원 의견이 더 필요하면 개별 할일 의견 폼 만들기",
+                "확정되면 개인별 또는 팀 전체에 공지하기",
             ],
             **formatted,
         }
@@ -760,17 +781,17 @@ def register(mcp: FastMCP) -> None:
             "members": filtered_members,
             "unassigned_tasks": filtered_unassigned,
             "next": (
-                "할일을 확인했습니다. 실행 todo가 비어 있으면 decompose_roadmap으로 "
-                "로드맵 milestone을 개인별 todo로 먼저 분해하세요."
+                "할일을 확인했습니다. 실행 todo가 비어 있으면 로드맵 단계를 "
+                "개인별 실행 todo로 먼저 분해하세요."
             ),
             "suggested_next_actions": [
-                "todo가 없으면 decompose_roadmap으로 milestone 아래 실행 todo 2~5개씩 생성",
-                "role_only_todos가 있으면 set_roles로 역할 확정 또는 역할명 보정",
-                "비어 있는 담당/마감은 update_task로 보정",
-                "할일 후보가 애매하면 gather_task_opinions(scope='todo')로 팀 의견수렴",
-                "갈리는 항목은 create_poll로 우선순위/채택 여부 결정",
-                "담당자에게 daily_task_digest로 개인별 할일 공지",
-                "날짜 있는 태스크는 calendar_create_task_events로 개인 캘린더 등록",
+                "todo가 없으면 각 단계 아래 실행 todo를 2~5개씩 만들기",
+                "역할명에만 묶인 todo가 있으면 역할을 확정하거나 역할명 보정하기",
+                "비어 있는 담당·마감 보정하기",
+                "할일 후보가 애매하면 개별 할일 의견 폼으로 팀 의견 모으기",
+                "의견이 갈리는 항목은 우선순위·채택 여부 투표로 정하기",
+                "담당자에게 개인별 할일 공지하기",
+                "날짜 있는 태스크는 담당자 개인 캘린더에 등록하기",
             ],
         }
 
@@ -871,14 +892,14 @@ def register(mcp: FastMCP) -> None:
                 "task_layer_summary": layer,
                 "error": reason,
                 "next": (
-                    "daily_task_digest는 분배 도구가 아니라 이미 배정된 개인 todo를 공지하는 도구입니다. "
-                    "먼저 member_tasks(member='all')로 실제 배정 상태를 확인하세요."
+                    "이 도구는 분배 도구가 아니라 이미 배정된 개인 todo를 공지하는 도구입니다. "
+                    "먼저 팀원별 실제 배정 상태를 확인하세요."
                 ),
                 "suggested_next_actions": [
-                    "role_only_todos가 있으면 set_roles로 역할 확정 또는 역할명 보정",
-                    "todo가 없으면 decompose_roadmap으로 실행 todo 생성",
-                    "담당자 토큰이 없으면 해당 팀원이 카카오 인증을 다시 진행",
-                    "배정 상태 확인 후 daily_task_digest 재시도",
+                    "역할명에만 묶인 todo가 있으면 역할을 확정하거나 역할명 보정하기",
+                    "todo가 없으면 실행 todo 만들기",
+                    "담당자 토큰이 없으면 해당 팀원이 카카오 인증을 다시 진행하기",
+                    "배정 상태 확인 후 다시 공지 시도하기",
                 ],
             }
 
@@ -893,12 +914,12 @@ def register(mcp: FastMCP) -> None:
             "previews": previews,
             "task_layer_summary": layer,
             "next": (
-                "할일 공지를 보냈습니다. 날짜가 있는 태스크는 calendar_create_task_events로 "
-                "담당자 개인 캘린더에도 등록할 수 있습니다."
+                "할일 공지를 보냈습니다. 날짜가 있는 태스크는 담당자 개인 캘린더에도 "
+                "등록할 수 있습니다."
             ),
             "suggested_next_actions": [
-                "calendar_create_task_events로 날짜 있는 태스크 캘린더 등록",
-                "room_dashboard로 개인별 진척 확인",
-                "완료 보고가 들어오면 update_task(status='done')로 갱신",
+                "날짜 있는 태스크를 담당자 개인 캘린더에 등록하기",
+                "개인별 진척을 대시보드에서 확인하기",
+                "완료 보고가 들어오면 해당 할일을 완료로 갱신하기",
             ],
         }

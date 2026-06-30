@@ -56,7 +56,7 @@ def _invite_payload(room: dict[str, Any]) -> dict[str, str]:
     invite_share_text = (
         f"팀플톡 '{room['name']}' 방에 참여해 주세요.\n"
         f"초대 코드: {invite_code}\n"
-        f"PlayMCP에서 teamplay-talk MCP를 열고 {join_command}를 호출하면 참여됩니다."
+        f'PlayMCP에서 teamplay-talk를 열고 "초대 코드 {invite_code}로 방에 참여할래"라고 요청하면 됩니다.'
     )
     return {
         "invite_code": invite_code,
@@ -75,7 +75,7 @@ def _room_onboarding(room: dict[str, Any]) -> dict[str, Any]:
             "first_steps": [
                 {
                     "label": "팀원 초대",
-                    "description": "invite_share_text를 팀원에게 그대로 공유하면 됩니다.",
+                    "description": "위 참여 안내 문구를 팀원에게 그대로 공유하면 됩니다.",
                     "next_tool": "join_room",
                 },
                 {
@@ -90,29 +90,29 @@ def _room_onboarding(room: dict[str, Any]) -> dict[str, Any]:
                 },
                 {
                     "label": "역할별 todo 만들기",
-                    "description": "확정된 역할과 로드맵을 decompose_roadmap으로 개인 실행 todo에 연결합니다.",
+                    "description": "확정된 역할과 로드맵을 개인 실행 todo로 연결합니다.",
                     "next_tool": "decompose_roadmap",
                 },
             ],
             "recommended_flow": [
-                "팀원 초대(join_room)",
-                "로드맵 생성(build_roadmap)",
-                "역할분배(assign_roles → finalize_roles → set_roles)",
-                "개인별 todo 분해(decompose_roadmap)",
-                "팀 의견/체크인(gather_task_opinions 또는 create_daily_checkin)",
-                "데일리 리포트(daily_report)와 대시보드(room_dashboard)",
+                "팀원 초대",
+                "로드맵 생성",
+                "역할분배(역할 제안 → 균형 배정 → 확정)",
+                "개인별 todo 분해",
+                "팀 의견 수렴 또는 체크인",
+                "데일리 리포트와 대시보드",
             ],
         },
-        "next": "invite_share_text를 팀원에게 공유한 뒤, 주제로 로드맵을 만들고 역할분배와 todo 분해로 이어가세요.",
+        "next": "위 참여 안내 문구를 팀원에게 공유한 뒤, 주제로 로드맵을 만들고 역할분배와 todo 분해로 이어가세요.",
         "suggested_next_actions": [
-            "invite_share_text를 팀원에게 공유",
-            "build_roadmap으로 프로젝트 milestone 생성",
-            "assign_roles로 역할분배 폼 생성",
-            "decompose_roadmap으로 역할별 실행 todo 생성",
-            "room_dashboard로 이후 결과 타임라인 확인",
+            "참여 안내 문구를 팀원에게 공유하기",
+            "프로젝트 주제로 로드맵 milestone 만들기",
+            "역할분배 폼 만들기",
+            "역할별 실행 todo 만들기",
+            "이후 결과 타임라인을 대시보드에서 확인하기",
         ],
         "chat_response_hint": (
-            "방 생성 성공과 invite_share_text를 먼저 그대로 보여주고, 다음 단계는 3개만 짧게 안내하세요: "
+            "방 생성 성공과 위 참여 안내 문구를 먼저 그대로 보여주고, 다음 단계는 3개만 짧게 안내하세요: "
             "팀원 초대, 로드맵 생성, 역할분배."
         ),
     }
@@ -160,7 +160,7 @@ def register(mcp: FastMCP) -> None:
             "invite_code": room["invite_code"],
             "active": True,
             **_invite_payload(room),
-            "message": f"'{room['name']}' 방 생성 완료 — 현재 작업 방으로 설정됨. invite_share_text를 팀원에게 공유하세요.",
+            "message": f"'{room['name']}' 방 생성 완료 — 현재 작업 방으로 설정됨. 참여 안내 문구를 팀원에게 공유하세요.",
             **_room_onboarding(room),
         }
 
@@ -201,11 +201,11 @@ def register(mcp: FastMCP) -> None:
             "name": room["name"],
             "active": True,
             "message": f"'{room['name']}' 참여 완료 — 현재 작업 방으로 설정됨.",
-            "next": "이제 rooms로 멤버를 확인하거나, 팀장이 역할분배/로드맵을 시작하면 됩니다.",
+            "next": "이제 방 멤버를 확인하거나, 팀장이 역할분배/로드맵을 시작하면 됩니다.",
             "suggested_next_actions": [
-                "rooms로 현재 방 멤버 확인",
-                "역할분배 폼이 오면 응답",
-                "로드맵/todo가 생기면 member_tasks로 내 할일 확인",
+                "현재 방 멤버 확인하기",
+                "역할분배 폼이 오면 응답하기",
+                "로드맵·todo가 생기면 내 할일 확인하기",
             ],
             "chat_response_hint": "참여 성공을 말하고, 이제 이 방에서 오는 역할분배/체크인/투표에 응답하면 된다고 짧게 안내하세요.",
         }
@@ -253,11 +253,11 @@ def register(mcp: FastMCP) -> None:
             "ok": True,
             "active_room": target["name"],
             "message": f"현재 작업 방을 '{target['name']}'(으)로 옮겼습니다.",
-            "next": "이제 이 방 기준으로 역할/로드맵/폼/대시보드 도구가 작동합니다.",
+            "next": "이제 이 방 기준으로 역할·로드맵·폼·대시보드 작업이 진행됩니다.",
             "suggested_next_actions": [
-                "rooms로 현재 방 멤버 확인",
-                "room_dashboard로 지금까지 타임라인 확인",
-                "member_tasks(member='all')로 할일 상태 확인",
+                "현재 방 멤버 확인하기",
+                "지금까지 타임라인을 대시보드에서 확인하기",
+                "팀원별 할일 상태 확인하기",
             ],
         }
 
@@ -302,12 +302,12 @@ def register(mcp: FastMCP) -> None:
                 "member_count": len(members),
                 "members": [{"nickname": m["nickname"], "role": m["role"]} for m in members],
                 "latest_decisions": latest_decisions,
-                "next": "방 상세를 확인했습니다. 팀원을 더 초대하려면 invite_share_text를 공유하고, 역할이 비어 있으면 역할분배부터 이어가세요.",
+                "next": "방 상세를 확인했습니다. 팀원을 더 초대하려면 참여 안내 문구를 공유하고, 역할이 비어 있으면 역할분배부터 이어가세요.",
                 "suggested_next_actions": [
-                    "invite_share_text로 팀원 초대",
-                    "역할이 없으면 assign_roles로 역할분배",
-                    "로드맵이 없으면 build_roadmap",
-                    "진행 현황은 room_dashboard로 확인",
+                    "참여 안내 문구로 팀원 초대하기",
+                    "역할이 없으면 역할분배 시작하기",
+                    "로드맵이 없으면 로드맵 만들기",
+                    "진행 현황을 대시보드에서 확인하기",
                 ],
             }
         my = storage.list_user_rooms(caller["id"])
@@ -324,11 +324,11 @@ def register(mcp: FastMCP) -> None:
                 }
                 for r in my
             ],
-            "next": "작업할 방을 확인했습니다. active_room이 없거나 다른 방을 쓰려면 switch_room을 호출하세요.",
+            "next": "작업할 방을 확인했습니다. 현재 작업 방이 없거나 다른 방을 쓰려면 작업 방을 전환하세요.",
             "suggested_next_actions": [
-                "switch_room으로 작업 방 전환",
-                "새 팀이면 create_room으로 방 생성",
-                "현재 방 상태는 rooms(invite_code) 또는 room_dashboard로 확인",
+                "작업 방 전환하기",
+                "새 팀이면 방 만들기",
+                "현재 방 상태를 상세 조회나 대시보드로 확인하기",
             ],
         }
 
@@ -379,7 +379,7 @@ def register(mcp: FastMCP) -> None:
                 "status": "deleting",
                 "purge_after": room.get("purge_after"),
                 "message": f"'{room['name']}' 방은 이미 삭제 대기 중입니다.",
-                "next": "복구하려면 7일 안에 restore_room(invite_code)을 호출하세요.",
+                "next": "복구하려면 7일 안에 방 복구를 진행하세요.",
             }
         return {
             "ok": True,
@@ -387,12 +387,12 @@ def register(mcp: FastMCP) -> None:
             "name": room["name"],
             "status": "deleting",
             "purge_after": room.get("purge_after"),
-            "restore": "7일 안에 restore_room(invite_code)으로 복구할 수 있습니다.",
+            "restore": "7일 안에 방을 복구할 수 있습니다.",
             "message": f"'{room['name']}' 방을 삭제 대기 상태로 전환했습니다. 7일 뒤 완전 삭제됩니다.",
-            "next": "실수로 삭제했다면 7일 안에 restore_room(invite_code)으로 복구하세요. 계속 작업하려면 rooms로 다른 방을 선택하세요.",
+            "next": "실수로 삭제했다면 7일 안에 방을 복구하세요. 계속 작업하려면 다른 방을 선택하세요.",
             "suggested_next_actions": [
-                "복구가 필요하면 restore_room(invite_code)",
-                "다른 방으로 이동하려면 rooms 후 switch_room",
+                "복구가 필요하면 방 복구하기",
+                "다른 방으로 작업 방 전환하기",
             ],
         }
 
@@ -431,7 +431,7 @@ def register(mcp: FastMCP) -> None:
                 "name": room["name"],
                 "active": True,
                 "message": f"'{room['name']}' 방은 이미 활성 상태입니다.",
-                "next": "계속 작업하려면 switch_room으로 현재 작업 방을 맞추거나 room_dashboard로 상태를 확인하세요.",
+                "next": "계속 작업하려면 현재 작업 방을 이 방으로 맞추거나, 대시보드로 상태를 확인하세요.",
             }
         if result.get("reason") == "expired":
             return {
@@ -445,11 +445,11 @@ def register(mcp: FastMCP) -> None:
             "name": room["name"],
             "active": True,
             "message": f"'{room['name']}' 방을 복구했고 현재 작업 방으로 설정했습니다.",
-            "next": "복구된 방에서 room_dashboard로 기존 기록을 확인하고, 필요한 작업을 이어가세요.",
+            "next": "복구된 방의 기존 기록을 대시보드에서 확인하고, 필요한 작업을 이어가세요.",
             "suggested_next_actions": [
-                "room_dashboard로 복구된 기록 확인",
-                "member_tasks(member='all')로 남은 할일 확인",
-                "필요하면 notify_room으로 복구 사실 공지",
+                "복구된 기록을 대시보드에서 확인하기",
+                "팀원별 남은 할일 확인하기",
+                "필요하면 팀에 복구 사실 공지하기",
             ],
         }
 
@@ -502,12 +502,12 @@ def register(mcp: FastMCP) -> None:
             "next": (
                 "마지막 멤버가 나가 방이 삭제 대기 중입니다. 복구하려면 7일 안에 다시 참여/복구해야 합니다."
                 if result.get("empty_scheduled") else
-                "다른 방에서 계속 작업하려면 rooms로 목록을 확인하고 switch_room으로 이동하세요."
+                "다른 방에서 계속 작업하려면 방 목록을 확인하고 작업 방을 전환하세요."
             ),
             "suggested_next_actions": [
-                "rooms로 남은 방 확인",
-                "다른 방으로 이동하려면 switch_room",
-                "새 팀이면 create_room",
+                "남은 방 목록 확인하기",
+                "다른 방으로 작업 방 전환하기",
+                "새 팀이면 방 만들기",
             ],
         }
 

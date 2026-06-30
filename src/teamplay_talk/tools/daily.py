@@ -135,11 +135,11 @@ def create_daily_checkin_form(
         return {
             "ok": False,
             "error": "체크인할 미완료 todo가 없습니다.",
-            "next": "먼저 decompose_roadmap으로 실행 todo를 만들거나 member_tasks로 배정 상태를 확인하세요.",
+            "next": "먼저 로드맵을 개인별 실행 todo로 나누거나, 현재 배정 상태를 확인하세요.",
             "suggested_next_actions": [
-                "view_roadmap으로 현재 로드맵 확인",
-                "todo가 없으면 decompose_roadmap으로 개인별 실행 항목 생성",
-                "담당이 비어 있으면 set_roles/update_task로 배정 보정",
+                "현재 로드맵 확인하기",
+                "todo가 없으면 개인별 실행 항목 만들기",
+                "담당이 비어 있으면 역할·담당 배정 보정하기",
             ],
     }
     today_choices = _unique_choices(today_tasks)
@@ -223,11 +223,11 @@ def create_daily_checkin_form(
         "required_next_tool": "send_form",
         "send_form_arguments": {"form_id": form["id"]},
         "do_not_claim_sent_before_send_form": True,
-        "next": "send_form(form_id)으로 팀원별 개인 체크인 링크를 보내세요. 응답 후 apply_daily_checkin → daily_report 순서로 이어집니다.",
+        "next": "팀원에게 개인 체크인 링크를 보낼 차례입니다. 응답이 모이면 완료 상태를 반영하고 아침 팀 리포트로 이어집니다.",
         "suggested_next_actions": [
-            "send_form으로 밤 체크인 폼 발송",
-            "응답이 모이면 apply_daily_checkin으로 밀린 일/오늘 일/미래 일 완료 상태 반영",
-            "daily_report로 팀 전체 상태와 남은 밀린 일, 기타 메모를 저장/공지",
+            "밤 체크인 폼을 팀원에게 발송하기",
+            "응답이 모이면 밀린 일·오늘 일·예정 일의 완료 상태 반영하기",
+            "팀 전체 상태·남은 밀린 일·메모를 리포트로 저장·공지하기",
         ],
     }
 
@@ -317,15 +317,15 @@ def apply_daily_checkin_to_tasks(form_id: int, *, dry_run: bool = True) -> dict[
         "tomorrow_focus": tomorrow_focus,
         "notes": notes,
         "next": (
-            "dry_run=true라면 변경안을 확인한 뒤 dry_run=false로 다시 호출하세요. "
-            "반영 후 daily_report로 아침 리포트를 만들면 됩니다."
+            "지금은 미리보기(변경안)입니다. 내용을 확인한 뒤 실제로 반영하세요. "
+            "반영 후 아침 팀 리포트를 만들 수 있습니다."
             if dry_run else
-            "체크인 응답을 todo 상태에 반영했습니다. 이제 daily_report로 팀 리포트를 만들 수 있습니다."
+            "체크인 응답을 todo 상태에 반영했습니다. 이제 팀 리포트를 만들 수 있습니다."
         ),
         "suggested_next_actions": [
-            "변경안을 확인하고 apply_daily_checkin(dry_run=false) 실행",
-            "지연/막힌 점은 필요하면 update_task(details) 또는 gather_task_opinions(scope='blockers')로 후속 수집",
-            "daily_report로 팀 전체 상태와 개인별 오늘 할일 생성",
+            "변경안을 확인하고 실제로 반영하기",
+            "지연·막힌 점이 있으면 해당 todo에 메모하거나 별도로 의견 수집하기",
+            "팀 전체 상태와 개인별 오늘 할일 리포트 만들기",
         ],
     }
 
@@ -538,12 +538,12 @@ def build_daily_report_for_room(
         "report": report,
         "summary": summary,
         "payload": payload,
-        "next": "필요하면 publish=true로 팀에 공지하거나, room_dashboard에서 리포트를 확인하세요.",
+        "next": "필요하면 팀에 공지하거나, 대시보드에서 리포트를 확인하세요.",
         "suggested_next_actions": [
-            "기타 메모나 막힌 점이 있으면 담당자/도움 줄 사람에게 notify_room 또는 개인 공지",
-            "밀린 태스크는 update_task로 일정/상태 조정",
-            "오늘 할 일은 daily_task_digest로 개인별 카카오 공지",
-            "다음 체크인은 create_daily_checkin으로 밤에 발송",
+            "메모·막힌 점이 있으면 담당자나 도와줄 사람에게 공지하기",
+            "밀린 태스크는 일정·상태 조정하기",
+            "오늘 할 일은 개인별로 카카오 공지하기",
+            "다음 체크인은 밤에 발송하기",
         ],
     }
 
@@ -701,6 +701,6 @@ def register(mcp: FastMCP) -> None:
         result.update({
             "published": bool(publish_result["sent_to"]),
             **publish_result,
-            "chat_response_hint": "리포트를 저장했고, publish=true였으면 sent_to/count 기준으로 공지 성공 여부를 말하세요.",
+            "chat_response_hint": "리포트를 저장했습니다. 공지도 함께 했다면 실제 발송 결과(published·sent_to)를 확인해 공지 성공 여부를 말하세요.",
         })
         return result

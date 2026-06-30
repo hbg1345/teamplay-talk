@@ -220,11 +220,11 @@ def register(mcp: FastMCP) -> None:
             "failed_count": len(failed),
             "recorded_decision": recorded_decision,
             "note": "실패한 멤버는 카카오 talk_calendar 권한이 없거나, 과거 동의 토큰이 우리 서버에 저장되지 않았을 수 있습니다. 해당 멤버가 PlayMCP에서 카카오 권한을 다시 연결하면 이후부터 저장됩니다.",
-            "next": "회의/공통 일정 등록이 끝났습니다. room_dashboard에서 결정 기록을 확인하고, 회의 전 준비 todo가 있으면 로드맵에 반영하세요.",
+            "next": "회의/공통 일정 등록이 끝났습니다. 대시보드에서 결정 기록을 확인하고, 회의 전 준비 todo가 있으면 로드맵에 반영하세요.",
             "suggested_next_actions": [
-                "room_dashboard로 회의 확정 기록 확인",
-                "회의 준비물이 있으면 add_task 또는 decompose_roadmap으로 todo 추가",
-                "회의 전 개인별 준비 항목은 daily_task_digest로 공지",
+                "회의 확정 기록을 대시보드에서 확인하기",
+                "회의 준비물이 있으면 실행 todo 추가하기",
+                "회의 전 개인별 준비 항목을 개인 공지하기",
             ],
         }
 
@@ -377,11 +377,11 @@ def register(mcp: FastMCP) -> None:
             "created_count": len(created),
             "failed_count": len(failed),
             "note": "실패한 담당자는 talk_calendar 권한 토큰이 우리 서버에 없거나 만료됐을 수 있습니다. 권한 재연결 이후부터 refresh_token이 저장됩니다.",
-            "next": "캘린더 등록 뒤에는 daily_task_digest로 담당자별 할일을 주기적으로 공지하면 좋습니다.",
+            "next": "캘린더 등록 뒤에는 담당자별 할일을 주기적으로 개인 공지하면 좋습니다.",
             "suggested_next_actions": [
-                "daily_task_digest로 담당자별 할일 공지",
-                "room_dashboard로 캘린더 후보/로드맵 진행 확인",
-                "일정 없는 todo는 update_task로 start_at/end_at 보정",
+                "담당자별 할일 개인 공지하기",
+                "캘린더 후보·로드맵 진행을 대시보드에서 확인하기",
+                "일정 없는 todo는 시작·마감일 보정하기",
             ],
         }
 
@@ -437,10 +437,10 @@ def register(mcp: FastMCP) -> None:
         return {
             "ok": True,
             "event_id": res["event_id"],
-            "next": "개인 일정이 생성됐습니다. 필요하면 calendar_list_events로 확인하거나, 팀 일정이면 calendar_create_room_event를 사용하세요.",
+            "next": "개인 일정이 생성됐습니다. 필요하면 일정 목록을 확인하거나, 팀 일정이면 전원 캘린더에 등록하세요.",
             "suggested_next_actions": [
-                "calendar_list_events(preset='THIS_WEEK')로 일정 확인",
-                "팀 전체 일정이면 calendar_create_room_event로 멤버별 등록",
+                "이번 주 일정 확인하기",
+                "팀 전체 일정이면 멤버별로 캘린더에 등록하기",
             ],
         }
 
@@ -487,11 +487,11 @@ def register(mcp: FastMCP) -> None:
             "count": len(res["events"]),
             "events": res["events"],
             "has_next": res.get("has_next", False),
-            "next": "일정 목록을 확인했습니다. 변경할 일정은 calendar_update_event, 삭제할 일정은 calendar_delete_event를 사용하세요.",
+            "next": "일정 목록을 확인했습니다. 필요하면 일정을 수정하거나 삭제할 수 있습니다.",
             "suggested_next_actions": [
-                "상세가 필요하면 calendar_get_event(event_id)",
-                "시간/제목 변경은 calendar_update_event",
-                "불필요한 일정은 calendar_delete_event",
+                "상세가 필요하면 해당 일정 열어보기",
+                "시간·제목 변경하기",
+                "불필요한 일정 삭제하기",
             ],
         }
 
@@ -522,7 +522,7 @@ def register(mcp: FastMCP) -> None:
         return {
             "ok": True,
             "event": res["event"],
-            "next": "일정 상세를 확인했습니다. 수정이 필요하면 calendar_update_event, 삭제가 필요하면 calendar_delete_event를 사용하세요.",
+            "next": "일정 상세를 확인했습니다. 필요하면 이 일정을 수정하거나 삭제할 수 있습니다.",
         }
 
     @mcp.tool(
@@ -582,10 +582,10 @@ def register(mcp: FastMCP) -> None:
         return {
             "ok": True,
             "event_id": res["event_id"],
-            "next": "일정을 수정했습니다. calendar_get_event 또는 calendar_list_events로 변경 결과를 확인할 수 있습니다.",
+            "next": "일정을 수정했습니다. 변경 결과를 일정 상세나 목록에서 확인할 수 있습니다.",
             "suggested_next_actions": [
-                "calendar_get_event로 수정 결과 확인",
-                "팀 일정 변경이면 notify_room으로 변경사항 공지",
+                "수정 결과 확인하기",
+                "팀 일정 변경이면 변경사항을 팀에 공지하기",
             ],
         }
 
@@ -622,9 +622,9 @@ def register(mcp: FastMCP) -> None:
         return {
             "ok": True,
             "event_id": res["event_id"],
-            "next": "일정을 삭제했습니다. 팀원이 알아야 하는 일정이면 notify_room으로 변경사항을 공지하세요.",
+            "next": "일정을 삭제했습니다. 팀원이 알아야 하는 일정이면 변경사항을 팀에 공지하세요.",
             "suggested_next_actions": [
-                "calendar_list_events로 남은 일정 확인",
-                "팀 일정 삭제라면 notify_room으로 공지",
+                "남은 일정 확인하기",
+                "팀 일정 삭제라면 팀에 공지하기",
             ],
         }

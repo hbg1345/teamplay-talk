@@ -86,61 +86,61 @@ def _send_form_followup(form: dict[str, Any]) -> dict[str, Any]:
         workflow = "meeting_time"
     if workflow == "location":
         return {
-            "next": "응답이 모이면 get_poll_results로 위치 후보를 읽고 정규화하세요. 카카오맵 MCP가 있으면 장소명/주소 확인에 보조적으로 쓰고, 없으면 제출 후보만 본투표로 넘기세요.",
+            "next": "응답이 모이면 위치 후보를 읽고 정규화하세요. 카카오맵 MCP가 있으면 장소명·주소 확인에 보조적으로 쓰고, 없으면 제출된 후보만 본투표로 넘기세요.",
             "suggested_next_actions": [
-                "응답 대기 후 get_poll_results 호출",
-                "location_1~5 값을 같은 역·상권·동네 기준으로 정규화",
-                "카카오맵 MCP가 있으면 장소명·역명·주소 확인과 중복 후보 정규화에만 보조적으로 사용",
-                "카카오맵 MCP가 없으면 있으면 장소 확인이 더 정확해진다고 안내",
-                "create_poll 복수선택 본투표 생성",
+                "응답이 모이면 결과 확인하기",
+                "제출된 장소 후보를 같은 역·상권·동네 기준으로 정규화하기",
+                "카카오맵 MCP가 있으면 장소명·주소 확인과 중복 정리에 보조적으로 사용하기",
+                "카카오맵 MCP가 없으면 있으면 장소 확인이 더 정확해진다고 안내하기",
+                "정리된 후보로 복수선택 본투표 만들기",
             ],
         }
     if workflow == "roadmap_decision":
         return {
-            "next": "응답이 모이면 get_poll_results로 확인하고, decompose_roadmap/add_task/update_task 또는 create_poll로 후속 반영하세요.",
+            "next": "응답이 모이면 결과를 확인하고, 실행 항목 반영이나 우선순위 투표로 이어가세요.",
             "suggested_next_actions": [
-                "응답 대기 후 get_poll_results 호출",
-                "답변을 태스크/담당/마감/리스크 후보로 정규화",
-                "여러 실행 항목은 decompose_roadmap으로 반영",
-                "갈리는 항목은 create_poll로 우선순위 투표",
+                "응답이 모이면 결과 확인하기",
+                "답변을 태스크·담당·마감·리스크 후보로 정규화하기",
+                "여러 실행 항목은 로드맵에 반영하기",
+                "의견이 갈리는 항목은 우선순위 투표로 정하기",
             ],
         }
     if workflow == "daily_checkin":
         return {
-            "next": "응답이 모이면 apply_daily_checkin으로 밀린 일/오늘 일/앞으로 예정된 일 완료 반영안을 확인하고 daily_report로 팀 리포트를 만드세요.",
+            "next": "응답이 모이면 완료 반영안을 확인하고, 팀 리포트를 만드세요.",
             "suggested_next_actions": [
-                "응답 대기 후 apply_daily_checkin(form_id, dry_run=true)로 완료 반영안 확인",
-                "확정되면 apply_daily_checkin(form_id, dry_run=false)로 todo 상태 반영",
-                "daily_report로 팀 전체 상태/남은 밀린 일/기타 메모 리포트 생성",
-                "필요하면 daily_report(publish=true) 또는 daily_task_digest로 공지",
+                "응답이 모이면 완료 반영안(미리보기) 확인하기",
+                "확정되면 todo 상태에 실제 반영하기",
+                "팀 전체 상태·남은 밀린 일·메모 리포트 만들기",
+                "필요하면 팀에 공지하거나 개인별 할일 공지하기",
             ],
         }
     if workflow == "role_assignment":
         return {
-            "next": "역할 선호 응답이 모이면 get_poll_results로 확인하고 finalize_roles로 배정안을 계산하세요.",
+            "next": "역할 선호 응답이 모이면 결과를 확인하고 배정안을 계산하세요.",
             "suggested_next_actions": [
-                "응답 대기 후 get_poll_results 호출",
-                "finalize_roles로 난이도/slots 기반 배정 계산",
-                "팀장 확인 후 set_roles로 저장",
+                "응답이 모이면 결과 확인하기",
+                "난이도·필요 인원 기준으로 배정안 계산하기",
+                "팀장 확인 후 역할 확정·저장하기",
             ],
         }
     if workflow == "meeting_time":
         return {
-            "next": "응답이 모이면 get_poll_results의 best_slots를 보고 회의 시간을 확정하세요.",
+            "next": "응답이 모이면 가장 가능한 시간대를 보고 회의 시간을 확정하세요.",
             "suggested_next_actions": [
-                "응답 대기 후 get_poll_results 호출",
-                "best_slots 중 시간 확정",
-                "notify_room으로 공지",
-                "calendar_create_room_event로 전원 캘린더 등록",
+                "응답이 모이면 결과 확인하기",
+                "가장 가능한 시간대 중에서 확정하기",
+                "팀에 공지하기",
+                "확정 시간을 전원 캘린더에 등록하기",
             ],
         }
     return {
-        "next": "응답이 모이면 get_poll_results로 결과를 확인하고, 필요하면 notify_room 또는 후속 투표/로드맵 반영으로 이어가세요.",
+        "next": "응답이 모이면 결과를 확인하고, 필요하면 공지하거나 후속 투표·로드맵 반영으로 이어가세요.",
         "suggested_next_actions": [
-            "응답 대기 후 get_poll_results 호출",
-            "결과 요약",
-            "필요하면 notify_room으로 공지",
-            "갈리면 create_poll로 후속 투표",
+            "응답이 모이면 결과 확인하기",
+            "결과 요약하기",
+            "필요하면 팀에 공지하기",
+            "의견이 갈리면 후속 투표 만들기",
         ],
     }
 
@@ -247,7 +247,7 @@ def register(mcp: FastMCP) -> None:
             "required_next_tool": "send_form",
             "send_form_arguments": {"form_id": fid},
             "do_not_claim_sent_before_send_form": True,
-            "next": "send_form(form_id)으로 팀에 발송하세요 (notify_room ❌).",
+            "next": "이 폼을 팀에 발송할 차례입니다. (공지용 알림이 아니라 폼 발송으로 보내세요.)",
         }
         if anonymous:
             out["share_url"] = base
@@ -335,9 +335,9 @@ def register(mcp: FastMCP) -> None:
             "send_form_arguments": {"form_id": fid},
             "do_not_claim_sent_before_send_form": True,
             "next": (
-                "send_form(form_id)으로 팀원에게 발송 → 응답 모이면(또는 마감 nudge) "
-                "get_poll_results로 의견을 읽고 **항목화**한 뒤, create_poll(복수선택 본투표)로 "
-                "2단계 투표를 만드세요. 약속 장소는 gather_locations 전용 흐름을 쓰세요."
+                "이 폼을 팀원에게 발송하세요. 응답이 모이면(또는 마감 무렵) 의견을 읽어 "
+                "항목으로 정리한 뒤, 복수선택 본투표로 2단계 투표를 만드세요. "
+                "약속 장소는 장소 정하기 전용 흐름을 쓰세요."
             ),
         }
 
@@ -444,17 +444,17 @@ def register(mcp: FastMCP) -> None:
             "send_form_arguments": {"form_id": fid},
             "do_not_claim_sent_before_send_form": True,
             "next": (
-                "send_form(form_id)으로 발송 → get_poll_results로 location_1~5 응답 확인 → "
-                "AI가 같은 역/상권/동네를 정규화 → 카카오맵 MCP가 있으면 장소명/주소 확인에 보조적으로 사용 → "
-                "지도 도구가 없으면 제출 후보만 create_poll 복수선택 본투표로 진행."
+                "이 폼을 팀원에게 발송하세요. 응답이 모이면 위치 칸별 원문을 읽어 "
+                "같은 역·상권·동네를 정규화하고, 카카오맵 MCP가 있으면 장소명·주소 확인에 "
+                "보조적으로 쓰세요. 지도 도구가 없으면 제출된 후보만 복수선택 본투표로 진행하세요."
             ),
             "suggested_next_actions": [
-                "send_form으로 팀원에게 위치 입력 폼 발송",
-                "응답 후 get_poll_results로 위치 칸별 원문 확인",
-                "같은 장소 표현을 정규화하고 모호한 값은 원문 보존",
-                "카카오맵 MCP가 있으면 장소명·역명·주소 확인과 중복 후보 정규화에만 보조적으로 사용",
-                "카카오맵 MCP가 없으면 있으면 장소 확인이 더 정확하다는 멘트 후 제출 후보만 본투표",
-                "정규화 후보로 create_poll 복수선택 본투표 생성",
+                "팀원에게 위치 입력 폼 발송하기",
+                "응답이 모이면 위치 칸별 원문 확인하기",
+                "같은 장소 표현은 정규화하고 모호한 값은 원문 보존하기",
+                "카카오맵 MCP가 있으면 장소명·주소 확인과 중복 정리에 보조적으로 사용하기",
+                "카카오맵 MCP가 없으면 있으면 장소 확인이 더 정확하다고 안내한 뒤 제출 후보만 본투표하기",
+                "정규화한 후보로 복수선택 본투표 만들기",
             ],
             "chat_response_hint": (
                 "사용자에게는 '위치 입력 폼을 만들었고 아직 발송 전입니다. 보낼까요?'처럼 말하세요. "
@@ -626,16 +626,16 @@ def register(mcp: FastMCP) -> None:
             "send_form_arguments": {"form_id": fid},
             "do_not_claim_sent_before_send_form": True,
             "next": (
-                "send_form(form_id)으로 팀에 발송 → get_poll_results로 응답 확인 → "
-                "AI가 태스크 후보/수정사항/리스크로 정규화 → decompose_roadmap/add_task/update_task 또는 "
-                "필요 시 create_poll 우선순위 투표 → member_tasks로 개인별 할일 확인."
+                "이 폼을 팀에 발송하세요. 응답이 모이면 원문 의견을 읽어 태스크 후보·수정사항·리스크로 "
+                "정규화한 뒤 로드맵·할일에 반영하고, 의견이 갈리면 우선순위 투표로 정한 다음 "
+                "개인별 할일을 확인하세요."
             ),
             "suggested_next_actions": [
-                "send_form으로 팀원에게 발송",
-                "응답 후 get_poll_results로 원문 의견 조회",
-                "AI가 중복 표현을 합치고 태스크/담당/마감/리스크 후보로 정리",
-                "여러 실행 항목은 decompose_roadmap, 단건 수정은 add_task/update_task로 반영",
-                "갈리는 항목은 create_poll로 채택/우선순위 투표",
+                "팀원에게 폼 발송하기",
+                "응답이 모이면 원문 의견 조회하기",
+                "중복 표현을 합쳐 태스크·담당·마감·리스크 후보로 정리하기",
+                "여러 실행 항목은 로드맵에 반영하고 단건 수정은 해당 할일에 반영하기",
+                "의견이 갈리는 항목은 채택·우선순위 투표로 정하기",
             ],
         }
 
@@ -781,6 +781,6 @@ def register(mcp: FastMCP) -> None:
             **followup,
             "chat_response_hint": (
                 "사용자에게 발송 성공 대상과 다음 행동을 함께 말하세요. "
-                "예: '박세원님에게 보냈고, 응답이 오면 get_poll_results로 확인한 뒤 본투표를 만들 수 있어요.'"
+                "예: '박세원님에게 보냈고, 응답이 오면 결과를 확인한 뒤 본투표를 만들 수 있어요.'"
             ),
         }

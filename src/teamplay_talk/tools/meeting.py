@@ -155,6 +155,6 @@ def register(mcp: FastMCP) -> None:
             "do_not_claim_sent_before_send_form": True,
             "action_required": (
                 "⚠️ 아직 보내지 마세요. 그리드 범위(날짜·시간)를 팀장에게 보여주고 확인받은 "
-                "뒤에만 send_form(form_id) 하세요. 응답 모이면 get_poll_results로 best_slots 확인."
+                "뒤에만 폼을 발송하세요. 응답이 모이면 가장 가능한 시간대를 확인하세요."
             ),
         }

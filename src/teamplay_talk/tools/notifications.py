@@ -116,14 +116,14 @@ def register(mcp: FastMCP) -> None:
             "status": "partial" if failed else "sent",
             "recorded_decision": decision,
             "next": (
-                "공지 발송이 끝났습니다. 확정 결정이면 room_dashboard에서 타임라인에 기록됐는지 확인하고, "
-                "후속 작업이 있으면 로드맵/todo나 캘린더에 반영하세요."
+                "공지 발송이 끝났습니다. 확정 결정이면 대시보드 타임라인에 기록됐는지 확인하고, "
+                "후속 작업이 있으면 로드맵·todo나 캘린더에 반영하세요."
             ),
             "suggested_next_actions": [
-                "room_dashboard로 공지/결정 기록 확인",
-                "결정된 일이 작업이면 add_task/update_task로 로드맵 반영",
-                "회의/마감 일정이면 calendar_create_room_event 또는 calendar_create_task_events로 캘린더 등록",
-                "팀원별 실행 항목은 daily_task_digest로 개인 공지",
+                "공지·결정 기록을 대시보드에서 확인하기",
+                "결정된 일이 작업이면 로드맵에 반영하기",
+                "회의·마감 일정이면 전원 카카오 캘린더에 등록하기",
+                "팀원별 실행 항목을 개인 공지하기",
             ],
-            "chat_response_hint": "sent_to/count를 기준으로 공지 성공 여부를 말하고, 다음 행동은 대시보드 확인/로드맵 반영/캘린더 등록 중 필요한 것만 짧게 안내하세요.",
+            "chat_response_hint": "실제 발송 결과(sent_to·count)를 기준으로 공지 성공 여부를 말하고, 다음 행동은 대시보드 확인·로드맵 반영·캘린더 등록 중 필요한 것만 짧게 안내하세요.",
         }
