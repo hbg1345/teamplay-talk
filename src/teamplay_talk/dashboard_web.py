@@ -33,7 +33,15 @@ _TOKEN_TTL_SECONDS = 60 * 60 * 24
 
 
 def _secret() -> bytes:
-    raw = settings.kakao_client_secret or settings.kakao_rest_api_key or settings.public_base_url
+    # 서명 키는 진짜 비밀에서만 가져온다. public_base_url(공개값) 폴백을 두면
+    # 두 키가 빈 배포에서 누구나 토큰을 위조할 수 있으므로 제거하고, 없으면
+    # fail-closed 한다(대시보드 토큰 발급/검증 자체를 막음).
+    raw = settings.kakao_client_secret or settings.kakao_rest_api_key
+    if not raw:
+        raise RuntimeError(
+            "대시보드 토큰 서명 키가 없습니다. KAKAO_CLIENT_SECRET 또는 "
+            "KAKAO_REST_API_KEY를 설정하세요."
+        )
     return raw.encode("utf-8")
 
 

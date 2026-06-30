@@ -25,6 +25,7 @@ class Settings:
     port: int
     data_dir: str
     database_url: str | None
+    token_enc_key: str | None
     public_base_url: str
     kakao_rest_api_key: str
     kakao_client_secret: str | None
@@ -47,6 +48,9 @@ class Settings:
             port=port,
             data_dir=os.getenv("DATA_DIR", "./data"),
             database_url=os.getenv("DATABASE_URL"),
+            # 저장 토큰(카카오 access/refresh) 암호화용 Fernet 키. 미설정 시
+            # 평문 저장으로 동작(하위호환). scripts/gen_token_key.py로 생성.
+            token_enc_key=os.getenv("TOKEN_ENC_KEY") or None,
             # 폼 공유 링크 생성에 쓰는 외부 접근 URL (배포 시 실제 도메인으로 지정)
             public_base_url=os.getenv("PUBLIC_BASE_URL", f"http://localhost:{port}"),
             kakao_rest_api_key=os.getenv("KAKAO_REST_API_KEY", ""),

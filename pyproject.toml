@@ -5,6 +5,7 @@ description = "팀플 협업 MCP 서버 (PlayMCP 공모전 출품)"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "cryptography>=42",
     "fastmcp>=2.0",
     "httpx>=0.27",
     "psycopg[binary]>=3.2",

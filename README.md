@@ -137,6 +137,24 @@ KAKAO PlayMCP 공모전 출품용 — 팀플(팀 프로젝트) 협업 MCP 서버
 
 `.env`에 `DATABASE_URL`(DigitalOcean Managed PostgreSQL 연결 문자열)이 필요합니다.
 
+### 저장 토큰 암호화 (TOKEN_ENC_KEY)
+
+DB(`users.kakao_access_token` / `kakao_refresh_token`)에 들어가는 카카오 OAuth
+토큰은 앱 계층에서 **Fernet으로 암호화**해 저장합니다. 운영 배포에는 키를
+설정하세요. (미설정 시 평문 저장으로 동작 — 개발 편의)
+
+```bash
+# 1) 키 생성 후 .env의 TOKEN_ENC_KEY=... 에 붙여넣기
+uv run python scripts/gen_token_key.py
+
+# 2) (기존 배포만) 평문으로 남아 있던 토큰을 일회성 암호화 — 여러 번 실행해도 안전
+uv run python scripts/encrypt_tokens.py
+```
+
+> 암호문에는 `enc:v1:` 접두사가 붙어 평문/암호문이 섞여 있어도 읽기가 무중단으로
+> 동작합니다. **키를 분실하면 기존 토큰은 복호화 불가**(사용자가 카카오 재연결
+> 필요)이므로 배포 시크릿에 안전히 보관하세요.
+
 ### Google Drive OAuth (PlayMCP 등록 시 설정)
 
 Drive 연동의 OAuth는 **호스트(PlayMCP)가 대행**하므로 서버 `.env`에 Google

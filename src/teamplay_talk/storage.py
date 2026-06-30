@@ -12,6 +12,7 @@ from typing import Any
 
 from psycopg.rows import dict_row
 
+from .crypto import decrypt_row_tokens
 from .db import conn
 
 
@@ -641,11 +642,11 @@ def close_form(form_id: int) -> None:
 
 
 def get_user(user_id: int) -> dict[str, Any] | None:
-    """사용자 단건 조회 (카카오 토큰 포함)."""
+    """사용자 단건 조회 (카카오 토큰 포함, 복호화됨)."""
     with conn() as c:
         with c.cursor(row_factory=dict_row) as cur:
             cur.execute("SELECT * FROM users WHERE id = %s", (user_id,))
-            return cur.fetchone()
+            return decrypt_row_tokens(cur.fetchone())
 
 
 def find_due_forms() -> list[dict[str, Any]]:
@@ -728,7 +729,7 @@ def list_form_recipients(form_id: int) -> list[dict[str, Any]]:
                 "AND u.kakao_access_token IS NOT NULL",
                 (form_id,),
             )
-            return cur.fetchall()
+            return [decrypt_row_tokens(r) for r in cur.fetchall()]
 
 
 # ── 방 조회/나가기 (카카오 통합) ───────────────────────────────────────

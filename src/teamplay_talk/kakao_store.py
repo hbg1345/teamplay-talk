@@ -11,6 +11,7 @@ from typing import Any
 
 from psycopg.rows import dict_row
 
+from .crypto import decrypt_row_tokens, encrypt_token
 from .db import conn
 
 
@@ -24,6 +25,10 @@ def set_kakao_token(
     expires_at = None
     if expires_in:
         expires_at = datetime.now(timezone.utc) + timedelta(seconds=int(expires_in))
+    # 저장 직전에 암호화한다(키 미설정이면 평문 통과). refresh_token이 None이면
+    # encrypt_token도 None을 반환해 아래 COALESCE가 기존 값을 보존한다.
+    enc_access = encrypt_token(access_token)
+    enc_refresh = encrypt_token(refresh_token)
     with conn() as c:
         with c.cursor() as cur:
             # refresh_token이 None이면 기존 값을 보존한다(헤더-브로커 토큰엔
@@ -33,7 +38,7 @@ def set_kakao_token(
                 "kakao_refresh_token = COALESCE(%s, kakao_refresh_token), "
                 "kakao_token_expires_at = COALESCE(%s, kakao_token_expires_at) "
                 "WHERE kakao_id = %s",
-                (access_token, refresh_token, expires_at, kakao_id),
+                (enc_access, enc_refresh, expires_at, kakao_id),
             )
         c.commit()
 
@@ -52,7 +57,7 @@ def list_members_with_tokens(room_id: int) -> list[dict[str, Any]]:
                 "ORDER BY rm.joined_at",
                 (room_id,),
             )
-            return cur.fetchall()
+            return [decrypt_row_tokens(r) for r in cur.fetchall()]
 
 
 async def send_with_refresh(member: dict[str, Any], message: str) -> int:
