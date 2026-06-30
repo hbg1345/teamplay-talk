@@ -217,7 +217,7 @@ def _member_digest_message(room_name: str, member: dict[str, Any], *, include_do
             lines.append(f"  - {t['details']}")
     lines.extend([
         "",
-        "완료했으면 팀플톡에서 update_task로 상태를 done으로 바꾸면 돼요.",
+        "완료했으면 팀플톡에서 이 할일을 완료로 바꿔달라고 말하면 돼요.",
     ])
     return "\n".join(lines)
 
@@ -400,7 +400,7 @@ def register(mcp: FastMCP) -> None:
         if existing["tasks"] and not replace_existing:
             return {
                 "ok": False,
-                "error": "이미 로드맵이 있습니다. build_roadmap은 전체 교체라 기본 실행을 막았습니다.",
+                "error": "이미 로드맵이 있습니다. 새 로드맵 생성은 전체 교체라 기본 실행을 막았습니다.",
                 "existing_task_count": len(existing["tasks"]),
                 "required_confirmation": "정말 전체 교체하려면 교체를 확정해 다시 시도하세요(기존 로드맵은 사라집니다).",
                 "suggested_next_actions": [
@@ -630,7 +630,7 @@ def register(mcp: FastMCP) -> None:
         if not roadmap["tasks"]:
             return {
                 "ok": False,
-                "error": "먼저 build_roadmap으로 큰 로드맵 milestone을 만들어야 합니다.",
+                "error": "먼저 큰 로드맵 단계부터 만들어야 합니다.",
             }
 
         created: list[dict[str, Any]] = []

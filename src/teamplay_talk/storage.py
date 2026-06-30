@@ -424,63 +424,64 @@ def _suggest_next_actions(
     needs_tiebreaker = bool(outcome.get("needs_tiebreaker"))
     if workflow_kind == "role_assignment":
         return [
-            f"finalize_roles(form_id={form_id})로 난이도 균형 역할 매칭 계산",
+            "응답이 다 모이면 난이도와 선호도를 반영해 역할 배정안을 계산",
             "팀장에게 멤버별 note와 배정안을 보여주고 확인",
-            "확정되면 set_roles로 방 멤버 역할 저장 및 공지",
-            "build_roadmap에서 assignee에 역할명을 넣어 개인별 태스크 자동 연결",
+            "확정되면 방 멤버 역할을 저장하고 팀에 공지",
+            "역할이 정해지면 로드맵의 실행 todo를 사람별로 연결",
         ]
     if workflow_kind == "meeting_time":
         return [
-            "best_slots 중 팀장이 확정한 시간을 notify_room으로 공지",
-            "확정 시간이 정해지면 calendar_create_room_event로 전원 톡캘린더 등록",
-            "회의 전 daily_task_digest 또는 notify_room으로 준비물 리마인드",
+            "가능 시간이 가장 많이 겹치는 후보 중에서 팀장이 최종 시간 확정",
+            "확정 시간을 팀 전체에 공지",
+            "원하면 팀원 톡캘린더에 회의 일정 등록",
+            "회의 전 준비물이나 개인별 할일을 다시 알려주기",
         ]
     if workflow_kind == "location":
         return [
-            "location_1~location_5와 기타 의견을 모아 같은 역·상권·동네를 정규화",
+            "제출된 장소 후보를 같은 역·상권·동네 기준으로 정규화",
             "카카오맵 MCP가 있으면 장소명·역명·주소 확인과 중복 후보 정규화에만 보조적으로 사용",
             "카카오맵 MCP가 없으면 '카카오맵 MCP가 있으면 장소명/주소 확인이 더 정확해진다'고 말하고 제출 후보만 정리",
-            "정규화 후보로 create_poll(복수선택) 본투표 생성",
-            "본투표 결과가 나오면 선택된 장소를 notify_room으로 공지",
+            "정리된 후보로 복수선택 장소 투표 만들기",
+            "장소가 정해지면 팀 전체에 공지",
         ]
     if workflow_kind == "priority":
         actions = [
-            "상위 항목을 build_roadmap 또는 add_task로 로드맵에 반영",
-            "역할이 확정돼 있으면 태스크 assignee에 역할명을 넣어 담당자 자동 연결",
-            "동점/범위 충돌이 있으면 create_poll로 결선 또는 스코프 축소 투표",
+            "상위 항목을 로드맵이나 실행 todo에 반영",
+            "역할이 확정돼 있으면 담당 역할·담당자를 연결",
+            "동점이나 범위 충돌이 있으면 결선 투표 또는 범위 축소 투표로 좁히기",
         ]
         if needs_tiebreaker:
-            actions.insert(0, "동점 후보만 추려 create_poll로 결선 투표 생성")
+            actions.insert(0, "동점 후보만 추려 결선 투표 만들기")
         return actions
     if workflow_kind == "roadmap_decision":
         return [
             "주관식 답변을 AI가 태스크 후보/수정사항/리스크로 정규화",
-            "여러 개인 실행 항목은 decompose_roadmap으로 milestone 아래 todo로 반영",
-            "단건 수정/추가는 add_task 또는 update_task로 로드맵에 반영",
-            "의견이 갈린 항목은 create_poll로 우선순위/채택 여부를 투표",
+            "여러 개인 실행 항목은 로드맵 단계 아래 todo로 나눠 반영",
+            "단건 수정/추가는 로드맵에 바로 반영",
+            "의견이 갈린 항목은 우선순위나 채택 여부를 투표",
             "역할이 확정돼 있으면 태스크 assignee에 역할명이나 닉네임을 넣어 담당자 자동 연결",
-            "member_tasks로 개인별 이번 주 할일을 확인하고 daily_task_digest로 공지",
+            "개인별 이번 주 할일을 확인하고 필요하면 각자에게 공지",
         ]
     if workflow_kind == "daily_checkin":
         return [
-            f"apply_daily_checkin(form_id={form_id}, dry_run=true)로 밀린 일/오늘 일/앞으로 예정된 일 완료 반영안 확인",
-            f"확정되면 apply_daily_checkin(form_id={form_id}, dry_run=false)로 todo 상태 반영",
-            "daily_report로 팀 전체 상태/남은 밀린 일/기타 메모 리포트 생성",
-            "밀린 항목은 update_task로 일정/담당 조정",
+            "응답이 모이면 밀린 일·오늘 일·미리 끝낸 일의 완료 반영안을 먼저 확인",
+            "확정되면 todo 상태에 실제 반영",
+            "팀 전체 상태, 남은 밀린 일, 기타 메모를 데일리 리포트로 정리",
+            "밀린 항목은 일정이나 담당자를 조정",
         ]
     if workflow_kind == "retro":
         return [
-            "주관식 답변을 요약해 개선 액션을 add_task로 등록",
+            "주관식 답변을 요약해 개선 액션으로 등록",
             "팀 분위기/기여도 이슈가 있으면 익명 피드백 후속 폼 생성",
-            "결과 요약을 notify_room으로 공유할지 팀장에게 확인",
+            "결과 요약을 팀에 공유할지 팀장에게 확인",
         ]
     actions = [
-        "결정 결과를 notify_room으로 팀에 공지",
-        "결정된 항목이 작업이면 build_roadmap/add_task/update_task에 반영",
-        "room_dashboard로 결정 기록 확인",
+        "결정 결과를 팀에 공지",
+        "결정된 항목이 작업이면 로드맵이나 todo에 반영",
+        "지금까지의 결정 기록과 진행 상황을 대시보드로 확인",
     ]
     if needs_tiebreaker:
-        actions.insert(0, "동점 후보만 추려 create_poll로 결선 투표 생성")
+        actions.insert(0, "동점 후보만 추려 결선 투표 만들기")
     return actions
 
 

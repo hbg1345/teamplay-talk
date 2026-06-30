@@ -110,7 +110,7 @@ def _validate_role_names(names: list[str], roadmap: dict[str, Any]) -> dict[str,
         "recommended_roles": _role_suggestions_from_roadmap(roadmap.get("tasks", [])),
         "role_design_rule": (
             "로드맵 단계명=할일, 역할명=담당 역량/책임영역. 로드맵 이후 역할분담을 할 때는 "
-            "태스크들을 묶어 워크스트림 역할로 바꾼 뒤 assign_roles를 다시 호출하세요."
+            "태스크들을 묶어 워크스트림 역할로 바꾼 뒤 역할분배를 다시 시작하세요."
         ),
     }
 
@@ -322,6 +322,15 @@ def register(mcp: FastMCP) -> None:
                 "(난이도 점수는 보여주지 마세요 — 내부 균형용입니다. slots는 필요 인원 설명용입니다.) "
                 "동의를 받은 뒤에만 역할 선호 폼을 발송하세요."
             ),
+            "user_prompt_examples": [
+                "이 역할 목록으로 팀원들에게 선호도 조사 보내줘",
+                "응답이 모이면 역할 배정안 계산해줘",
+                "이 배정안으로 역할 확정하고 공지해줘",
+            ],
+            "chat_response_hint": (
+                "내부 도구명은 말하지 말고, 역할 목록과 필요한 인원을 "
+                "팀장에게 보여준 뒤 '이대로 선호도 조사를 보낼까요?'처럼 자연어로 확인을 받으세요."
+            ),
         }
 
     @mcp.tool(
@@ -428,6 +437,11 @@ def register(mcp: FastMCP) -> None:
                 "저장 후 팀원별 할일 확인하거나 역할별 실행 todo로 연결하기",
             ],
             "chat_response_hint": "역할이 확정됐다고 말하지 마세요. 아직 '배정안'이며 확정·저장 전에는 반영되지 않았다고 분명히 말하세요.",
+            "user_prompt_examples": [
+                "이 배정안으로 확정해줘",
+                "박세원 역할만 바꿔서 다시 보여줘",
+                "확정 후 팀원들에게 공지해줘",
+            ],
         }
 
     @mcp.tool(

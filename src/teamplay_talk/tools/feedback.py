@@ -248,13 +248,22 @@ def register(mcp: FastMCP) -> None:
             "send_form_arguments": {"form_id": fid},
             "do_not_claim_sent_before_send_form": True,
             "next": "이 폼을 팀에 발송할 차례입니다. (공지용 알림이 아니라 폼 발송으로 보내세요.)",
+            "user_prompt_examples": [
+                "이 폼 팀원들에게 보내줘",
+                "응답이 모이면 결과 정리해줘",
+                "마감되면 팀에 결과 공지해줘",
+            ],
+            "chat_response_hint": (
+                "폼은 아직 발송되지 않았습니다. 내부 도구명은 말하지 말고, "
+                "'이 폼을 팀원들에게 보내드릴까요?'처럼 자연어로 다음 행동을 물어보세요."
+            ),
         }
         if anonymous:
             out["share_url"] = base
         else:
             members = storage.list_members(room_id)
             storage.create_invites(fid, [m["id"] for m in members])
-            out["mode"] = "identified — send_form이 각 멤버에게 개인 링크를 발송"
+            out["mode"] = "식별 폼 — 팀원별 개인 링크로 발송됩니다."
         return out
 
     @mcp.tool(
@@ -335,9 +344,18 @@ def register(mcp: FastMCP) -> None:
             "send_form_arguments": {"form_id": fid},
             "do_not_claim_sent_before_send_form": True,
             "next": (
-                "이 폼을 팀원에게 발송하세요. 응답이 모이면(또는 마감 무렵) 의견을 읽어 "
+                "이 의견 폼을 팀원에게 보낼 차례입니다. 응답이 모이면(또는 마감 무렵) 의견을 읽어 "
                 "항목으로 정리한 뒤, 복수선택 본투표로 2단계 투표를 만드세요. "
                 "약속 장소는 장소 정하기 전용 흐름을 쓰세요."
+            ),
+            "user_prompt_examples": [
+                "이 의견 폼 팀원들에게 보내줘",
+                "응답이 모이면 후보로 정리해줘",
+                "정리된 후보로 본투표 만들어줘",
+            ],
+            "chat_response_hint": (
+                "내부 도구명은 말하지 말고, "
+                "'의견 폼을 만들었고 아직 발송 전입니다. 팀원들에게 보내드릴까요?'처럼 자연어로 안내하세요."
             ),
         }
 
@@ -444,7 +462,7 @@ def register(mcp: FastMCP) -> None:
             "send_form_arguments": {"form_id": fid},
             "do_not_claim_sent_before_send_form": True,
             "next": (
-                "이 폼을 팀원에게 발송하세요. 응답이 모이면 위치 칸별 원문을 읽어 "
+                "이 장소 후보 폼을 팀원에게 보낼 차례입니다. 응답이 모이면 위치 칸별 원문을 읽어 "
                 "같은 역·상권·동네를 정규화하고, 카카오맵 MCP가 있으면 장소명·주소 확인에 "
                 "보조적으로 쓰세요. 지도 도구가 없으면 제출된 후보만 복수선택 본투표로 진행하세요."
             ),
@@ -457,9 +475,15 @@ def register(mcp: FastMCP) -> None:
                 "정규화한 후보로 복수선택 본투표 만들기",
             ],
             "chat_response_hint": (
-                "사용자에게는 '위치 입력 폼을 만들었고 아직 발송 전입니다. 보낼까요?'처럼 말하세요. "
+                "내부 도구명은 말하지 마세요. "
+                "사용자에게는 '장소 후보 폼을 만들었고 아직 발송 전입니다. 팀원들에게 보내드릴까요?'처럼 말하세요. "
                 "발송 성공 전에는 팀원에게 물어봤다고 말하지 마세요."
             ),
+            "user_prompt_examples": [
+                "이 장소 후보 폼 팀원들에게 보내줘",
+                "응답이 모이면 장소 후보 정리해줘",
+                "정리된 장소로 본투표 만들어줘",
+            ],
             "optional_integration": {
                 "name": "카카오맵 MCP",
                 "when_available": "장소명·역명·주소 확인, 중복 후보 정규화 보조",
@@ -637,6 +661,15 @@ def register(mcp: FastMCP) -> None:
                 "여러 실행 항목은 로드맵에 반영하고 단건 수정은 해당 할일에 반영하기",
                 "의견이 갈리는 항목은 채택·우선순위 투표로 정하기",
             ],
+            "user_prompt_examples": [
+                "이 의견 폼 팀원들에게 보내줘",
+                "응답이 모이면 할일 후보로 정리해줘",
+                "정리한 항목을 로드맵에 반영해줘",
+            ],
+            "chat_response_hint": (
+                "내부 도구명은 말하지 말고, "
+                "'이 의견 폼을 팀원들에게 보내드릴까요?'처럼 자연어로 다음 행동을 물어보세요."
+            ),
         }
 
     @mcp.tool(
@@ -780,7 +813,12 @@ def register(mcp: FastMCP) -> None:
             "status": "partial" if failed else "sent",
             **followup,
             "chat_response_hint": (
-                "사용자에게 발송 성공 대상과 다음 행동을 함께 말하세요. "
+                "사용자에게 발송 성공 대상과 다음 행동을 함께 말하세요. 내부 도구명은 말하지 마세요. "
                 "예: '박세원님에게 보냈고, 응답이 오면 결과를 확인한 뒤 본투표를 만들 수 있어요.'"
             ),
+            "user_prompt_examples": [
+                "응답 결과 정리해줘",
+                "결과를 팀에 공지해줘",
+                "필요하면 다음 투표까지 만들어줘",
+            ],
         }

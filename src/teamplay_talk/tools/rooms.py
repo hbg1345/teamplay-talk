@@ -76,22 +76,26 @@ def _room_onboarding(room: dict[str, Any]) -> dict[str, Any]:
                 {
                     "label": "팀원 초대",
                     "description": "위 참여 안내 문구를 팀원에게 그대로 공유하면 됩니다.",
-                    "next_tool": "join_room",
+                    "internal_next_tool": "join_room",
+                    "user_can_say": "초대 코드로 이 방에 참여해줘",
                 },
                 {
                     "label": "주제로 로드맵 만들기",
                     "description": "프로젝트 주제에서 큰 milestone을 먼저 잡습니다.",
-                    "next_tool": "build_roadmap",
+                    "internal_next_tool": "build_roadmap",
+                    "user_can_say": "이 주제로 로드맵 만들어줘",
                 },
                 {
                     "label": "역할분배하기",
                     "description": "로드맵을 보고 기획·PM, 구현, 연동, QA, 문서·발표처럼 워크스트림 역할을 나눕니다.",
-                    "next_tool": "assign_roles",
+                    "internal_next_tool": "assign_roles",
+                    "user_can_say": "우리 팀 역할 분배해줘",
                 },
                 {
                     "label": "역할별 todo 만들기",
                     "description": "확정된 역할과 로드맵을 개인 실행 todo로 연결합니다.",
-                    "next_tool": "decompose_roadmap",
+                    "internal_next_tool": "decompose_roadmap",
+                    "user_can_say": "역할별로 각자 할 일 나눠줘",
                 },
             ],
             "recommended_flow": [
@@ -111,10 +115,17 @@ def _room_onboarding(room: dict[str, Any]) -> dict[str, Any]:
             "역할별 실행 todo 만들기",
             "이후 결과 타임라인을 대시보드에서 확인하기",
         ],
+        "user_prompt_examples": [
+            "이 방 팀원들에게 초대 문구 보내줘",
+            "카카오 MCP 대회 주제로 로드맵 만들어줘",
+            "우리 팀 역할 분배해줘",
+            "역할별로 개인 todo까지 나눠줘",
+        ],
         "chat_response_hint": (
             "방 생성 성공과 위 참여 안내 문구를 먼저 그대로 보여주세요. "
             "다음 단계는 명령형으로 나열하지 말고 사용자에게 질문으로 제안하세요. "
             "예: '이어서 로드맵을 만들어 드릴까요, 아니면 역할 분배부터 할까요?' "
+            "next_tool/internal_next_tool 같은 내부 필드명은 사용자에게 말하지 말고, user_prompt_examples의 자연어 예시를 보여주세요. "
             "초대 코드는 사용자가 바로 복사할 수 있도록 백틱으로 감싼 인라인 코드(예: `초대코드`)로 표시하고, "
             "참여 안내 문구 전체는 코드 블록(```)으로 감싸 한 번에 복사하기 쉽게 보여주세요."
         ),
