@@ -101,7 +101,12 @@ register_kakao_token_proxy(mcp)
 
 def main() -> None:
     start_scheduler()  # 폼 마감 감지 + 드라이버 nudge (백그라운드)
-    mcp.run(transport="http", host=settings.host, port=settings.port)
+    mcp.run(
+        transport="http",
+        host=settings.host,
+        port=settings.port,
+        uvicorn_config={"access_log": False},
+    )
 
 
 if __name__ == "__main__":
