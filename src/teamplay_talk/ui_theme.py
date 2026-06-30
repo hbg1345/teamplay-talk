@@ -38,16 +38,11 @@ const liquidRoots = new WeakMap();
 const defaultLiquidSelector = [
   ".glass-panel:not(.workspace)",
   ".roadmap-panel",
-  ".event-avatar",
   ".date-tab",
   ".day-action",
   ".sd-btn",
   ".sd-navigation__complete-btn",
-  ".schedule__submit button",
-  ".kind",
-  ".badge",
-  ".best",
-  ".mini"
+  ".schedule__submit button"
 ].join(",");
 const contentWrapSelector = [
   "button",
@@ -55,11 +50,17 @@ const contentWrapSelector = [
   ".day-action",
   ".sd-btn",
   ".sd-navigation__complete-btn",
-  ".schedule__submit button",
+  ".schedule__submit button"
+].join(",");
+const repeatedDashboardSelector = [
+  ".event-avatar",
   ".kind",
   ".badge",
   ".best",
-  ".mini"
+  ".mini",
+  ".preference-chip",
+  ".assignment-card",
+  ".task-item"
 ].join(",");
 
 function radiusFor(element) {
@@ -71,12 +72,11 @@ function radiusFor(element) {
 function propsFor(element) {
   const isDateControl = element.matches(".date-tab,.day-action");
   const isControl = element.matches(contentWrapSelector);
-  const isSmall = element.matches(".event-avatar,.nav-icon,.kind,.badge,.best,.mini");
   return {
-    displacementScale: isDateControl ? 4 : isSmall ? 6 : isControl ? 10 : 18,
-    blurAmount: isDateControl ? 0.006 : isSmall ? 0.01 : isControl ? 0.018 : 0.032,
+    displacementScale: isDateControl ? 4 : isControl ? 10 : 18,
+    blurAmount: isDateControl ? 0.006 : isControl ? 0.018 : 0.032,
     saturation: isDateControl ? 104 : isControl ? 106 : 112,
-    aberrationIntensity: isDateControl ? 0.08 : isSmall ? 0.18 : isControl ? 0.28 : 0.55,
+    aberrationIntensity: isDateControl ? 0.08 : isControl ? 0.28 : 0.55,
     elasticity: isDateControl ? 0.02 : isControl ? 0.1 : 0.04,
     cornerRadius: radiusFor(element),
     padding: "0",
@@ -93,6 +93,11 @@ function propsFor(element) {
   };
 }
 
+function shouldSkipLiquid(element) {
+  if (!element || element.matches(repeatedDashboardSelector)) return true;
+  return Boolean(element.closest(".timeline") && element.matches(".glass-panel,.roadmap-panel"));
+}
+
 function wrapLiquidContent(element) {
   if (!element.matches(contentWrapSelector) || element.querySelector(":scope > .liquid-react-content")) {
     return;
@@ -105,6 +110,7 @@ function wrapLiquidContent(element) {
 
 function mountLiquidGlass(element) {
   if (!element || liquidRoots.has(element) || element.closest(".liquid-react-layer")) return;
+  if (shouldSkipLiquid(element)) return;
   const rect = element.getBoundingClientRect();
   if (rect.width < 16 || rect.height < 16) return;
 
@@ -332,12 +338,6 @@ button{cursor:pointer}
 }
 .liquid-react-host > .liquid-react-content{
   z-index:3;
-}
-.kind .liquid-react-content,
-.badge .liquid-react-content,
-.best .liquid-react-content,
-.mini .liquid-react-content{
-  width:auto;
 }
 .liquid-react-layer{
   position:absolute!important;

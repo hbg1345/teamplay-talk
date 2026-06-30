@@ -258,8 +258,8 @@ __APP_LUCIDE_SCRIPT__
   .task-title{font-weight:760;line-height:1.35}
   .task-meta{margin-top:4px;color:var(--muted);font-size:.78rem;font-weight:680}
   .roadmap-note{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
-  .timeline{min-width:0;border:1px solid rgba(33,24,8,.10);border-radius:var(--radius);background:rgba(255,252,244,.88);box-shadow:var(--shadow-md);overflow:hidden}
-  .event{position:relative;display:grid;grid-template-columns:42px minmax(0,1fr);gap:12px;padding:16px 18px}
+  .timeline{min-width:0;border:1px solid rgba(33,24,8,.10);border-radius:var(--radius);background:rgba(255,252,244,.88);box-shadow:var(--shadow-md);overflow:hidden;contain:layout paint style}
+  .event{position:relative;display:grid;grid-template-columns:42px minmax(0,1fr);gap:12px;padding:16px 18px;content-visibility:auto;contain-intrinsic-size:280px;contain:layout paint style}
   .event:after{content:"";position:absolute;left:72px;right:18px;bottom:0;height:1px;background:rgba(33,24,8,.10)}
   .event:last-child:after{display:none}
   .event-avatar{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border:1px solid rgba(37,33,29,.13);border-radius:8px;background:linear-gradient(180deg,rgba(255,255,255,.78),rgba(255,250,240,.54));color:var(--workspace);box-shadow:inset 0 1px 0 rgba(255,255,255,.86),0 8px 20px rgba(45,36,18,.08);text-align:center}
@@ -268,7 +268,6 @@ __APP_LUCIDE_SCRIPT__
   .event-avatar.roles,.event-avatar.decision_roles{background:linear-gradient(180deg,rgba(37,33,29,.12),rgba(255,250,240,.62));color:var(--workspace)}
   .event-avatar.location,.event-avatar.roadmap_input,.event-avatar.decision_meeting_location{background:linear-gradient(180deg,rgba(18,100,163,.15),rgba(255,250,240,.64));color:var(--slack-blue);border-color:rgba(18,100,163,.18)}
   .event-avatar.retro,.event-avatar.opinion{background:linear-gradient(180deg,rgba(224,30,90,.14),rgba(255,250,240,.64));color:var(--slack-red);border-color:rgba(224,30,90,.18)}
-  .event-avatar.liquid-react-mounted{background:rgba(255,251,241,.16)}
   .card{min-width:0;background:transparent;padding:0}
   .card-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:start;margin-bottom:12px}
   .message-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px}
