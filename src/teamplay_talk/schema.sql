@@ -26,6 +26,12 @@ ALTER TABLE rooms ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 ALTER TABLE rooms ADD COLUMN IF NOT EXISTS purge_after TIMESTAMPTZ;
 ALTER TABLE rooms ADD COLUMN IF NOT EXISTS deleted_by_user_id BIGINT REFERENCES users (id) ON DELETE SET NULL;
 ALTER TABLE rooms ADD COLUMN IF NOT EXISTS delete_reason TEXT;
+ALTER TABLE rooms ADD COLUMN IF NOT EXISTS public_id TEXT;
+UPDATE rooms
+SET public_id = 'r_' || substr(md5(id::text || invite_code || clock_timestamp()::text || random()::text), 1, 16)
+WHERE public_id IS NULL;
+ALTER TABLE rooms ALTER COLUMN public_id SET NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_rooms_public_id ON rooms (public_id);
 CREATE INDEX IF NOT EXISTS idx_rooms_active_invite ON rooms (invite_code) WHERE status = 'active';
 CREATE INDEX IF NOT EXISTS idx_rooms_purge_after ON rooms (purge_after) WHERE status = 'deleting';
 UPDATE rooms SET status = 'active' WHERE status NOT IN ('active', 'deleting');
@@ -123,6 +129,13 @@ ALTER TABLE forms ADD COLUMN IF NOT EXISTS creator_user_id BIGINT REFERENCES use
 ALTER TABLE forms ADD COLUMN IF NOT EXISTS closes_at       TIMESTAMPTZ;    -- 마감 시각(트리거)
 ALTER TABLE forms ADD COLUMN IF NOT EXISTS close_on_all    BOOLEAN NOT NULL DEFAULT FALSE;  -- 전원 응답 시 자동 마감
 ALTER TABLE forms ADD COLUMN IF NOT EXISTS nudge_sent      BOOLEAN NOT NULL DEFAULT FALSE;  -- 드라이버 "확인하세요" 1회 발송
+ALTER TABLE forms ADD COLUMN IF NOT EXISTS public_id       TEXT;
+UPDATE forms
+SET public_id = 'f_' || substr(md5(id::text || room_id::text || clock_timestamp()::text || random()::text), 1, 16)
+WHERE public_id IS NULL;
+ALTER TABLE forms ALTER COLUMN public_id SET NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_forms_public_id ON forms (public_id);
+CREATE INDEX IF NOT EXISTS idx_forms_room_public_id ON forms (room_id, public_id);
 
 ALTER TABLE form_responses ADD COLUMN IF NOT EXISTS member_id    BIGINT REFERENCES users (id) ON DELETE SET NULL;  -- identified면 누구
 ALTER TABLE form_responses ADD COLUMN IF NOT EXISTS answers_json JSONB;    -- SurveyJS 결과 {q1:..., q2:[...]}

@@ -236,7 +236,7 @@ def register(mcp: FastMCP) -> None:
             close_on_all=close_on_all,
         )
         fid = form["id"]
-        base = f"{settings.public_base_url}/form/{fid}"
+        base = f"{settings.public_base_url}{storage.form_public_path(fid)}"
         out: dict[str, Any] = {
             "ok": True,
             "form_id": fid,
@@ -722,7 +722,7 @@ def register(mcp: FastMCP) -> None:
         _caller, form, error = await require_form(form_id)
         if error:
             return error
-        base = f"{settings.public_base_url}/form/{form_id}"
+        base = f"{settings.public_base_url}{storage.form_public_path(form_id)}"
         title, description = _form_feed_copy(form)
         prefix = (message or f"[팀플톡] '{form['title']}' 응답 요청").rstrip()
         room = storage.get_room(form["room_id"])
@@ -747,7 +747,7 @@ def register(mcp: FastMCP) -> None:
                 (sent if status == 200 else failed).append(m["nickname"])
         else:
             for r in storage.list_form_recipients(form_id):
-                url = f"{base}?t={r['invite_token']}"
+                url = f"{settings.public_base_url}{storage.form_public_path(form_id, r['invite_token'])}"
                 status = await kakao_store.send_feed_with_refresh(
                     r,
                     title=title,

@@ -14,6 +14,7 @@
 - 대시보드는 React/liquid-glass 런타임을 주입하지 않도록 최적화했다.
 - Docker 이미지에 `.env`를 굽던 이전 방식은 제거했고, `.dockerignore`에 `.env`를 추가했다.
 - Codex Security diff scan 결과는 high 1건(`Dockerfile COPY .env`)이었고, 현재 main에서는 이미 수정된 상태다.
+- 새 폼/투표 링크는 숫자 id 대신 `/r/{room_public_id}/f/{form_public_id}` 구조를 쓴다. 식별 폼은 `/r/{room_public_id}/f/{form_public_id}/{invite_token}`로 개인 토큰을 path에 붙인다. 기존 `/form/{id}`는 과거 링크 호환용으로 남겨둔다.
 
 핵심 제품 방향은 **"팀원은 응답/실행만, 조율은 AI가 PM처럼"** 이다. 다만 AI 기억에 의존하지 않고 DB의 방/폼/역할/로드맵/todo 상태를 읽어 다음 행동을 이어가게 설계했다.
 

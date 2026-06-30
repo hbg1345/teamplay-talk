@@ -126,7 +126,7 @@ async def _send_identified_form(form_id: int, message: str) -> dict[str, Any]:
         return {"sent_to": [], "failed": [], "count": 0, "error": "form not found"}
     from .tools.feedback import _form_feed_copy
 
-    base = f"{settings.public_base_url}/form/{form_id}"
+    base = f"{settings.public_base_url}{storage.form_public_path(form_id)}"
     title, description = _form_feed_copy(form)
     room = storage.get_room(form["room_id"])
     items = [
@@ -136,7 +136,7 @@ async def _send_identified_form(form_id: int, message: str) -> dict[str, Any]:
     sent: list[str] = []
     failed: list[str] = []
     for recipient in storage.list_form_recipients(form_id):
-        url = f"{base}?t={recipient['invite_token']}"
+        url = f"{settings.public_base_url}{storage.form_public_path(form_id, recipient['invite_token'])}"
         status = await kakao_store.send_feed_with_refresh(
             recipient,
             title=title,

@@ -457,12 +457,23 @@ def _message(title: str, msg: str, status: int = 200) -> HTMLResponse:
 
 def _resolve(request: Request) -> tuple[int | None, int | None]:
     """경로/쿼리에서 form_id + (매직링크면) member_id 를 해석한다."""
-    try:
-        form_id = int(request.path_params["form_id"])
-    except (ValueError, KeyError):
+    form_id: int | None = None
+    if "room_public_id" in request.path_params and "form_public_id" in request.path_params:
+        form = storage.get_form_by_public_ids(
+            str(request.path_params["room_public_id"]),
+            str(request.path_params["form_public_id"]),
+        )
+        if form is not None:
+            form_id = int(form["id"])
+    else:
+        try:
+            form_id = int(request.path_params["form_id"])
+        except (ValueError, KeyError):
+            return None, None
+    if form_id is None:
         return None, None
     member_id = None
-    token = request.query_params.get("t")
+    token = request.path_params.get("invite_token") or request.query_params.get("t")
     if token:
         inv = storage.get_invite(token)
         if inv and inv["form_id"] == form_id:
@@ -531,5 +542,21 @@ async def submit_form(request: Request) -> JSONResponse:
 
 def register_form_routes(mcp) -> None:
     """폼 웹 라우트를 MCP 서버(Starlette)에 등록한다."""
+    mcp.custom_route(
+        "/r/{room_public_id}/f/{form_public_id}",
+        methods=["GET"],
+    )(view_form)
+    mcp.custom_route(
+        "/r/{room_public_id}/f/{form_public_id}",
+        methods=["POST"],
+    )(submit_form)
+    mcp.custom_route(
+        "/r/{room_public_id}/f/{form_public_id}/{invite_token}",
+        methods=["GET"],
+    )(view_form)
+    mcp.custom_route(
+        "/r/{room_public_id}/f/{form_public_id}/{invite_token}",
+        methods=["POST"],
+    )(submit_form)
     mcp.custom_route("/form/{form_id}", methods=["GET"])(view_form)
     mcp.custom_route("/form/{form_id}", methods=["POST"])(submit_form)

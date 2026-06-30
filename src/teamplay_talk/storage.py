@@ -21,6 +21,11 @@ def _generate_invite_code() -> str:
     return secrets.token_urlsafe(6)
 
 
+def _generate_public_id(prefix: str) -> str:
+    """외부 URL에 노출할 난수 id를 생성한다."""
+    return f"{prefix}_{secrets.token_urlsafe(12)}"
+
+
 def create_room(
     name: str,
     owner_nickname: str,
@@ -32,6 +37,7 @@ def create_room(
     Returns: ``{"room": <rooms row>, "owner": <users row>}``
     """
     code = _generate_invite_code()
+    public_id = _generate_public_id("r")
     with conn() as c:
         with c.cursor(row_factory=dict_row) as cur:
             # 방장 사용자 확보 (kakao_id 있으면 재사용, 없으면 신규)
@@ -48,9 +54,9 @@ def create_room(
 
             # 방 생성
             cur.execute(
-                "INSERT INTO rooms (name, owner_id, invite_code, description) "
-                "VALUES (%s, %s, %s, %s) RETURNING *",
-                (name, owner["id"], code, description),
+                "INSERT INTO rooms (name, owner_id, invite_code, public_id, description) "
+                "VALUES (%s, %s, %s, %s, %s) RETURNING *",
+                (name, owner["id"], code, public_id, description),
             )
             room = cur.fetchone()
 
@@ -172,18 +178,42 @@ def create_form(
     """폼(SurveyJS JSON 정의)을 생성하고 forms 행을 반환한다."""
     from psycopg.types.json import Json
 
+    public_id = _generate_public_id("f")
     with conn() as c:
         with c.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 "INSERT INTO forms (room_id, title, description, anonymous, "
-                "schema_json, creator_user_id, closes_at, close_on_all) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING *",
+                "schema_json, creator_user_id, closes_at, close_on_all, public_id) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *",
                 (room_id, title, description, anonymous, Json(schema_json),
-                 creator_user_id, closes_at, close_on_all),
+                 creator_user_id, closes_at, close_on_all, public_id),
             )
             form = cur.fetchone()
         c.commit()
     return form
+
+
+def form_public_path(form_id: int, invite_token: str | None = None) -> str:
+    """외부에 공유할 폼 경로. public id가 없으면 legacy 숫자 경로로 폴백."""
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                "SELECT f.id, f.public_id AS form_public_id, r.public_id AS room_public_id "
+                "FROM forms f JOIN rooms r ON r.id = f.room_id "
+                "WHERE f.id = %s AND r.status = 'active'",
+                (form_id,),
+            )
+            row = cur.fetchone()
+    if row is None:
+        path = f"/form/{form_id}"
+        return f"{path}?t={invite_token}" if invite_token else path
+    room_public_id = row.get("room_public_id")
+    form_public_id = row.get("form_public_id")
+    if not room_public_id or not form_public_id:
+        path = f"/form/{form_id}"
+        return f"{path}?t={invite_token}" if invite_token else path
+    path = f"/r/{room_public_id}/f/{form_public_id}"
+    return f"{path}/{invite_token}" if invite_token else path
 
 
 def get_form(form_id: int) -> dict[str, Any] | None:
@@ -191,9 +221,26 @@ def get_form(form_id: int) -> dict[str, Any] | None:
     with conn() as c:
         with c.cursor(row_factory=dict_row) as cur:
             cur.execute(
-                "SELECT f.* FROM forms f JOIN rooms r ON r.id = f.room_id "
+                "SELECT f.*, r.public_id AS room_public_id "
+                "FROM forms f JOIN rooms r ON r.id = f.room_id "
                 "WHERE f.id = %s AND r.status = 'active'",
                 (form_id,),
+            )
+            return cur.fetchone()
+
+
+def get_form_by_public_ids(
+    room_public_id: str,
+    form_public_id: str,
+) -> dict[str, Any] | None:
+    """외부 URL의 room/form public id로 폼을 조회한다."""
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                "SELECT f.*, r.public_id AS room_public_id "
+                "FROM forms f JOIN rooms r ON r.id = f.room_id "
+                "WHERE r.public_id = %s AND f.public_id = %s AND r.status = 'active'",
+                (room_public_id, form_public_id),
             )
             return cur.fetchone()
 
@@ -204,13 +251,14 @@ def list_room_forms(room_id: int) -> list[dict[str, Any]]:
         with c.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 "SELECT f.id, f.room_id, f.title, f.description, f.anonymous, f.closed, "
-                "f.created_at, f.schema_json, f.creator_user_id, f.closes_at, "
+                "f.created_at, f.public_id, r.public_id AS room_public_id, "
+                "f.schema_json, f.creator_user_id, f.closes_at, "
                 "f.close_on_all, f.nudge_sent, COUNT(fr.id)::int AS total_responses "
                 "FROM forms f "
                 "JOIN rooms r ON r.id = f.room_id "
                 "LEFT JOIN form_responses fr ON fr.form_id = f.id "
                 "WHERE f.room_id = %s AND r.status = 'active' "
-                "GROUP BY f.id "
+                "GROUP BY f.id, r.public_id "
                 "ORDER BY f.created_at DESC",
                 (room_id,),
             )
