@@ -441,6 +441,51 @@ def _report_summary(
     return "\n".join(lines)
 
 
+def _daily_report_kakao_text(message: str, link: str) -> str:
+    return f"{message.rstrip()}\n\n대시보드: {link}"
+
+
+def _split_kakao_text(text: str, *, limit: int = 180) -> list[str]:
+    """Split Kakao text-template content conservatively by line boundaries."""
+    clean = text.strip()
+    if len(clean) <= limit:
+        return [clean]
+
+    chunks: list[str] = []
+    current = ""
+    for line in clean.splitlines():
+        line = line.rstrip()
+        if not line:
+            if current and len(current) + 1 <= limit:
+                current += "\n"
+            continue
+        if len(line) > limit:
+            if current.strip():
+                chunks.append(current.strip())
+                current = ""
+            for i in range(0, len(line), limit):
+                chunks.append(line[i:i + limit])
+            continue
+        candidate = f"{current}\n{line}" if current else line
+        if len(candidate) <= limit:
+            current = candidate
+        else:
+            if current.strip():
+                chunks.append(current.strip())
+            current = line
+    if current.strip():
+        chunks.append(current.strip())
+    return chunks
+
+
+def _numbered_kakao_chunks(text: str) -> list[str]:
+    chunks = _split_kakao_text(text, limit=155)
+    if len(chunks) == 1:
+        return chunks
+    total = len(chunks)
+    return [f"[팀플톡 데일리 리포트 {idx}/{total}]\n{chunk}" for idx, chunk in enumerate(chunks, 1)]
+
+
 def build_daily_report_for_room(
     room_id: int,
     *,
@@ -563,22 +608,40 @@ async def send_daily_report(room_id: int, message: str) -> dict[str, Any]:
 
     room = storage.get_room(room_id)
     sent: list[str] = []
-    failed: list[str] = []
+    failed: list[dict[str, Any]] = []
+    chunked: list[dict[str, Any]] = []
     for member in kakao_store.list_members_with_tokens(room_id):
         token = create_dashboard_token(room_id, member["id"])
         link = f"{settings.public_base_url}/dashboard/rooms/{room_id}?token={token}"
-        first_line = next((line.strip() for line in message.splitlines() if line.strip()), "팀 상태를 확인하세요.")
-        status = await kakao_store.send_feed_with_refresh(
-            member,
-            title=f"데일리 리포트 · {room['name'] if room else room_id}",
-            description=first_line,
-            link_url=link,
-            button_title="리포트 보기",
-            items=[("방", room["name"] if room else str(room_id)), ("보기", "대시보드")],
-            fallback_text=f"{message}\n\n{link}",
-        )
-        (sent if status == 200 else failed).append(member["nickname"])
-    return {"sent_to": sent, "failed": failed, "count": len(sent)}
+        text = _daily_report_kakao_text(message, link)
+        status = await kakao_store.send_with_refresh(member, text, link_url=link)
+        if status == 200:
+            sent.append(member["nickname"])
+            continue
+
+        # Kakao text templates can reject long text. Retry as readable chunks
+        # so the report still arrives in KakaoTalk instead of becoming a link-only notice.
+        chunks = _numbered_kakao_chunks(text)
+        chunk_statuses = [
+            await kakao_store.send_with_refresh(member, chunk, link_url=link)
+            for chunk in chunks
+        ]
+        if chunk_statuses and all(s == 200 for s in chunk_statuses):
+            sent.append(member["nickname"])
+            chunked.append({"nickname": member["nickname"], "chunks": len(chunks)})
+        else:
+            failed.append({
+                "nickname": member["nickname"],
+                "initial_status": status,
+                "chunk_statuses": chunk_statuses,
+            })
+    return {
+        "sent_to": sent,
+        "failed": failed,
+        "chunked": chunked,
+        "count": len(sent),
+        "delivery_mode": "text_full_or_chunked",
+    }
 
 
 def register(mcp: FastMCP) -> None:
