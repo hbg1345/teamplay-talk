@@ -40,7 +40,7 @@ __APP_REACT_LIQUID_IMPORTS__
  .sd-container-modern{background:transparent!important}
  .sd-body,.sd-page{background:transparent!important}
  .sd-title{color:var(--ink)!important;font-weight:850;letter-spacing:0}
- .sd-description,.sd-question__description{color:var(--muted);line-height:1.55}
+ .sd-description,.sd-question__description{color:var(--muted);line-height:1.55;white-space:pre-line}
  .sd-header__text{max-width:920px;margin:0 auto}
  .sd-container-modern__title{position:relative!important;box-shadow:none!important;border:0!important;margin:0 auto 28px!important;padding:0 0 24px!important}
  .sd-container-modern__title:after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:linear-gradient(90deg,transparent,rgba(37,33,29,.22) 14%,rgba(254,229,0,.22) 50%,rgba(37,33,29,.18) 86%,transparent);box-shadow:0 1px 0 rgba(255,255,255,.72)}

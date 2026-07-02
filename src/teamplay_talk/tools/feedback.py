@@ -157,11 +157,67 @@ def _form_feed_copy(form: dict[str, Any]) -> tuple[str, str]:
         "meeting_time": "가능한 시간은 O, 절대 안 되는 시간은 X로 표시해주세요.",
         "location": "선호하는 약속 장소 후보만 한 칸에 하나씩 적어주세요.",
         "daily_checkin": "밀린 일과 오늘 끝낸 일을 체크하고, 필요한 메모만 남겨주세요.",
-        "roadmap_decision": "로드맵에 반영할 의견을 짧게 남겨주세요.",
+        "roadmap_decision": _compact_text(
+            str(schema.get("_kakao_description") or schema.get("description") or "로드맵에 반영할 의견을 짧게 남겨주세요."),
+            limit=220,
+        ),
     }
     return str(form.get("title") or "팀플톡 폼"), descriptions.get(
         str(workflow), "팀 의사결정을 위해 짧게 응답해주세요."
     )
+
+
+def _compact_text(value: str, *, limit: int = 160) -> str:
+    text = " ".join(str(value or "").split())
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 1)].rstrip() + "…"
+
+
+def _format_date_range(task: dict[str, Any]) -> str:
+    start = task.get("start_at")
+    end = task.get("end_at")
+    if not start and not end:
+        return ""
+    left = start.date().isoformat() if hasattr(start, "date") else str(start)[:10]
+    right = end.date().isoformat() if hasattr(end, "date") else str(end)[:10]
+    if left and right and left != right:
+        return f" ({left}~{right})"
+    return f" ({left or right})"
+
+
+def _task_opinion_context(room_id: int, scope: str) -> tuple[str, str, list[str]]:
+    roadmap = storage.get_roadmap(room_id)
+    tasks = roadmap.get("tasks", [])
+    milestones = [t for t in tasks if (t.get("task_type") or "milestone") == "milestone"]
+    todos = [t for t in tasks if (t.get("task_type") or "milestone") == "todo"]
+    milestone_lines = [
+        f"{idx}. {str(t.get('title') or '').strip()}{_format_date_range(t)}"
+        for idx, t in enumerate(milestones[:8], start=1)
+        if str(t.get("title") or "").strip()
+    ]
+    if not milestone_lines:
+        context = "아직 저장된 로드맵이 없습니다. 이번 프로젝트에 필요하다고 생각하는 큰 단계와 이유를 적어주세요."
+        return context, "아직 저장된 로드맵이 없습니다. 필요한 큰 단계와 이유를 적어주세요.", []
+
+    lead_by_scope = {
+        "roadmap": "아래 현재 로드맵을 보고 추가/수정/삭제하면 좋을 단계를 적어주세요.",
+        "todo": "아래 현재 로드맵을 보고 각 단계에서 실제로 해야 할 일을 적어주세요.",
+        "blockers": "아래 현재 로드맵을 보고 막힌 점이나 도움이 필요한 부분을 적어주세요.",
+        "scope": "아래 현재 로드맵을 보고 유지/줄임/추가할 범위를 적어주세요.",
+    }
+    lines = [lead_by_scope.get(scope, lead_by_scope["roadmap"]), "", "현재 로드맵:"]
+    lines.extend(milestone_lines)
+    if scope == "todo" and todos:
+        lines.extend(["", "현재 실행 todo 일부:"])
+        lines.extend(
+            f"- {str(t.get('title') or '').strip()}{_format_date_range(t)}"
+            for t in todos[:8]
+            if str(t.get("title") or "").strip()
+        )
+    context = "\n".join(lines)
+    kakao = "현재 로드맵: " + " · ".join(line.split(". ", 1)[-1] for line in milestone_lines[:5])
+    return context, kakao, [line.split(". ", 1)[-1] for line in milestone_lines]
 
 
 def register(mcp: FastMCP) -> None:
@@ -544,6 +600,7 @@ def register(mcp: FastMCP) -> None:
             "scope": "이번 프로젝트 범위에서 유지/줄임/추가할 것을 적어주세요.",
         }
         title = prompt or titles[scope]
+        context_text, kakao_description, context_milestones = _task_opinion_context(room_id, scope)
         elements_by_scope: dict[str, list[dict[str, Any]]] = {
             "roadmap": [
                 {
@@ -622,16 +679,21 @@ def register(mcp: FastMCP) -> None:
         }
         schema = {
             "title": title,
+            "description": context_text,
             "completeText": "제출",
             "showQuestionNumbers": "off",
             "elements": elements_by_scope[scope],
             "_workflow_kind": "roadmap_decision",
             "_workflow_scope": scope,
+            "_context_milestones": context_milestones,
+            "_kakao_description": kakao_description,
+            "_message_context": context_text,
         }
         form = storage.create_form(
             room_id=room_id,
             title=title,
             schema_json=schema,
+            description=context_text,
             anonymous=anonymous,
             creator_user_id=caller["id"],
             closes_at=closes_at,
@@ -644,6 +706,8 @@ def register(mcp: FastMCP) -> None:
             "ok": True,
             "form_id": fid,
             "scope": scope,
+            "context": context_text,
+            "context_milestones": context_milestones,
             "anonymous": anonymous,
             "sent": False,
             "required_next_tool": "send_form",
@@ -667,8 +731,8 @@ def register(mcp: FastMCP) -> None:
                 "정리한 항목을 로드맵에 반영해줘",
             ],
             "chat_response_hint": (
-                "내부 도구명은 말하지 말고, "
-                "'이 의견 폼을 팀원들에게 보내드릴까요?'처럼 자연어로 다음 행동을 물어보세요."
+                "내부 도구명은 말하지 말고, 이 의견 폼에는 현재 로드맵 요약이 포함되어 있다고 짧게 말하세요. "
+                "'로드맵을 같이 볼 수 있게 넣어둔 의견 폼을 팀원들에게 보내드릴까요?'처럼 자연어로 다음 행동을 물어보세요."
             ),
         }
 
@@ -757,6 +821,8 @@ def register(mcp: FastMCP) -> None:
             return error
         base = f"{settings.public_base_url}{storage.form_public_path(form_id)}"
         title, description = _form_feed_copy(form)
+        schema = form.get("schema_json") or {}
+        fallback_description = str(schema.get("_message_context") or description)
         prefix = (message or f"[팀플톡] '{form['title']}' 응답 요청").rstrip()
         room = storage.get_room(form["room_id"])
         items = [
@@ -775,7 +841,7 @@ def register(mcp: FastMCP) -> None:
                     link_url=base,
                     button_title="폼 열기",
                     items=items,
-                    fallback_text=f"{prefix}\n{description}\n{base}",
+                    fallback_text=f"{prefix}\n{fallback_description}\n{base}",
                 )
                 (sent if status == 200 else failed).append(m["nickname"])
         else:
@@ -788,7 +854,7 @@ def register(mcp: FastMCP) -> None:
                     link_url=url,
                     button_title="내 링크 열기",
                     items=items,
-                    fallback_text=f"{prefix}\n{description}\n{url}",
+                    fallback_text=f"{prefix}\n{fallback_description}\n{url}",
                 )
                 (sent if status == 200 else failed).append(r["nickname"])
 
