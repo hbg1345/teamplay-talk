@@ -102,7 +102,8 @@ def _missing_required_args(tool: Any, args: dict[str, Any]) -> list[str]:
 def _filter_args_for_tool(tool: Any, args: dict[str, Any]) -> dict[str, Any]:
     allowed = _tool_arg_names(tool)
     cleaned = _clean_args(args)
-    if not allowed:
+    parameters = getattr(tool, "parameters", None)
+    if parameters is None:
         return cleaned
     return {key: value for key, value in cleaned.items() if key in allowed}
 
