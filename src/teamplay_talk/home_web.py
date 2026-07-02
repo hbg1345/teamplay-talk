@@ -109,9 +109,10 @@ h2{font-size:clamp(28px,4.4vw,44px)}
 @keyframes cdIn{to{opacity:1;transform:none}}
 /* News+ 식 도크: 한 줄 캡슐 + 분리된 원형 버튼 */
 .cd-dock{display:flex;align-items:stretch;gap:10px}
-.cd-bar{flex:1;min-width:0;display:flex;align-items:center;padding:6px;border-radius:999px;overflow-x:auto;scrollbar-width:none}
-.cd-bar::-webkit-scrollbar{display:none}
-.demo-chips{display:flex;flex-wrap:nowrap;gap:3px;margin:0}
+.cd-bar{flex:1;min-width:0;position:relative;padding:6px;border-radius:999px;overflow:hidden}
+.cd-bar::after{content:"";position:absolute;top:1px;bottom:1px;right:1px;width:36px;border-radius:0 999px 999px 0;pointer-events:none;background:linear-gradient(90deg,rgba(247,244,252,0),rgba(247,244,252,.9))}
+.demo-chips{display:flex;flex-wrap:nowrap;gap:3px;margin:0;overflow-x:auto;scrollbar-width:none}
+.demo-chips::-webkit-scrollbar{display:none}
 .demo-chip{flex:none;display:flex;align-items:center;gap:7px;padding:9px 14px;border-radius:999px;font-size:13px;font-weight:600;color:var(--ink-soft);background:transparent;border:0;cursor:pointer;white-space:nowrap;transition:color .18s,background .18s;font-family:inherit}
 .demo-chip .ci{width:16px;height:16px;flex:none}
 .demo-chip .ci svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
@@ -170,8 +171,9 @@ h2{font-size:clamp(28px,4.4vw,44px)}
 .maker .face{width:82px;height:82px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;color:#fff;background:var(--violet)}
 .maker.b .face{background:var(--violet-2)}
 .maker h3{font-size:19px}
-.maker .role{font-size:13px;font-weight:700;color:var(--violet);margin-top:2px}
-.maker p{color:var(--muted);font-size:13.8px;margin:8px 0 0}
+.maker .cred{list-style:none;margin:9px 0 0;padding:0;display:flex;flex-direction:column;gap:5px}
+.maker .cred li{font-size:13px;color:var(--muted);line-height:1.4}
+.maker .cred li b{color:var(--ink);font-weight:700}
 
 /* ── 연결 CTA ── */
 .connect{padding:60px min(6vw,72px);border-radius:28px;text-align:center;position:relative;overflow:hidden;background:var(--card)}
@@ -224,6 +226,7 @@ const CD=[
  [{r:'user',t:'역할 좀 나눠줘'},
   {r:'ai',t:'<b>4개 역할</b>(기획·개발·디자인·문서)로 나눴어요. 선호 순위 받을까요?'},
   {r:'user',t:'ㅇㅇ'},
+  {r:'ai',t:'팀원들 <b>선호 순위</b>를 받았어요. 이제 배정할게요.'},
   {r:'ai',t:'선호·난이도 균형으로 배정했어요.<br>세원 <b>기획</b> · 봉구 <b>개발</b> · 지윤 <b>디자인</b> · 민아 <b>문서</b><br>확정하고 공지했어요.'}],
  [{r:'user',t:'회식 메뉴 정하자'},
   {r:'ai',t:'후보 4개로 <b>익명 투표</b>를 만들었어요. 보낼까요?'},
@@ -435,17 +438,32 @@ def _page() -> str:
     <div class="sec-head rv">
       <span class="eyebrow">Makers</span>
       <h2>만든 사람들</h2>
-      <p>둘이서 만들었습니다. 팀플이 굴러가게 하는 데 진심입니다.</p>
+      <p>역할을 나누기보다, 기획부터 개발까지 둘이 함께 만들었습니다.</p>
     </div>
     <div class="makers">
-      <!-- TODO: 소개 문장 보강 + 소셜 링크는 실제 URL 확보 후 추가 -->
       <div class="maker card rv d1 a">
         <div class="face">박</div>
-        <div><h3>박세원</h3><div class="role">Product · PM</div><p>제품 기획과 워크플로우 설계를 맡았습니다.</p></div>
+        <div>
+          <h3>박세원</h3>
+          <ul class="cred">
+            <li><b>University of Seoul</b> · B.Eng. Transportation Eng.</li>
+            <li><b>Arthur D. Little</b> · Strategy Consulting Intern</li>
+            <li><b>CnerG</b> · Analyst Intern</li>
+            <li><b>Campus Startup Camp</b> · 3rd of 40+ teams</li>
+          </ul>
+        </div>
       </div>
       <div class="maker card rv d2 b">
         <div class="face">함</div>
-        <div><h3>함봉구</h3><div class="role">Engineering</div><p>MCP 서버와 인증·인프라를 맡았습니다.</p></div>
+        <div>
+          <h3>함봉구</h3>
+          <ul class="cred">
+            <li><b>KAIST</b> · B.S. School of Computing</li>
+            <li><b>Kaggle</b> · Orbit Wars Silver Medalist</li>
+            <li><b>Plask Corp.</b> · Prompt Engineering Intern</li>
+            <li><b>SCPC 2025</b> · Finalist</li>
+          </ul>
+        </div>
       </div>
     </div>
   </div>
