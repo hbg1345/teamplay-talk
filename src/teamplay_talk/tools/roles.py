@@ -67,13 +67,21 @@ def _role_suggestions_from_roadmap(tasks: list[dict[str, Any]]) -> list[dict[str
 
     if any(k in text for k in ["주제", "아이디어", "기획", "브레인스토밍"]):
         add("기획·PM", 7)
+    if any(k in text for k in ["빵", "소보로", "레시피", "재료", "식품", "조리", "시제품", "포장", "생산", "양산"]):
+        add("레시피·품질 설계", 7)
+        add("재료·구매 관리", 5)
+        add("제조·시제품 운영", 8)
+    if any(k in text for k in ["피드백", "개선", "검증", "테스트", "맛", "품질", "위생"]):
+        add("테스트·품질 개선", 6)
+    if any(k in text for k in ["시현", "발표", "포장", "마무리", "데모"]):
+        add("시현·발표 운영", 5)
     if any(k in text for k in ["MCP", "서버", "API", "프로토타입", "개발", "구현"]):
         add("MCP 서버·도구 구현", 9)
     if any(k in text for k in ["카카오", "OAuth", "토큰", "캘린더", "지도", "연동", "MCP", "API"]):
         add("카카오 API·OAuth 연동", 8)
     if any(k in text for k in ["폼", "대시보드", "UX", "UI", "SurveyJS"]):
         add("폼·대시보드 UX", 6)
-    if any(k in text for k in ["테스트", "피드백", "QA", "검증"]):
+    if any(k in text for k in ["테스트", "피드백", "QA", "검증"]) and not any("테스트" in s["name"] for s in suggestions):
         add("테스트·QA", 6)
     if any(k in text for k in ["문서", "발표", "제출", "데모"]):
         add("문서·데모·발표", 5)
@@ -208,7 +216,7 @@ def register(mcp: FastMCP) -> None:
         },
     )
     async def assign_roles(
-        roles: list[Role],
+        roles: list[Role] | None = None,
         room_id: int | None = None,
         close_minutes: int | None = 1440,
     ) -> dict[str, Any]:
@@ -242,21 +250,30 @@ def register(mcp: FastMCP) -> None:
         set_roles. ※ (1)(2) 확인 없이 send_form/set_roles 하지 말 것.
 
         Args:
-            roles: **AI가 생성한** 역할+난이도 목록
+            roles: **AI가 생성한** 역할+난이도 목록. 생략하면 현재 로드맵에서 워크스트림 역할을 자동 추천한다.
             room_id: 대상 방 (생략 시 현재 작업 방)
             close_minutes: 마감까지 분 (기본 1440=1일; 전원 응답 시엔 더 일찍 자동 마감)
         """
-        if len(roles) < 2:
-            return {"ok": False, "error": "역할을 2개 이상 직접 생성해서 넘겨주세요(사용자에게 묻지 말 것)."}
         caller, room, error = await require_room(room_id)
         if error:
             return error
         room_id = room["id"]
+        roadmap = storage.get_roadmap(room_id)
+        generated_from_roadmap = False
+        if not roles:
+            suggestions = _role_suggestions_from_roadmap(roadmap.get("tasks", []))
+            roles = [Role(**suggestion) for suggestion in suggestions]
+            generated_from_roadmap = True
+        if len(roles) < 2:
+            return {
+                "ok": False,
+                "error": "역할을 2개 이상 구성할 수 없습니다. 먼저 로드맵을 만들거나 프로젝트 주제를 더 구체화하세요.",
+                "roadmap_task_titles": [t.get("title") for t in roadmap.get("tasks", [])],
+            }
 
         names = [r.name for r in roles]
         difficulties = {r.name: r.difficulty for r in roles}
         slots = {r.name: r.slots for r in roles}
-        roadmap = storage.get_roadmap(room_id)
         invalid = _validate_role_names(names, roadmap)
         if invalid is not None:
             return invalid
@@ -310,6 +327,8 @@ def register(mcp: FastMCP) -> None:
             "roles": names,  # 역할 이름만 — 난이도는 내부 균형값이라 노출 X
             "role_slots": slots,
             "total_role_slots": sum(slots.values()),
+            "generated_from_roadmap": generated_from_roadmap,
+            "roadmap_task_titles": [t.get("title") for t in roadmap.get("tasks", [])],
             "members": [m["nickname"] for m in members],
             "closes_in_minutes": close_minutes,
             "sent": False,
@@ -328,8 +347,9 @@ def register(mcp: FastMCP) -> None:
                 "이 배정안으로 역할 확정하고 공지해줘",
             ],
             "chat_response_hint": (
-                "내부 도구명은 말하지 말고, 역할 목록과 필요한 인원을 "
-                "팀장에게 보여준 뒤 '이대로 선호도 조사를 보낼까요?'처럼 자연어로 확인을 받으세요."
+                "내부 도구명은 말하지 말고, 현재 로드맵을 참고해 만든 워크스트림 역할 목록과 필요한 인원을 "
+                "팀장에게 보여준 뒤 '이대로 선호도 조사를 보낼까요?'처럼 자연어로 확인을 받으세요. "
+                "로드맵 단계명을 역할로 쓰지 않았다는 점을 짧게 설명하세요."
             ),
         }
 

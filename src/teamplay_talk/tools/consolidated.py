@@ -13,6 +13,9 @@ from typing import Any, Literal
 
 from fastmcp import FastMCP
 
+from .. import storage
+from .guards import require_room
+
 
 LegacyTools = dict[str, Any]
 
@@ -80,6 +83,10 @@ CONSOLIDATED_GROUPS: dict[str, list[str]] = {
         "calendar_delete_event",
     ],
 }
+
+
+def _iso(value: Any) -> str | None:
+    return value.isoformat() if hasattr(value, "isoformat") else (str(value) if value else None)
 
 
 def _clean_args(values: dict[str, Any]) -> dict[str, Any]:
@@ -150,6 +157,139 @@ def _publicize_next_tool(data: Any) -> Any:
     return out
 
 
+def _workflow_label(schema: dict[str, Any]) -> str:
+    workflow = str(schema.get("_workflow_kind") or "")
+    scope = str(schema.get("_workflow_scope") or "")
+    if workflow == "roadmap_decision":
+        labels = {
+            "roadmap": "로드맵 의견",
+            "todo": "todo 의견",
+            "blockers": "병목 의견",
+            "scope": "스코프 의견",
+        }
+        return labels.get(scope, "로드맵/todo 의견")
+    if workflow == "role_assignment":
+        return "역할분배"
+    if workflow == "meeting_time":
+        return "회의 시간"
+    if workflow == "location":
+        return "약속 장소"
+    if workflow == "daily_checkin":
+        return "데일리 체크인"
+    return "일반 폼/투표"
+
+
+def _form_summary(form: dict[str, Any]) -> dict[str, Any]:
+    schema = form.get("schema_json") or {}
+    return {
+        "form_id": form["id"],
+        "title": form["title"],
+        "status": "closed" if form.get("closed") else "active",
+        "kind": _workflow_label(schema),
+        "workflow_kind": schema.get("_workflow_kind"),
+        "workflow_scope": schema.get("_workflow_scope"),
+        "responses": int(form.get("total_responses") or 0),
+        "anonymous": bool(form.get("anonymous")),
+        "created_at": _iso(form.get("created_at")),
+        "closes_at": _iso(form.get("closes_at")),
+    }
+
+
+def _matches_form(form: dict[str, Any], query: str | None) -> bool:
+    if not query:
+        return True
+    schema = form.get("schema_json") or {}
+    haystack = " ".join(
+        str(part or "")
+        for part in [
+            form.get("title"),
+            form.get("description"),
+            schema.get("title"),
+            schema.get("description"),
+            schema.get("_workflow_kind"),
+            schema.get("_workflow_scope"),
+            _workflow_label(schema),
+        ]
+    ).lower()
+    return all(token in haystack for token in str(query).lower().split())
+
+
+async def _list_forms(
+    room_id: int | None,
+    *,
+    status: str = "active",
+    query: str | None = None,
+    limit: int = 12,
+) -> dict[str, Any]:
+    _caller, room, error = await require_room(room_id)
+    if error:
+        return error
+    forms = [
+        form for form in storage.list_room_forms(room["id"])
+        if (status == "all" or (status == "closed") == bool(form.get("closed")))
+        and _matches_form(form, query)
+    ]
+    summaries = [_form_summary(form) for form in forms[:limit]]
+    active_count = sum(1 for form in storage.list_room_forms(room["id"]) if not form.get("closed"))
+    return {
+        "ok": True,
+        "room_id": room["id"],
+        "room_name": room["name"],
+        "status_filter": status,
+        "query": query,
+        "forms": summaries,
+        "count": len(summaries),
+        "total_matching": len(forms),
+        "active_count": active_count,
+        "next": (
+            "진행중인 폼을 확인했습니다. 닫거나 결과를 볼 폼은 제목 또는 form_id로 지정하세요."
+            if summaries
+            else "조건에 맞는 폼이 없습니다."
+        ),
+        "suggested_next_actions": [
+            "특정 폼 결과 확인하기",
+            "응답이 끝난 폼 마감하기",
+            "새 의견수렴 또는 역할분배 이어가기",
+        ],
+        "chat_response_hint": (
+            "대시보드 링크로만 안내하지 말고 forms 목록의 form_id, 제목, 상태, 응답 수를 바로 요약하세요. "
+            "마감/결과 확인이 필요하면 사용자가 제목으로 말해도 된다고 안내하세요."
+        ),
+    }
+
+
+async def _resolve_form_id(
+    room_id: int | None,
+    *,
+    form_id: int | None,
+    query: str | None,
+    status: str,
+    action: str,
+) -> tuple[int | None, dict[str, Any] | None]:
+    if form_id is not None:
+        return form_id, None
+    _caller, room, error = await require_room(room_id)
+    if error:
+        return None, error
+    forms = [
+        form for form in storage.list_room_forms(room["id"])
+        if (status == "all" or (status == "closed") == bool(form.get("closed")))
+        and _matches_form(form, query)
+    ]
+    if len(forms) == 1:
+        return int(forms[0]["id"]), None
+    return None, {
+        "ok": False,
+        "error": "대상 폼을 하나로 특정할 수 없습니다." if forms else "조건에 맞는 폼이 없습니다.",
+        "needs_form_selection": True,
+        "action": action,
+        "query": query,
+        "forms": [_form_summary(form) for form in forms[:12]],
+        "next": "아래 목록에서 form_id나 제목을 지정해 다시 요청하세요.",
+        "chat_response_hint": "사용자에게 후보 폼 목록을 보여주고, 어떤 폼을 마감/조회할지 확인하세요.",
+    }
+
+
 async def _run_legacy(tools: LegacyTools, name: str, args: dict[str, Any]) -> Any:
     tool = tools[name]
     call_args = _filter_args_for_tool(tool, args)
@@ -178,7 +318,7 @@ def _missing_next_hint(name: str, missing: list[str]) -> str:
             "4~6개의 milestone을 직접 구성해 tasks에 넣어 다시 시도하세요."
         )
     if name == "assign_roles" and "roles" in missing:
-        return "역할분배를 시작하려면 프로젝트에 필요한 역할 목록을 먼저 구성해 roles에 넣어 다시 시도하세요."
+        return "현재 로드맵을 기준으로 워크스트림 역할 후보를 생성해 role_manage(action='start')로 다시 시도하세요."
     if name in {"send_form", "get_poll_results", "close_poll", "finalize_roles", "apply_daily_checkin"}:
         return "대상 form_id를 확인한 뒤 다시 시도하세요."
     return "빠진 값을 채운 뒤 다시 시도하세요."
@@ -233,17 +373,38 @@ def install(mcp: FastMCP) -> None:
         },
     )
     async def form_manage(
-        action: Literal["send", "results", "close"],
-        form_id: int,
+        action: Literal["list", "send", "results", "close", "cancel"],
+        form_id: int | None = None,
+        query: str | None = None,
+        status: Literal["active", "closed", "all"] = "active",
+        room_id: int | None = None,
         message: str | None = None,
     ) -> dict[str, Any]:
-        """Send, read results, or close an existing teamplay-talk(팀플톡) form/poll."""
+        """List, send, read results, or close an existing teamplay-talk(팀플톡) form/poll.
+
+        Use action='list' when the user asks what polls/forms are currently running.
+        For send/results/close, form_id is best. If unknown, pass query/title and this
+        hub will resolve the matching form in the current room.
+        """
+        if action == "list":
+            return await _list_forms(room_id, status=status, query=query)
+        lookup_status = "all" if action == "results" and status == "active" else status
+        resolved_form_id, resolve_error = await _resolve_form_id(
+            room_id,
+            form_id=form_id,
+            query=query,
+            status=lookup_status,
+            action=action,
+        )
+        if resolve_error is not None:
+            return resolve_error
         target = {
             "send": "send_form",
             "results": "get_poll_results",
             "close": "close_poll",
+            "cancel": "close_poll",
         }[action]
-        return await _run_legacy(legacy, target, {"form_id": form_id, "message": message})
+        return await _run_legacy(legacy, target, {"form_id": resolved_form_id, "message": message})
 
     @mcp.tool(
         name="role_manage",
