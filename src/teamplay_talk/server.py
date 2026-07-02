@@ -79,6 +79,8 @@ mcp = FastMCP(
         "카카오맵/지도 도구가 보이지 않으면 '카카오맵 MCP가 있으면 장소명/주소 확인이 더 정확해지고, 지금은 제출된 텍스트 기준으로 후보를 정리해 투표할 수 있다'고 안내한 뒤 제출 후보만 정규화해 create_poll로 본투표를 만든다. "
         "⑤ 폼 배포는 notify_room이 아니라 form_manage(action=send). "
         "⑥ 로드맵/할일은 한 번에 끝내지 말고 계속 루프로 관리한다: "
+        "로드맵 적절성/마일스톤 수정/todo/병목/스코프 의견을 받을 때는 일반 gather_opinions가 아니라 gather_task_opinions(scope='roadmap'|'todo'|'blockers'|'scope')를 우선 사용하라. "
+        "이 전용 폼은 카카오톡 미리보기와 폼 상단에 현재 로드맵 스냅샷을 함께 넣어 팀원이 무엇을 보고 의견 내는지 알 수 있게 한다. "
         "gather_task_opinions(scope='roadmap'|'todo'|'blockers'|'scope') → form_manage(action=send) → form_manage(action=results) → "
         "AI가 중복 표현을 합쳐 태스크/담당/마감/리스크 후보로 정규화 → roadmap_manage(action=decompose) 또는 task_manage(action=add/update) 또는 create_poll 우선순위 투표 → "
         "roadmap_manage(action=member_tasks)로 개인별 할일 확인 → roadmap_manage(action=digest)/캘린더. "

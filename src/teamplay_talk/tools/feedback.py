@@ -220,6 +220,30 @@ def _task_opinion_context(room_id: int, scope: str) -> tuple[str, str, list[str]
     return context, kakao, [line.split(". ", 1)[-1] for line in milestone_lines]
 
 
+def _infer_task_opinion_scope(text: str | None) -> str | None:
+    haystack = str(text or "").lower()
+    if any(token in haystack for token in ("막힌", "병목", "리스크", "blocker")):
+        return "blockers"
+    if any(token in haystack for token in ("스코프", "범위", "줄이", "빼도", "추가할")):
+        return "scope"
+    if any(token in haystack for token in ("todo", "to-do", "할일", "할 일", "태스크", "작업")):
+        return "todo"
+    if any(token in haystack for token in ("로드맵", "마일스톤", "milestone")):
+        return "roadmap"
+    return None
+
+
+def _attach_task_opinion_context(schema: dict[str, Any], room_id: int, scope: str) -> str:
+    context, kakao, milestones = _task_opinion_context(room_id, scope)
+    schema["description"] = context
+    schema["_workflow_kind"] = "roadmap_decision"
+    schema["_workflow_scope"] = scope
+    schema["_context_milestones"] = milestones
+    schema["_kakao_description"] = kakao
+    schema["_message_context"] = context
+    return context
+
+
 def register(mcp: FastMCP) -> None:
     """의견 수렴 도메인 도구를 등록한다."""
 
@@ -281,11 +305,19 @@ def register(mcp: FastMCP) -> None:
 
             closes_at = datetime.now(timezone.utc) + timedelta(minutes=int(close_minutes))
 
+        inferred_scope = _infer_task_opinion_scope(
+            " ".join([title, description or "", *[q.title for q in questions]])
+        )
+        schema = _to_surveyjs(title, description, questions)
+        context_description = description
+        if inferred_scope:
+            context_description = _attach_task_opinion_context(schema, room_id, inferred_scope)
+
         form = storage.create_form(
             room_id=room_id,
             title=title,
-            schema_json=_to_surveyjs(title, description, questions),
-            description=description,
+            schema_json=schema,
+            description=context_description,
             anonymous=anonymous,
             creator_user_id=creator_id,
             closes_at=closes_at,
@@ -299,6 +331,8 @@ def register(mcp: FastMCP) -> None:
             "title": title,
             "anonymous": anonymous,
             "question_count": len(questions),
+            "context_attached": bool(inferred_scope),
+            "workflow_scope": inferred_scope,
             "sent": False,
             "required_next_tool": "send_form",
             "send_form_arguments": {"form_id": fid},
@@ -311,6 +345,7 @@ def register(mcp: FastMCP) -> None:
             ],
             "chat_response_hint": (
                 "폼은 아직 발송되지 않았습니다. 내부 도구명은 말하지 말고, "
+                "로드맵/todo 관련 폼이면 현재 로드맵 요약을 포함했다고 말하세요. "
                 "'이 폼을 팀원들에게 보내드릴까요?'처럼 자연어로 다음 행동을 물어보세요."
             ),
         }
@@ -379,10 +414,15 @@ def register(mcp: FastMCP) -> None:
                 {"type": "comment", "name": "opinion", "title": question, "isRequired": True}
             ],
         }
+        inferred_scope = _infer_task_opinion_scope(question)
+        context_description = None
+        if inferred_scope:
+            context_description = _attach_task_opinion_context(schema, room_id, inferred_scope)
         form = storage.create_form(
             room_id=room_id,
             title=question,
             schema_json=schema,
+            description=context_description,
             anonymous=anonymous,
             creator_user_id=caller["id"],
             closes_at=closes_at,
@@ -395,6 +435,8 @@ def register(mcp: FastMCP) -> None:
             "ok": True,
             "form_id": fid,
             "stage": "1/2 (의견수렴)",
+            "context_attached": bool(inferred_scope),
+            "workflow_scope": inferred_scope,
             "sent": False,
             "required_next_tool": "send_form",
             "send_form_arguments": {"form_id": fid},
@@ -411,6 +453,7 @@ def register(mcp: FastMCP) -> None:
             ],
             "chat_response_hint": (
                 "내부 도구명은 말하지 말고, "
+                "로드맵/todo 관련 의견 폼이면 현재 로드맵 요약이 포함되어 있다고 말하세요. "
                 "'의견 폼을 만들었고 아직 발송 전입니다. 팀원들에게 보내드릴까요?'처럼 자연어로 안내하세요."
             ),
         }
