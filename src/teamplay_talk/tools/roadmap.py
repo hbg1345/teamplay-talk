@@ -287,20 +287,30 @@ def _format(roadmap: dict[str, Any]) -> dict[str, Any]:
     # PlayMCP가 곧장 todo/캘린더로 건너뛰지 않는다.
     has_roles = any(m.get("role") for m in roadmap.get("members", []))
     if not has_roles:
+        workflow_state = "roadmap_created_roles_missing"
         roadmap_next = (
-            "로드맵 단계가 잡혔습니다. 다음은 이 로드맵에 대한 팀 의견을 모아 수정하거나, "
-            "마일스톤을 바탕으로 워크스트림 역할분배를 진행하는 흐름이 자연스럽습니다."
+            "로드맵 단계가 잡혔고 아직 확정된 역할은 없습니다. 다음은 이 로드맵에 대한 "
+            "팀 의견을 모아 수정하거나, 마일스톤을 바탕으로 워크스트림 역할분배를 진행하는 흐름이 자연스럽습니다."
         )
         roadmap_suggestions = [
             "로드맵이 맞는지 팀원 의견을 모아 수정·보완하기",
             "마일스톤을 바탕으로 기획·생산·품질·마케팅·유통 같은 워크스트림 역할 나누기",
-            "역할이 정해지면 각 단계 아래 실행 todo를 2~5개씩 만들기",
+            "역할이 정해진 뒤 각 단계 아래 실행 todo를 2~5개씩 만들기",
             "진행 흐름을 대시보드에서 확인하기",
         ]
+        workflow_order_guidance = (
+            "일반적으로는 로드맵을 먼저 만들고, 그 마일스톤을 보고 역할을 나눈 뒤, "
+            "역할별 실행 todo로 분해합니다. 아직 역할이 없으므로 '현재 역할 기준'이라고 말하지 마세요."
+        )
+        chat_hint = (
+            "역할이 아직 없으므로 '현재 역할 기준으로 todo를 쪼개자'고 말하지 마세요. "
+            "로드맵 의견수렴/수정 또는 마일스톤 기반 역할분배를 먼저 제안하세요."
+        )
     else:
+        workflow_state = "roadmap_created_roles_present"
         roadmap_next = (
             "로드맵 단계가 잡혔고 역할 정보도 있습니다. 먼저 로드맵에 대한 팀 의견을 모아 수정할지, "
-            "현재 역할을 기준으로 각 단계의 실행 todo를 쪼갤지 정하면 좋습니다."
+            "기존 역할이 이 마일스톤에 맞는지 점검한 뒤 각 단계의 실행 todo를 쪼갤지 정하면 좋습니다."
         )
         roadmap_suggestions = [
             "로드맵이 맞는지 팀원 의견을 모아 수정·보완하기",
@@ -316,6 +326,14 @@ def _format(roadmap: dict[str, Any]) -> dict[str, Any]:
             "진행 상황이 바뀌면 태스크 상태 갱신하기",
             "진행 흐름을 대시보드에서 확인하기",
         ]
+        workflow_order_guidance = (
+            "역할분배를 먼저 해둔 팀이라면 기존 역할을 로드맵에 맞게 점검한 뒤 바로 실행 todo로 "
+            "분해할 수 있습니다. 다만 역할이 마일스톤과 어긋나면 역할분배를 다시 제안하세요."
+        )
+        chat_hint = (
+            "역할이 이미 있으므로 '기존 역할 점검'과 '역할 기준 실행 todo 분해'를 제안할 수 있습니다. "
+            "그래도 로드맵 의견수렴/수정 선택지는 함께 보여주세요."
+        )
     return {
         "tasks": formatted_tasks,
         "milestones": milestones,
@@ -337,17 +355,16 @@ def _format(roadmap: dict[str, Any]) -> dict[str, Any]:
         "unassigned_tasks": unassigned_tasks,
         "role_only_tasks": role_only_tasks,
         "calendar_candidates": calendar_candidates,
+        "workflow_state": workflow_state,
         "next": roadmap_next,
         "suggested_next_actions": roadmap_suggestions,
+        "workflow_order_guidance": workflow_order_guidance,
         "role_assignment_guidance": (
             "로드맵 단계명은 역할이 아닙니다. 역할을 나눌 때는 여러 태스크를 책임지는 "
             "역량/워크스트림 역할(예: 기획·PM, MCP 서버·도구 구현, 카카오 API·OAuth 연동, "
             "테스트·QA, 문서·데모·발표)로 만드세요."
         ),
-        "chat_response_hint": (
-            "로드맵 생성 직후에는 캘린더보다 먼저 '로드맵 의견수렴/수정'과 "
-            "'마일스톤 기반 역할분배'를 짧게 제안하세요."
-        ),
+        "chat_response_hint": chat_hint,
         "user_prompt_examples": [
             "이 로드맵 괜찮은지 팀원 의견 받아줘",
             "이 마일스톤 기준으로 역할분배 해줘",
