@@ -1,12 +1,9 @@
 """도구(tool) 도메인 모듈 모음.
 
-각 도메인 모듈은 ``register(mcp)`` 함수를 노출하며, 관련 기능을 1~2개의
-MCP 도구로 묶어 등록한다. PlayMCP 가이드 권장(도구 3~10개, 최대 20개)에
-맞추기 위해 기능을 도메인 단위로 그룹화한다.
-
-일정·의견수렴·장소·회의록·자료·캘린더는 Google Forms / Google MCP가
-담당하고, teamplay-talk는 그 산출물 링크를 방에 묶는 ``resources`` 모듈로
-협업 허브 역할을 한다.
+각 도메인 모듈은 기존 세부 기능을 등록하고, 마지막에 ``consolidated`` 모듈이
+방/폼/역할/로드맵/task/데일리/캘린더 기능을 공개 domain hub 도구로 묶는다.
+PlayMCP 가이드(최대 20개)를 맞추되, 생성형 의사결정 도구는 따로 남겨 라우팅
+오류를 줄인다.
 """
 
 from __future__ import annotations
@@ -15,6 +12,7 @@ from fastmcp import FastMCP
 
 from . import (
     calendar,
+    consolidated,
     daily,
     feedback,
     integrations,
@@ -43,3 +41,4 @@ def register_all(mcp: FastMCP) -> None:
     reports.register(mcp)
     integrations.register(mcp)
     calendar.register(mcp)
+    consolidated.install(mcp)

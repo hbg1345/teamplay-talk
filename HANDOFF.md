@@ -66,19 +66,21 @@ PY'
 
 - PlayMCP는 도구 목록/instructions를 캐싱하는 경우가 많다.
 - 서버에는 새 도구가 보이는데 PlayMCP 대화에서 안 보이면 MCP 삭제 후 재등록이 필요할 수 있다.
-- 현재 라이브 도구 수는 **38개**다. PlayMCP 가이드 권장/심사용으로는 나중에 도구 합치기 필요. 지금은 QC/데모 기능 완성 우선.
+- `codex/reduce-mcp-tool-count` 브랜치 기준 공개 MCP 도구 수는 **15개**다.
+- 기존 38개 기능은 최대한 유지하되, 방/폼/역할/로드맵/task/데일리/캘린더는 domain hub 도구로 묶었다.
+- PlayMCP가 캐시한 도구 목록이 남아 있으면 재등록 또는 MCP 새로고침이 필요할 수 있다.
 
 ## 채팅 응답 톤 / 함수명 노출 방지
 
 - 사용자가 보는 PlayMCP 채팅에서는 `send_form`, `get_poll_results`, `member_tasks` 같은 내부 도구명을 그대로 말하지 않는다.
-- 도구 응답에는 내부 실행용 `required_next_tool`이 남아 있을 수 있지만, 채팅에서는 항상 자연어로 번역한다.
+- 도구 응답에는 공개 도구 기준 `required_next_tool` + `required_next_action`이 들어갈 수 있지만, 채팅에서는 항상 자연어로 번역한다.
 - 각 주요 도구 응답에 `user_prompt_examples`와 `chat_response_hint`를 넣었다.
 - 예시 톤:
   - “이 폼 팀원들에게 보내줘”
   - “응답이 모이면 결과 정리해줘”
   - “확정된 회의 시간 공지해줘”
   - “역할별로 개인 todo까지 나눠줘”
-- 친구가 진행 중인 **도구 개수 줄이기**는 별도 작업이다. 이 패치는 도구 수를 줄이지 않고, 현재 도구들이 사용자에게 덜 개발자스럽게 보이도록 안내층을 정리한 것이다.
+- `codex/reduce-mcp-tool-count` 브랜치에서는 함수명 노출 방지와 도구 수 축소를 함께 반영했다.
 
 ## 인증
 
@@ -89,38 +91,37 @@ PY'
 - `kakao_token_proxy.py`는 성공한 token 응답을 카카오 `user/me`로 식별해 `users.kakao_access_token`/`kakao_refresh_token`에 저장한다. 팀원별 캘린더/알림 반복 실행은 이 저장 토큰에 의존한다.
 - 이 저장 로직 이전에 권한동의한 팀원은 refresh token이 없을 수 있으므로, 캘린더 실패 시 PlayMCP에서 카카오 권한을 다시 연결해야 한다.
 
-## 현재 도구 35개
+## 현재 공개 도구 15개
 
 방/멤버:
-- `create_room`, `join_room`, `switch_room`, `rooms`, `delete_room`, `restore_room`, `leave_room`
+- `room_manage` — create/join/switch/list/delete/restore/leave
 
 공지:
 - `notify_room`
 
 폼/투표/의견수렴:
 - `create_poll`, `gather_opinions`, `gather_locations`, `gather_task_opinions`
-- `send_form`, `get_poll_results`, `close_poll`
+- `form_manage` — send/results/close
 
 역할분배:
-- `assign_roles`, `finalize_roles`, `set_roles`
+- `role_manage` — start/finalize/set
 
 회의 일정:
 - `schedule_meeting`
 
 로드맵/todo:
-- `build_roadmap`, `view_roadmap`
-- `add_task`, `delete_task`, `update_task`
-- `decompose_roadmap`, `member_tasks`, `daily_task_digest`
+- `roadmap_manage` — build/view/decompose/member_tasks/digest
+- `task_manage` — add/update/delete
 
 데일리 운영:
-- `create_daily_checkin`, `apply_daily_checkin`, `daily_report`
+- `daily_manage` — create_checkin/apply_checkin/report
 
 대시보드:
 - `room_dashboard`
 
 카카오 톡캘린더:
-- `calendar_create_room_event`, `calendar_create_task_events`
-- `calendar_create_event`, `calendar_list_events`, `calendar_get_event`, `calendar_update_event`, `calendar_delete_event`
+- `calendar_team` — room_event/task_events
+- `calendar_personal` — create/list/get/update/delete
 
 ## 핵심 워크플로우
 
@@ -129,18 +130,18 @@ PY'
 기본은 현재 작업 방(active room)이다.
 
 ```text
-create_room / join_room
-→ switch_room
-→ rooms 로 현재 방과 멤버 확인
+room_manage(action=create) / room_manage(action=join)
+→ room_manage(action=switch)
+→ room_manage(action=list) 로 현재 방과 멤버 확인
 ```
 
 방 삭제:
-- `delete_room`: soft delete, 유예 기간 후 purge
-- `restore_room`: 유예 기간 내 복구
-- `leave_room`: 마지막 멤버가 나가면 empty room 삭제 유예
+- `room_manage(action=delete)`: soft delete, 유예 기간 후 purge
+- `room_manage(action=restore)`: 유예 기간 내 복구
+- `room_manage(action=leave)`: 마지막 멤버가 나가면 empty room 삭제 유예
 
 방 생성 온보딩:
-- `create_room` 응답에 `invite_share_text`, `join_command`, `onboarding`, `recommended_flow`, `suggested_next_actions`가 들어간다.
+- `room_manage(action=create)` 응답에 `invite_share_text`, `join_command`, `onboarding`, `recommended_flow`, `suggested_next_actions`가 들어간다.
 - 채팅 응답은 길게 설명하지 말고 “invite_share_text 공유 → 팀원 초대 → 역할분배/로드맵 시작” 정도만 짧게 안내한다.
 
 ### 2. 역할분배
@@ -333,13 +334,13 @@ gather_task_opinions(scope='roadmap'|'todo'|'blockers'|'scope')
 ## 다음 할 일
 
 1. PlayMCP에서 재등록 후 전체 워크플로우 QC:
-   - 역할분배 → set_roles → decompose_roadmap → member_tasks → daily_task_digest
-   - schedule_meeting → best_slots → calendar_create_room_event
+   - 역할분배 → role_manage(action=set) → roadmap_manage(action=decompose) → roadmap_manage(action=member_tasks) → roadmap_manage(action=digest)
+   - schedule_meeting → best_slots → calendar_team(action=room_event)
    - gather_locations → 본투표 → notify_room
 
 2. 도구 수 정리:
-   - 현재 38개라 심사 가이드(최대 20개, 권장 3~10개) 대비 많다.
-   - 캘린더 CRUD, room lifecycle, roadmap CRUD 등을 통합 도구로 묶는 작업 필요.
+   - `codex/reduce-mcp-tool-count` 브랜치에서 공개 도구 수를 38개에서 15개로 줄였다.
+   - 다음 단계는 PlayMCP 재등록 후 실제 라우팅 QC다.
 
 3. 개인정보/운영:
    - 카카오 토큰 저장 암호화는 구현됨(`TOKEN_ENC_KEY`).
