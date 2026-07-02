@@ -87,6 +87,26 @@ def _clean_args(values: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in values.items() if value is not None}
 
 
+def _tool_arg_names(tool: Any) -> set[str]:
+    parameters = getattr(tool, "parameters", None) or {}
+    properties = parameters.get("properties") or {}
+    return set(properties)
+
+
+def _missing_required_args(tool: Any, args: dict[str, Any]) -> list[str]:
+    parameters = getattr(tool, "parameters", None) or {}
+    required = parameters.get("required") or []
+    return [name for name in required if name not in args]
+
+
+def _filter_args_for_tool(tool: Any, args: dict[str, Any]) -> dict[str, Any]:
+    allowed = _tool_arg_names(tool)
+    cleaned = _clean_args(args)
+    if not allowed:
+        return cleaned
+    return {key: value for key, value in cleaned.items() if key in allowed}
+
+
 def _local_tools(mcp: FastMCP) -> LegacyTools:
     tools: LegacyTools = {}
     components = getattr(mcp, "_local_provider")._components
@@ -130,13 +150,37 @@ def _publicize_next_tool(data: Any) -> Any:
 
 
 async def _run_legacy(tools: LegacyTools, name: str, args: dict[str, Any]) -> Any:
-    result = await tools[name].run(_clean_args(args))
+    tool = tools[name]
+    call_args = _filter_args_for_tool(tool, args)
+    missing = _missing_required_args(tool, call_args)
+    if missing:
+        return {
+            "ok": False,
+            "error": "필수 입력이 부족합니다.",
+            "missing_arguments": missing,
+            "target": name,
+            "next": _missing_next_hint(name, missing),
+        }
+    result = await tool.run(call_args)
     if result.structured_content is not None:
         return _publicize_next_tool(result.structured_content)
     return {
         "ok": not result.is_error,
         "content": [getattr(item, "text", str(item)) for item in result.content],
     }
+
+
+def _missing_next_hint(name: str, missing: list[str]) -> str:
+    if name == "build_roadmap" and "tasks" in missing:
+        return (
+            "로드맵을 만들려면 큰 단계 목록이 필요합니다. 프로젝트 주제를 바탕으로 "
+            "4~6개의 milestone을 직접 구성해 tasks에 넣어 다시 시도하세요."
+        )
+    if name == "assign_roles" and "roles" in missing:
+        return "역할분배를 시작하려면 프로젝트에 필요한 역할 목록을 먼저 구성해 roles에 넣어 다시 시도하세요."
+    if name in {"send_form", "get_poll_results", "close_poll", "finalize_roles", "apply_daily_checkin"}:
+        return "대상 form_id를 확인한 뒤 다시 시도하세요."
+    return "빠진 값을 채운 뒤 다시 시도하세요."
 
 
 def install(mcp: FastMCP) -> None:
