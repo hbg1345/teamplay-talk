@@ -20,6 +20,7 @@ from starlette.responses import PlainTextResponse
 from .config import settings
 from .dashboard_web import register_dashboard_routes
 from .forms_web import register_form_routes
+from .home_web import register_home_routes
 from .kakao_token_proxy import register_kakao_token_proxy
 from .tools import register_all
 from .triggers import start_scheduler
@@ -119,6 +120,9 @@ register_dashboard_routes(mcp)
 
 # 카카오 토큰 프록시(/kakao/token) — PlayMCP의 Basic 인증을 카카오용 body로 변환
 register_kakao_token_proxy(mcp)
+
+# 홈페이지(랜딩) — / , /favicon.svg
+register_home_routes(mcp)
 
 
 def main() -> None:

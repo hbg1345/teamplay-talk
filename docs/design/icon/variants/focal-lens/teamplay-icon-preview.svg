@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>Teamplay Talk focal lens icon preview</title>
+  <defs>
+    <radialGradient id="bg" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(520 512) rotate(76) scale(710)">
+      <stop offset="0" stop-color="#1B1243"/>
+      <stop offset=".6" stop-color="#0A071A"/>
+      <stop offset="1" stop-color="#05040C"/>
+    </radialGradient>
+    <linearGradient id="lensGlass" x1="350.0" y1="298.0" x2="586.0" y2="726.0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity=".36"/>
+      <stop offset=".5" stop-color="#FFFFFF" stop-opacity=".72"/>
+      <stop offset="1" stop-color="#7678ed" stop-opacity=".22"/>
+    </linearGradient>
+    <radialGradient id="focalGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(792.0 512.0) rotate(90) scale(132)">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity=".98"/>
+      <stop offset=".28" stop-color="#FFF7C6" stop-opacity=".5"/>
+      <stop offset="1" stop-color="#f7b801" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="softShadow" x="38" y="176" width="848" height="672" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="26" stdDeviation="24" flood-color="#000000" flood-opacity=".28"/>
+    </filter>
+    <filter id="bloom" x="650" y="370" width="284" height="284" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+    <linearGradient id="upper" x1="148.0" y1="338.0" x2="792.0" y2="512.0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3d348b" stop-opacity=".42"/>
+      <stop offset=".48" stop-color="#3d348b" stop-opacity=".9"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity=".88"/>
+    </linearGradient>
+    <linearGradient id="middle_upper" x1="148.0" y1="450.0" x2="792.0" y2="512.0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7678ed" stop-opacity=".42"/>
+      <stop offset=".48" stop-color="#7678ed" stop-opacity=".9"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity=".88"/>
+    </linearGradient>
+    <linearGradient id="middle_lower" x1="148.0" y1="574.0" x2="792.0" y2="512.0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f7b801" stop-opacity=".42"/>
+      <stop offset=".48" stop-color="#f7b801" stop-opacity=".9"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity=".88"/>
+    </linearGradient>
+    <linearGradient id="lower" x1="148.0" y1="686.0" x2="792.0" y2="512.0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f35b04" stop-opacity=".42"/>
+      <stop offset=".48" stop-color="#f35b04" stop-opacity=".9"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity=".88"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <g filter="url(#softShadow)">
+    <path d="M148 338C276 338 328.1 440 416.1 440C601.9 480.3 650 512 792 512" fill="none" stroke="url(#upper)" stroke-width="42" stroke-linecap="round"/>
+    <path d="M148 450C276 450 328.1 488 416.1 488C601.9 501.4 650 512 792 512" fill="none" stroke="url(#middle_upper)" stroke-width="46" stroke-linecap="round"/>
+    <path d="M148 574C276 574 328.1 536 416.1 536C601.9 522.6 650 512 792 512" fill="none" stroke="url(#middle_lower)" stroke-width="48" stroke-linecap="round"/>
+    <path d="M148 686C276 686 328.1 584 416.1 584C601.9 543.7 650 512 792 512" fill="none" stroke="url(#lower)" stroke-width="42" stroke-linecap="round"/>
+    <path d="M468 298C354.7 379.3 354.7 644.7 468 726C581.3 644.7 581.3 379.3 468 298Z" fill="url(#lensGlass)" stroke="#FFFFFF" stroke-opacity=".34" stroke-width="6"/>
+  </g>
+  <circle cx="792.0" cy="512.0" r="96" fill="url(#focalGlow)" filter="url(#bloom)"/>
+  <circle cx="792.0" cy="512.0" r="34" fill="#FFFFFF" fill-opacity=".92"/>
+  <circle cx="792.0" cy="512.0" r="12" fill="#FFF4B8"/>
+</svg>
