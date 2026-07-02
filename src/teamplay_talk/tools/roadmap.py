@@ -155,6 +155,161 @@ def _allocate_milestone_days(milestones: list[dict[str, Any]], total_days: int) 
     return durations
 
 
+def _split_task_days(parent: dict[str, Any], count: int) -> list[tuple[str | None, str | None]]:
+    if count <= 0:
+        return []
+    start_day, end_day = _task_date_bounds(parent)
+    if start_day is None or end_day is None:
+        return [(None, None) for _ in range(count)]
+    total_days = max(1, (end_day - start_day).days + 1)
+    out: list[tuple[str | None, str | None]] = []
+    for idx in range(count):
+        start_offset = int(idx * total_days / count)
+        end_offset = int((idx + 1) * total_days / count) - 1
+        item_start = min(start_day + timedelta(days=start_offset), end_day)
+        item_end = min(start_day + timedelta(days=max(start_offset, end_offset)), end_day)
+        out.append((_day_start_utc(item_start), _day_end_utc(item_end)))
+    return out
+
+
+def _role_match_score(role: str, text: str) -> int:
+    score = 0
+    pairs = [
+        (("레시피", "품질", "맛", "연구", "조사"), ("레시피", "품질", "연구", "맛", "개선")),
+        (("재료", "구매", "준비"), ("재료", "구매", "준비", "도구")),
+        (("제조", "시제품", "운영", "제작", "생산"), ("제조", "시제품", "제작", "반죽", "토핑", "굽")),
+        (("테스트", "QA", "검증", "피드백", "개선"), ("테스트", "검증", "피드백", "개선", "시식")),
+        (("시현", "발표", "문서", "데모", "제출"), ("시현", "발표", "데모", "최종", "제출", "포장")),
+        (("기획", "PM", "관리"), ("기획", "일정", "조율", "관리", "정리")),
+        (("구현", "개발", "서버", "도구"), ("구현", "개발", "서버", "도구", "API")),
+    ]
+    for role_words, text_words in pairs:
+        if any(word in role for word in role_words) and any(word in text for word in text_words):
+            score += 3
+    role_tokens = {token for token in re.split(r"[·,\s/]+", role) if token}
+    for token in role_tokens:
+        if token and token in text:
+            score += 1
+    return score
+
+
+def _assignee_for_auto_todo(roadmap: dict[str, Any], milestone: dict[str, Any], title: str) -> str | None:
+    if milestone.get("assignee_nickname"):
+        return str(milestone["assignee_nickname"])
+    if milestone.get("assignee_role"):
+        return str(milestone["assignee_role"])
+    members = roadmap.get("members", [])
+    text = f"{milestone.get('title') or ''} {milestone.get('details') or ''} {title}"
+    best: tuple[int, str | None] = (0, None)
+    for member in members:
+        role = str(member.get("role") or "")
+        if not role:
+            continue
+        score = _role_match_score(role, text)
+        if score > best[0]:
+            best = (score, str(member.get("nickname") or ""))
+    if best[1]:
+        return best[1]
+    if len(members) == 1:
+        return str(members[0].get("nickname") or "") or None
+    return None
+
+
+def _auto_todo_specs(milestone: dict[str, Any]) -> list[tuple[str, str]]:
+    title = str(milestone.get("title") or "")
+    details = str(milestone.get("details") or "")
+    text = f"{title} {details}"
+    if any(k in title for k in ["최종", "시현", "발표", "제출", "마무리"]):
+        return [
+            ("시현 순서 정리", "최종 시현 흐름, 설명 포인트, 담당 순서를 정리합니다."),
+            ("최종 준비물 점검", "완성품, 재료, 도구, 포장, 기록물을 체크합니다."),
+            ("리허설 및 최종 보완", "시현 전 리허설을 진행하고 부족한 부분을 보완합니다."),
+        ]
+    if any(k in title for k in ["피드백", "개선", "테스트", "검증"]):
+        return [
+            ("시식 피드백 수집", "팀원 또는 테스트 대상에게 맛·식감·외형 피드백을 받습니다."),
+            ("개선안 정리", "반영할 개선점을 우선순위로 정리합니다."),
+            ("레시피·공정 수정", "개선안을 반영해 최종 레시피와 제작 공정을 갱신합니다."),
+        ]
+    if any(k in title for k in ["시제품", "제작", "반죽", "토핑", "굽"]):
+        return [
+            ("반죽과 소보로 토핑 준비", "확정 레시피에 맞춰 반죽과 토핑을 준비합니다."),
+            ("1차 시제품 제작", "굽기 시간과 온도를 기록하며 시제품을 만듭니다."),
+            ("제작 결과 기록", "맛, 식감, 외형, 문제점을 사진/메모로 남깁니다."),
+        ]
+    if any(k in title for k in ["레시피", "연구", "조사"]):
+        return [
+            ("레시피 후보 조사", "참고 레시피 2~3개를 비교하고 재료·공정 차이를 정리합니다."),
+            ("선정 기준 정리", "맛, 식감, 난이도, 준비물 기준으로 선택 기준을 정리합니다."),
+            ("최종 레시피 초안 확정", "시제품 제작에 사용할 배합과 공정을 1안으로 확정합니다."),
+        ]
+    if any(k in title for k in ["재료", "구매", "준비"]):
+        return [
+            ("재료·도구 목록 작성", "필요 재료, 수량, 도구, 구매처 후보를 체크리스트로 정리합니다."),
+            ("재료 구매 및 보관", "재료를 구매하고 시제품 제작 전까지 보관 상태를 확인합니다."),
+        ]
+    if any(k in text for k in ["최종", "시현", "발표", "제출", "마무리"]):
+        return [
+            ("시현 순서 정리", "최종 시현 흐름, 설명 포인트, 담당 순서를 정리합니다."),
+            ("최종 준비물 점검", "완성품, 재료, 도구, 포장, 기록물을 체크합니다."),
+            ("리허설 및 최종 보완", "시현 전 리허설을 진행하고 부족한 부분을 보완합니다."),
+        ]
+    if any(k in text for k in ["피드백", "개선", "테스트", "검증"]):
+        return [
+            ("시식 피드백 수집", "팀원 또는 테스트 대상에게 맛·식감·외형 피드백을 받습니다."),
+            ("개선안 정리", "반영할 개선점을 우선순위로 정리합니다."),
+            ("레시피·공정 수정", "개선안을 반영해 최종 레시피와 제작 공정을 갱신합니다."),
+        ]
+    if any(k in text for k in ["시제품", "제작", "반죽", "토핑", "굽"]):
+        return [
+            ("반죽과 소보로 토핑 준비", "확정 레시피에 맞춰 반죽과 토핑을 준비합니다."),
+            ("1차 시제품 제작", "굽기 시간과 온도를 기록하며 시제품을 만듭니다."),
+            ("제작 결과 기록", "맛, 식감, 외형, 문제점을 사진/메모로 남깁니다."),
+        ]
+    if any(k in text for k in ["레시피", "연구", "조사"]):
+        return [
+            ("레시피 후보 조사", "참고 레시피 2~3개를 비교하고 재료·공정 차이를 정리합니다."),
+            ("선정 기준 정리", "맛, 식감, 난이도, 준비물 기준으로 선택 기준을 정리합니다."),
+            ("최종 레시피 초안 확정", "시제품 제작에 사용할 배합과 공정을 1안으로 확정합니다."),
+        ]
+    if any(k in text for k in ["재료", "구매", "준비"]):
+        return [
+            ("재료·도구 목록 작성", "필요 재료, 수량, 도구, 구매처 후보를 체크리스트로 정리합니다."),
+            ("재료 구매 및 보관", "재료를 구매하고 시제품 제작 전까지 보관 상태를 확인합니다."),
+        ]
+    return [
+        (f"{title} 완료 기준 정리", "이 단계가 끝났다고 판단할 산출물과 체크 기준을 정리합니다."),
+        (f"{title} 실행", "정리한 기준에 맞춰 핵심 작업을 수행합니다."),
+        (f"{title} 결과 공유", "결과물, 이슈, 다음 단계로 넘길 내용을 팀에 공유합니다."),
+    ]
+
+
+def _auto_generate_todos(roadmap: dict[str, Any]) -> list[TodoDraft]:
+    tasks = roadmap.get("tasks", [])
+    milestones = [task for task in tasks if (task.get("task_type") or "milestone") == "milestone"]
+    existing_by_parent: dict[int, int] = {}
+    for task in tasks:
+        if (task.get("task_type") or "milestone") == "todo" and task.get("parent_task_id") is not None:
+            existing_by_parent[int(task["parent_task_id"])] = existing_by_parent.get(int(task["parent_task_id"]), 0) + 1
+    generated: list[TodoDraft] = []
+    for milestone in milestones:
+        parent_id = int(milestone["id"])
+        if existing_by_parent.get(parent_id):
+            continue
+        specs = _auto_todo_specs(milestone)
+        spans = _split_task_days(milestone, len(specs))
+        for (title, details), (start_at, end_at) in zip(specs, spans, strict=False):
+            generated.append(TodoDraft(
+                title=title,
+                details=details,
+                assignee=_assignee_for_auto_todo(roadmap, milestone, title),
+                parent_task_id=parent_id,
+                start_at=start_at,
+                end_at=end_at,
+            ))
+    return generated
+
+
 def _task_date_bounds(task: dict[str, Any]) -> tuple[Any | None, Any | None]:
     start = _parse_task_dt(task.get("start_at"))
     end = _parse_task_dt(task.get("end_at"))
@@ -804,7 +959,7 @@ def register(mcp: FastMCP) -> None:
         },
     )
     async def decompose_roadmap(
-        todos: list[TodoDraft],
+        todos: list[TodoDraft] | None = None,
         room_id: int | None = None,
     ) -> dict[str, Any]:
         """Adds executable todo items under roadmap milestones in teamplay-talk(팀플톡).
@@ -821,21 +976,43 @@ def register(mcp: FastMCP) -> None:
         - 팀원 의견 원문 1개를 그대로 한 줄 태스크로 저장하지 말고, 필요한 하위 작업으로 쪼갠다.
 
         Args:
-            todos: 생성할 실행 todo 목록
+            todos: 생성할 실행 todo 목록. 생략하면 현재 로드맵/확정 역할/마일스톤 일정을 바탕으로 서버가 초안을 자동 생성한다.
             room_id: 대상 방 (생략 시 현재 작업 방)
         """
         _caller, room, error = await require_room(room_id)
         if error:
             return error
         room_id = room["id"]
-        if not todos:
-            return {"ok": False, "error": "todos가 비어 있습니다. 최소 1개 이상의 실행 todo를 넘겨주세요."}
 
         roadmap = storage.get_roadmap(room_id)
         if not roadmap["tasks"]:
             return {
                 "ok": False,
                 "error": "먼저 큰 로드맵 단계부터 만들어야 합니다.",
+            }
+        auto_generated = False
+        if not todos:
+            todos = _auto_generate_todos(roadmap)
+            auto_generated = True
+        if not todos:
+            formatted = _format(roadmap)
+            return {
+                "ok": True,
+                "room_id": room_id,
+                "room": room["name"],
+                "created_todos": [],
+                "created_count": 0,
+                "auto_generated": auto_generated,
+                "already_decomposed": True,
+                "next": "이미 각 마일스톤 아래 실행 todo가 있습니다. 팀원별 할일을 확인하거나 필요한 todo만 추가·수정하세요.",
+                "suggested_next_actions": [
+                    "팀원별 할일 확인하기",
+                    "누락된 todo만 추가하기",
+                    "날짜나 담당자 수정하기",
+                    "개인별 할일을 카톡으로 공지하기",
+                ],
+                "chat_response_hint": "이미 생성된 todo가 있음을 말하고, 팀원별 할일을 확인하자고 제안하세요.",
+                **formatted,
             }
 
         created: list[dict[str, Any]] = []
@@ -874,12 +1051,13 @@ def register(mcp: FastMCP) -> None:
             "room": room["name"],
             "created_todos": created,
             "created_count": len(created),
+            "auto_generated": auto_generated,
             "synced_todos": synced,
             "unresolved_parent": unresolved_parent,
             "needs_role_assignment": needs_role_assignment,
             "required_next_tool": "set_roles" if needs_role_assignment else "member_tasks",
             "next": (
-                "todo 분해가 저장됐습니다. "
+                ("로드맵·역할·일정을 바탕으로 todo 초안을 자동 생성해 저장했습니다. " if auto_generated else "todo 분해가 저장됐습니다. ")
                 + (
                     "다만 일부 todo가 역할명에만 묶여 있어 실제 팀원에게 아직 배정되지 않았습니다. 역할을 확정한 뒤 팀원별 할일을 확인하세요."
                     if needs_role_assignment else
@@ -893,6 +1071,11 @@ def register(mcp: FastMCP) -> None:
                 "팀원 의견이 더 필요하면 개별 할일 의견 폼 만들기",
                 "확정되면 개인별 또는 팀 전체에 공지하기",
             ],
+            "chat_response_hint": (
+                "생성된 todo를 팀원/역할별로 요약해서 보여주세요. "
+                "auto_generated가 true면 사용자에게 세부 할일을 다시 요구하지 마세요. "
+                "needs_role_assignment가 true면 실제 담당자 확정을 먼저 안내하고, false면 팀원별 할일 확인/공지로 이어가세요."
+            ),
             **formatted,
         }
 

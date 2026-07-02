@@ -239,10 +239,17 @@ async def _list_forms(
         f"- 폼 #{form['form_id']} · {form['kind']} · {form['title']} · {form['responses']}응답 · {form['status']}"
         for form in summaries
     ]
+    message = (
+        "진행중인 폼/투표:\n" + "\n".join(forms_text)
+        if forms_text
+        else "조건에 맞는 진행중 폼/투표가 없습니다."
+    )
     return {
         "ok": True,
         "room_id": room["id"],
         "room_name": room["name"],
+        "message": message,
+        "important": "사용자에게 답할 때 반드시 폼 #ID를 포함하세요.",
         "status_filter": status,
         "query": query,
         "forms": summaries,
@@ -261,7 +268,7 @@ async def _list_forms(
             "새 의견수렴 또는 역할분배 이어가기",
         ],
         "chat_response_hint": (
-            "대시보드 링크로만 안내하지 말고 forms_text를 그대로 사용해 폼 #ID, 제목, 상태, 응답 수를 바로 요약하세요. "
+            "대시보드 링크로만 안내하지 말고 message 또는 forms_text를 그대로 사용해 폼 #ID, 제목, 상태, 응답 수를 바로 요약하세요. "
             "같은 문장을 반복하지 마세요. 마감/결과 확인이 필요하면 사용자가 제목이나 폼 #ID로 말해도 된다고 안내하세요."
         ),
     }
