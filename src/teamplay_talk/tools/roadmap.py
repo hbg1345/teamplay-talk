@@ -10,7 +10,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+import re
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Literal
 
 from fastmcp import FastMCP
@@ -91,6 +92,67 @@ def _parse_task_dt(value: Any) -> datetime | None:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(_KST)
+
+
+def _parse_schedule_date(value: str | None) -> date | None:
+    if not value:
+        return None
+    text = str(value).strip()
+    today = datetime.now(_KST).date()
+    try:
+        return date.fromisoformat(text)
+    except ValueError:
+        pass
+    m = re.search(r"(?:(\d{4})\s*[./-]\s*)?(\d{1,2})\s*[./월]\s*(\d{1,2})", text)
+    if not m:
+        return None
+    year = int(m.group(1) or today.year)
+    month = int(m.group(2))
+    day = int(m.group(3))
+    try:
+        return date(year, month, day)
+    except ValueError:
+        return None
+
+
+def _day_start_utc(day: date) -> str:
+    return datetime(day.year, day.month, day.day, 9, 0, tzinfo=_KST).astimezone(timezone.utc).isoformat()
+
+
+def _day_end_utc(day: date) -> str:
+    return datetime(day.year, day.month, day.day, 18, 0, tzinfo=_KST).astimezone(timezone.utc).isoformat()
+
+
+def _milestone_weight(task: dict[str, Any]) -> int:
+    text = f"{task.get('title') or ''} {task.get('details') or ''}"
+    weight = 1
+    if any(k in text for k in ["연구", "조사", "분석", "기획", "레시피"]):
+        weight += 1
+    if any(k in text for k in ["제작", "개발", "구현", "시제품", "프로토타입", "생산"]):
+        weight += 2
+    if any(k in text for k in ["피드백", "개선", "테스트", "검증"]):
+        weight += 1
+    if any(k in text for k in ["최종", "시현", "발표", "제출", "마무리"]):
+        weight += 1
+    return weight
+
+
+def _allocate_milestone_days(milestones: list[dict[str, Any]], total_days: int) -> list[int]:
+    if not milestones:
+        return []
+    durations = [1 for _ in milestones]
+    if total_days <= len(milestones):
+        return durations
+    remaining = total_days - len(milestones)
+    weights = [_milestone_weight(task) for task in milestones]
+    order = sorted(range(len(milestones)), key=lambda idx: (-weights[idx], idx))
+    while remaining > 0:
+        for idx in order:
+            if remaining <= 0:
+                break
+            durations[idx] += 1
+            remaining -= 1
+    return durations
 
 
 def _task_date_bounds(task: dict[str, Any]) -> tuple[Any | None, Any | None]:
@@ -626,6 +688,109 @@ def register(mcp: FastMCP) -> None:
             "title": updated["title"],
             "status": updated["status"],
             **_format(storage.get_roadmap(room["id"])),
+        }
+
+    @mcp.tool(
+        name="schedule_roadmap",
+        annotations={
+            "title": "로드맵 마일스톤 일정 배치",
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        },
+    )
+    async def schedule_roadmap(
+        final_date: str,
+        start_date: str | None = None,
+        final_milestone: str | None = None,
+        room_id: int | None = None,
+    ) -> dict[str, Any]:
+        """Schedules existing roadmap milestones by distributing dates up to a final deadline.
+
+        팀플톡(teamplay-talk) 현재 로드맵의 큰 단계(milestone)에 시작/종료 일정을 자동 배치한다.
+        "7월 9일 최종 시현이니까 각 로드맵 일정 잡아줘"처럼 최종일이 주어졌을 때 사용한다.
+        실행 todo를 생성하는 decompose_roadmap과 다르며, 기존 milestone의 start_at/end_at만 갱신한다.
+
+        Args:
+            final_date: 최종 마감일. YYYY-MM-DD 권장. "7월 9일", "7/9"도 현재 연도로 해석.
+            start_date: 시작일. 생략하면 오늘(KST).
+            final_milestone: 최종 마감과 연결되는 milestone 제목 힌트(선택). 순서는 기존 로드맵 순서를 따른다.
+            room_id: 대상 방 (생략 시 현재 작업 방)
+        """
+        _caller, room, error = await require_room(room_id)
+        if error:
+            return error
+        room_id = room["id"]
+        final_day = _parse_schedule_date(final_date)
+        if final_day is None:
+            return {"ok": False, "error": "final_date를 날짜로 해석할 수 없습니다. 예: 2026-07-09"}
+        start_day = _parse_schedule_date(start_date) or datetime.now(_KST).date()
+        if start_day > final_day:
+            return {
+                "ok": False,
+                "error": "시작일이 최종일보다 늦습니다.",
+                "start_date": start_day.isoformat(),
+                "final_date": final_day.isoformat(),
+            }
+        roadmap = storage.get_roadmap(room_id)
+        milestones = [
+            task for task in roadmap.get("tasks", [])
+            if (task.get("task_type") or "milestone") == "milestone"
+        ]
+        if not milestones:
+            return {
+                "ok": False,
+                "error": "일정을 배치할 로드맵 마일스톤이 없습니다. 먼저 로드맵을 만들어야 합니다.",
+            }
+        total_days = (final_day - start_day).days + 1
+        durations = _allocate_milestone_days(milestones, total_days)
+        scheduled: list[dict[str, Any]] = []
+        cursor = start_day
+        for idx, (task, duration) in enumerate(zip(milestones, durations, strict=False)):
+            if total_days >= len(milestones):
+                end_day = min(cursor + timedelta(days=duration - 1), final_day)
+                if idx == len(milestones) - 1:
+                    end_day = final_day
+                item_start = min(cursor, final_day)
+            else:
+                # 기간보다 마일스톤이 많으면 뒤쪽 단계들이 같은 날짜에 병렬 배치된다.
+                item_start = min(start_day + timedelta(days=idx), final_day)
+                end_day = item_start
+            storage.update_task(
+                int(task["id"]),
+                room_id,
+                start_at=_day_start_utc(item_start),
+                end_at=_day_end_utc(end_day),
+            )
+            scheduled.append({
+                "task_id": task["id"],
+                "title": task["title"],
+                "start_date": item_start.isoformat(),
+                "end_date": end_day.isoformat(),
+                "duration_days": (end_day - item_start).days + 1,
+            })
+            cursor = end_day + timedelta(days=1)
+        formatted = _format(storage.get_roadmap(room_id))
+        return {
+            "ok": True,
+            "room_id": room_id,
+            "room": room["name"],
+            "start_date": start_day.isoformat(),
+            "final_date": final_day.isoformat(),
+            "final_milestone_hint": final_milestone,
+            "scheduled_milestones": scheduled,
+            "next": "로드맵 마일스톤 일정이 저장됐습니다. 다음은 역할분배 또는 단계별 실행 todo 분해로 이어가면 됩니다.",
+            "suggested_next_actions": [
+                "일정이 괜찮은지 팀장에게 확인하기",
+                "마일스톤 기준 역할분배 시작하기",
+                "역할이 정해진 뒤 단계별 실행 todo 만들기",
+                "날짜가 있는 todo를 캘린더에 등록하기",
+            ],
+            "chat_response_hint": (
+                "각 마일스톤의 날짜를 목록으로 보여주세요. decompose나 todo 생성이 아니라 기존 로드맵 일정 배치가 완료됐다고 말하세요."
+            ),
+            **formatted,
         }
 
     @mcp.tool(

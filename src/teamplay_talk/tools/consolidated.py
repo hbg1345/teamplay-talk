@@ -29,6 +29,7 @@ NEXT_TOOL_MAP: dict[str, tuple[str, str]] = {
     "set_roles": ("role_manage", "set"),
     "build_roadmap": ("roadmap_manage", "build"),
     "view_roadmap": ("roadmap_manage", "view"),
+    "schedule_roadmap": ("roadmap_manage", "schedule"),
     "decompose_roadmap": ("roadmap_manage", "decompose"),
     "member_tasks": ("roadmap_manage", "member_tasks"),
     "daily_task_digest": ("roadmap_manage", "digest"),
@@ -68,6 +69,7 @@ CONSOLIDATED_GROUPS: dict[str, list[str]] = {
     "roadmap_manage": [
         "build_roadmap",
         "view_roadmap",
+        "schedule_roadmap",
         "decompose_roadmap",
         "member_tasks",
         "daily_task_digest",
@@ -181,8 +183,10 @@ def _workflow_label(schema: dict[str, Any]) -> str:
 
 def _form_summary(form: dict[str, Any]) -> dict[str, Any]:
     schema = form.get("schema_json") or {}
+    label = f"폼 #{form['id']} · {_workflow_label(schema)} · {form['title']} · {int(form.get('total_responses') or 0)}응답"
     return {
         "form_id": form["id"],
+        "label": label,
         "title": form["title"],
         "status": "closed" if form.get("closed") else "active",
         "kind": _workflow_label(schema),
@@ -231,6 +235,10 @@ async def _list_forms(
     ]
     summaries = [_form_summary(form) for form in forms[:limit]]
     active_count = sum(1 for form in storage.list_room_forms(room["id"]) if not form.get("closed"))
+    forms_text = [
+        f"- 폼 #{form['form_id']} · {form['kind']} · {form['title']} · {form['responses']}응답 · {form['status']}"
+        for form in summaries
+    ]
     return {
         "ok": True,
         "room_id": room["id"],
@@ -238,6 +246,7 @@ async def _list_forms(
         "status_filter": status,
         "query": query,
         "forms": summaries,
+        "forms_text": forms_text,
         "count": len(summaries),
         "total_matching": len(forms),
         "active_count": active_count,
@@ -252,8 +261,8 @@ async def _list_forms(
             "새 의견수렴 또는 역할분배 이어가기",
         ],
         "chat_response_hint": (
-            "대시보드 링크로만 안내하지 말고 forms 목록의 form_id, 제목, 상태, 응답 수를 바로 요약하세요. "
-            "마감/결과 확인이 필요하면 사용자가 제목으로 말해도 된다고 안내하세요."
+            "대시보드 링크로만 안내하지 말고 forms_text를 그대로 사용해 폼 #ID, 제목, 상태, 응답 수를 바로 요약하세요. "
+            "같은 문장을 반복하지 마세요. 마감/결과 확인이 필요하면 사용자가 제목이나 폼 #ID로 말해도 된다고 안내하세요."
         ),
     }
 
@@ -451,11 +460,14 @@ def install(mcp: FastMCP) -> None:
         },
     )
     async def roadmap_manage(
-        action: Literal["build", "view", "decompose", "member_tasks", "digest"],
+        action: Literal["build", "view", "schedule", "decompose", "member_tasks", "digest"],
         tasks: list[dict[str, Any]] | None = None,
         edges: list[dict[str, Any]] | None = None,
         topic: str | None = None,
         replace_existing: bool = False,
+        start_date: str | None = None,
+        final_date: str | None = None,
+        final_milestone: str | None = None,
         todos: list[dict[str, Any]] | None = None,
         member: str | None = None,
         window: Literal["all", "today", "week", "overdue", "upcoming", "no_date"] = "week",
@@ -463,10 +475,11 @@ def install(mcp: FastMCP) -> None:
         dry_run: bool = False,
         room_id: int | None = None,
     ) -> dict[str, Any]:
-        """Build/view/decompose a teamplay-talk(팀플톡) roadmap or inspect/notify member tasks."""
+        """Build/view/schedule/decompose a teamplay-talk(팀플톡) roadmap or inspect/notify member tasks."""
         target = {
             "build": "build_roadmap",
             "view": "view_roadmap",
+            "schedule": "schedule_roadmap",
             "decompose": "decompose_roadmap",
             "member_tasks": "member_tasks",
             "digest": "daily_task_digest",
@@ -476,6 +489,9 @@ def install(mcp: FastMCP) -> None:
             "edges": edges,
             "topic": topic,
             "replace_existing": replace_existing,
+            "start_date": start_date,
+            "final_date": final_date,
+            "final_milestone": final_milestone,
             "todos": todos,
             "member": member,
             "window": window,

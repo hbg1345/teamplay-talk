@@ -53,12 +53,16 @@ def _workflow_label(schema: dict[str, Any]) -> str:
 
 def _form_summary(form: dict[str, Any]) -> dict[str, Any]:
     schema = form.get("schema_json") or {}
+    kind = _workflow_label(schema)
+    responses = int(form.get("total_responses") or 0)
+    label = f"폼 #{form['id']} · {kind} · {form['title']} · {responses}응답"
     return {
         "form_id": form["id"],
+        "label": label,
         "title": form["title"],
         "status": "closed" if form.get("closed") else "active",
-        "kind": _workflow_label(schema),
-        "responses": int(form.get("total_responses") or 0),
+        "kind": kind,
+        "responses": responses,
         "created_at": _iso(form.get("created_at")),
         "closes_at": _iso(form.get("closes_at")),
     }
@@ -105,6 +109,10 @@ def register(mcp: FastMCP) -> None:
         forms = storage.list_room_forms(room_id)
         active_forms = [_form_summary(form) for form in forms if not form.get("closed")]
         recent_forms = [_form_summary(form) for form in forms[:8]]
+        active_forms_text = [
+            f"- 폼 #{form['form_id']} · {form['kind']} · {form['title']} · {form['responses']}응답 · {form['status']}"
+            for form in active_forms
+        ]
         latest_decisions = {
             kind: _decision_payload(decision)
             for kind, decision in storage.latest_room_decisions(room_id).items()
@@ -117,6 +125,7 @@ def register(mcp: FastMCP) -> None:
             "dashboard_url": url,
             "form_count": len(forms),
             "active_forms": active_forms,
+            "active_forms_text": active_forms_text,
             "recent_forms": recent_forms,
             "active_form_count": len(active_forms),
             "total_responses": sum(int(f.get("total_responses") or 0) for f in forms),
@@ -129,7 +138,7 @@ def register(mcp: FastMCP) -> None:
                 "아직 응답 중인 폼이 있으면 마감 후 결과 확인하기",
             ],
             "chat_response_hint": (
-                "진행중 폼이 있으면 active_forms의 form_id, 제목, 종류, 응답 수를 먼저 요약하세요. "
+                "진행중 폼이 있으면 active_forms_text를 그대로 사용해 폼 #ID, 제목, 종류, 응답 수를 먼저 요약하세요. "
                 "대시보드 링크는 전체 타임라인을 볼 보조 링크로 덧붙이세요."
             ),
         }
