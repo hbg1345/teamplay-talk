@@ -240,6 +240,11 @@ def _format(roadmap: dict[str, Any]) -> dict[str, Any]:
         {**m, "todos": todos_by_parent.get(int(m["id"]), [])}
         for m in formatted_milestones
     ]
+    milestone_titles = [
+        str(m.get("title", "")).strip()
+        for m in formatted_milestones
+        if str(m.get("title", "")).strip()
+    ]
     member_buckets = {
         m["id"]: {
             "member_id": m["id"],
@@ -303,6 +308,7 @@ def _format(roadmap: dict[str, Any]) -> dict[str, Any]:
             "역할별 실행 todo로 분해합니다. 아직 역할이 없으므로 '현재 역할 기준'이라고 말하지 마세요."
         )
         chat_hint = (
+            "채팅 응답에서는 생성/조회된 마일스톤 제목을 먼저 bullet로 보여주세요. "
             "역할이 아직 없으므로 '현재 역할 기준으로 todo를 쪼개자'고 말하지 마세요. "
             "로드맵 의견수렴/수정 또는 마일스톤 기반 역할분배를 먼저 제안하세요."
         )
@@ -331,12 +337,14 @@ def _format(roadmap: dict[str, Any]) -> dict[str, Any]:
             "분해할 수 있습니다. 다만 역할이 마일스톤과 어긋나면 역할분배를 다시 제안하세요."
         )
         chat_hint = (
+            "채팅 응답에서는 생성/조회된 마일스톤 제목을 먼저 bullet로 보여주세요. "
             "역할이 이미 있으므로 '기존 역할 점검'과 '역할 기준 실행 todo 분해'를 제안할 수 있습니다. "
             "그래도 로드맵 의견수렴/수정 선택지는 함께 보여주세요."
         )
     return {
         "tasks": formatted_tasks,
         "milestones": milestones,
+        "milestone_titles": milestone_titles,
         "todo_tasks": formatted_todos,
         "edges": [
             {"from": e["from_task_id"], "to": e["to_task_id"]} for e in roadmap["edges"]
@@ -359,6 +367,11 @@ def _format(roadmap: dict[str, Any]) -> dict[str, Any]:
         "next": roadmap_next,
         "suggested_next_actions": roadmap_suggestions,
         "workflow_order_guidance": workflow_order_guidance,
+        "roadmap_response_guidance": (
+            "채팅 응답에서는 먼저 생성/조회된 마일스톤 제목을 bullet로 보여주세요. "
+            "그 다음 로드맵 의견수렴/수정, 마일스톤 기반 역할분배, 역할 확정 후 todo 분해 순서로 제안하세요. "
+            "역할이 아직 없으면 '현재 역할 기준'이라는 표현을 쓰지 마세요."
+        ),
         "role_assignment_guidance": (
             "로드맵 단계명은 역할이 아닙니다. 역할을 나눌 때는 여러 태스크를 책임지는 "
             "역량/워크스트림 역할(예: 기획·PM, MCP 서버·도구 구현, 카카오 API·OAuth 연동, "

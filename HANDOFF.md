@@ -142,7 +142,9 @@ room_manage(action=create) / room_manage(action=join)
 
 방 생성 온보딩:
 - `room_manage(action=create)` 응답에 `invite_share_text`, `join_command`, `onboarding`, `recommended_flow`, `suggested_next_actions`가 들어간다.
-- 채팅 응답은 길게 설명하지 말고 “invite_share_text 공유 → 팀원 초대 → 역할분배/로드맵 시작” 정도만 짧게 안내한다.
+- 채팅 응답은 길게 설명하지 말고 “invite_share_text 공유 → 팀원 초대 → 주제 분석/로드맵 생성”을 먼저 안내한다.
+- 기본 흐름은 `방 생성 → 팀원 초대 → 주제 분석/로드맵 생성 → 로드맵 의견수렴/수정 → 마일스톤 기반 역할분배 → 개인별 todo 분해`다.
+- 역할분배를 먼저 하는 흐름은 사용자가 “이미 역할이 정해졌다/팀원 전문성이 확정됐다”고 명시한 경우만 예외로 둔다.
 
 ### 2. 역할분배
 
@@ -177,6 +179,7 @@ assign_roles
 
 ```text
 build_roadmap
+→ gather_task_opinions(scope='roadmap') 또는 바로 다음 단계
 → set_roles
 → decompose_roadmap
 → member_tasks(member='all', window='week')
