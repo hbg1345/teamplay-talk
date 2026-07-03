@@ -185,9 +185,9 @@ h2{font-size:clamp(28px,4.4vw,44px)}
 .maker.b .face{background:var(--violet-2)}
 .maker .face img{width:100%;height:100%;object-fit:cover;object-position:center 12%}
 .maker h3{font-size:19px}
-.mk-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.mk-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .mk-links{display:flex;gap:8px}
-.mk-link{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.01em;color:var(--muted);background:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.5);backdrop-filter:blur(11px) saturate(1.35);-webkit-backdrop-filter:blur(11px) saturate(1.35);box-shadow:0 2px 7px rgba(80,52,140,.05);transition:color .18s,background .18s,transform .16s,box-shadow .18s}
+.mk-link{display:inline-flex;align-items:center;gap:5px;padding:5px 13px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.02em;color:var(--muted);background:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.65);backdrop-filter:blur(12px) saturate(1.4);-webkit-backdrop-filter:blur(12px) saturate(1.4);box-shadow:0 1px 3px rgba(80,52,140,.04),inset 0 1px 0 rgba(255,255,255,.6);transition:color .18s,background .18s,transform .16s,box-shadow .18s}
 .mk-link svg{display:none}
 .mk-link:hover{color:var(--ink);background:rgba(255,255,255,.62);transform:translateY(-1px);box-shadow:0 5px 12px rgba(80,52,140,.1)}
 @media(max-width:560px){.mk-link{width:32px;height:32px;padding:0;gap:0;justify-content:center}.mk-link .mk-txt{display:none}.mk-link svg{display:inline-flex;width:15px;height:15px}}
@@ -854,7 +854,7 @@ var EN={
   "doc_title":"teamplay-talk — Your team's PM, handled by AI",
   "nav_how":"How it works","nav_demo":"Demo","nav_flow":"Workflow","nav_features":"Features","nav_makers":"Makers","nav_cta":"Connect PlayMCP",
   "hero_badge":"Kakao PlayMCP · team-project MCP",
-  "hero_h1":"Your team's PM,<br>handed to <span class=\"mlg\">AI<svg class=\"wave-underline\" viewBox=\"0 0 120 14\" preserveAspectRatio=\"none\" aria-hidden=\"true\"><defs><linearGradient id=\"ulg2\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"0\"><stop stop-color=\"#7c3aed\"/><stop offset=\"1\" stop-color=\"#22b8ff\"/></linearGradient></defs><path pathLength=\"100\" d=\"M2 8 H10 C24 4.5 38 4.5 52 8 C66 11.5 80 11.5 94 8 C104 5.8 112 5.8 118 8\" fill=\"none\" stroke=\"url(#ulg2)\" stroke-width=\"4.5\" stroke-linecap=\"round\"/></svg></span>",
+  "hero_h1":"Your team's PM,<br>handed to <span class=\"mlg\">AI<svg class=\"wave-underline\" viewBox=\"0 0 120 14\" preserveAspectRatio=\"none\" aria-hidden=\"true\"><defs><linearGradient id=\"ulg2\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"0\"><stop stop-color=\"#7c3aed\"/><stop offset=\"1\" stop-color=\"#22b8ff\"/></linearGradient></defs><path pathLength=\"100\" d=\"M2 8 C10 4.5 22 4.5 32 8 S54 11.5 64 8 S86 4.5 96 8 C106 11.5 112 8 118 8\" fill=\"none\" stroke=\"url(#ulg2)\" stroke-width=\"4.5\" stroke-linecap=\"round\"/></svg></span>",
   "hero_sub":"Polls, meeting times, role splits, roadmaps, daily reports — all of it. AI handles the busywork of team coordination like a PM, and teammates just reply in the KakaoTalk they already use.",
   "cta_primary":"Connect on PlayMCP","cta_ghost":"See how it works","chat_head":"teamplay-talk · AI conversation demo",
   "how_h2":"One word from the owner,<br>and it reaches the whole team.","how_p":"No installs, no new app. Teammates get forms and alerts in the KakaoTalk they already use, and reply with a single link.",
@@ -959,7 +959,7 @@ def _page() -> str:
   <div class="wrap hero-inner">
     <div>
       <span class="hero-badge lg"><span class="dot"></span><span data-i18n="hero_badge">Kakao PlayMCP · 팀플 협업 MCP</span></span>
-      <h1 data-i18n="hero_h1">팀플의 PM을,<br>AI에게 <span class="mlg">맡기세요<svg class="wave-underline" viewBox="0 0 120 14" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="ulg" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#7c3aed"/><stop offset="1" stop-color="#22b8ff"/></linearGradient></defs><path pathLength="100" d="M2 8 H10 C24 4.5 38 4.5 52 8 C66 11.5 80 11.5 94 8 C104 5.8 112 5.8 118 8" fill="none" stroke="url(#ulg)" stroke-width="4.5" stroke-linecap="round"/></svg></span></h1>
+      <h1 data-i18n="hero_h1">팀플의 PM을,<br>AI에게 <span class="mlg">맡기세요<svg class="wave-underline" viewBox="0 0 120 14" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="ulg" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#7c3aed"/><stop offset="1" stop-color="#22b8ff"/></linearGradient></defs><path pathLength="100" d="M2 8 C10 4.5 22 4.5 32 8 S54 11.5 64 8 S86 4.5 96 8 C106 11.5 112 8 118 8" fill="none" stroke="url(#ulg)" stroke-width="4.5" stroke-linecap="round"/></svg></span></h1>
       <p class="hero-sub" data-i18n="hero_sub">투표, 회의 시간, 역할 분배, 로드맵, 데일리 리포트까지.
       손 많이 가는 팀플 조율은 AI가 PM처럼 맡고, 팀원은 늘 쓰던 카카오톡으로 응답만 하면 돼요.</p>
       <div class="hero-ctas">
