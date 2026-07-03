@@ -241,6 +241,9 @@ footer{padding:50px 0 58px;border-top:1px solid var(--line)}
 .sr-slot{display:flex;flex-direction:column;min-height:0;height:100%;padding:12px;border-radius:var(--radius);outline:2px solid transparent;outline-offset:0;overflow:hidden}
 .sr-slot-tag{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--muted);padding:0 2px 8px;margin-bottom:6px;border-bottom:1px solid var(--line)}
 .sr-slot-tag b{color:var(--ink-soft);font-weight:800}
+#srMemberChan{display:inline-block}
+.sr-chan-swap{animation:chanSwap .5s cubic-bezier(.2,.85,.25,1)}
+@keyframes chanSwap{0%{opacity:0;transform:translateY(5px);color:var(--violet)}55%{color:var(--violet)}100%{opacity:1;transform:translateY(0)}}
 .sr-msgs{flex:1;min-height:0;display:flex;flex-direction:column;gap:9px;padding:0 3px 4px;overflow-y:auto;scroll-behavior:smooth;overscroll-behavior:contain;overflow-anchor:none;scrollbar-width:none;-ms-overflow-style:none}
 .sr-msgs::-webkit-scrollbar{display:none}
 .sr-actionbar{flex:none;height:52px;min-height:52px;display:flex;align-items:flex-end;justify-content:flex-end;padding:8px 2px 0}
@@ -536,7 +539,7 @@ function cdPlay(i){
       ? '<b>AI PM workflow</b><span>Owner talks on PlayMCP → team replies in KakaoTalk → AI wraps up</span>'
       : '<b>AI PM 워크플로우</b><span>방장 PlayMCP 대화 → 팀원 카카오톡 응답 → AI 정리</span>';
   }
-  function setMember(name,chan){ if(memberName)memberName.textContent=name; if(memberChan)memberChan.textContent=tr(chan||'카카오톡'); }
+  function setMember(name,chan){ if(memberName)memberName.textContent=name; if(memberChan){ var nc=tr(chan||'카카오톡'); if(memberChan.textContent!==nc){ memberChan.textContent=nc; memberChan.classList.remove('sr-chan-swap'); void memberChan.offsetWidth; memberChan.classList.add('sr-chan-swap'); } } }
   // 받음 플래시: 받는 패널이 잠깐 리플-아웃 링으로 반짝 (강제 리플로우 없이 rAF로 재시작 → 안 들썩)
   function flash(el){ if(!el)return; el.classList.remove('rx'); requestAnimationFrame(function(){ el.classList.add('rx'); }); after(650,function(){ el.classList.remove('rx'); }); }
   function divider(box,text){ var d=document.createElement('div'); d.className='sr-chapdiv'; d.textContent=text; box.appendChild(d); rev(box,d); }
@@ -978,12 +981,12 @@ def _page() -> str:
     <div class="sec-head rv">
       <span class="eyebrow">How it works</span>
       <h2 data-i18n="how_h2">방장이 한마디면,<br>팀 전체에 후두둑.</h2>
-      <p data-i18n="how_p">설치도, 새 앱도 없습니다. 팀원들은 늘 쓰던 카카오톡으로 폼과 알림을 받고, 링크 하나로 응답합니다.</p>
+      <p data-i18n="how_p">설치도, 새 앱도 없어요. 팀원들은 늘 쓰던 카카오톡으로 폼과 알림을 받고, 링크 하나로 응답해요.</p>
     </div>
     <div class="steps">
-      <div class="step card rv d1"><div class="no">STEP 1</div><h3 data-i18n="s1t">PlayMCP에서 연결</h3><p data-i18n="s1d">카카오 로그인 한 번으로 teamplay-talk가 AI 에이전트에 연결됩니다.</p></div>
-      <div class="step card rv d2"><div class="no">STEP 2</div><h3 data-i18n="s2t">AI에게 말하기</h3><p data-i18n="s2d">"역할 나눠줘", "회의 시간 잡아줘". 자연어 한마디면 충분합니다.</p></div>
-      <div class="step card rv d3"><div class="no">STEP 3</div><h3 data-i18n="s3t">팀에 자동 전파</h3><p data-i18n="s3d">폼·투표·공지가 팀원들의 카카오톡으로 퍼집니다.</p></div>
+      <div class="step card rv d1"><div class="no">STEP 1</div><h3 data-i18n="s1t">PlayMCP에서 연결</h3><p data-i18n="s1d">카카오 로그인 한 번으로 teamplay-talk가 AI 에이전트에 연결돼요.</p></div>
+      <div class="step card rv d2"><div class="no">STEP 2</div><h3 data-i18n="s2t">AI에게 말하기</h3><p data-i18n="s2d">"역할 나눠줘", "회의 시간 잡아줘". 자연어 한마디면 충분해요.</p></div>
+      <div class="step card rv d3"><div class="no">STEP 3</div><h3 data-i18n="s3t">팀에 자동 전파</h3><p data-i18n="s3d">폼·투표·공지가 팀원들의 카카오톡으로 퍼져요.</p></div>
       <div class="step card rv d1"><div class="no">STEP 4</div><h3 data-i18n="s4t">AI가 정리·결정</h3><p data-i18n="s4d">응답이 모이면 AI가 받아서 분석하고, 결과와 다음 행동까지 정리해줘요.</p></div>
     </div>
     <div class="flow-line rv">
