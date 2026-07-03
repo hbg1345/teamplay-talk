@@ -186,6 +186,7 @@ h2{font-size:clamp(28px,4.4vw,44px)}
 .maker .face img{width:100%;height:100%;object-fit:cover;object-position:center 12%}
 .maker h3{font-size:19px}
 .mk-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.mk-head h3{line-height:1;margin:0}
 .mk-links{display:flex;gap:8px}
 .mk-link{display:inline-flex;align-items:center;gap:5px;padding:5px 13px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.02em;color:var(--muted);background:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.65);backdrop-filter:blur(12px) saturate(1.4);-webkit-backdrop-filter:blur(12px) saturate(1.4);box-shadow:0 1px 3px rgba(80,52,140,.04),inset 0 1px 0 rgba(255,255,255,.6);transition:color .18s,background .18s,transform .16s,box-shadow .18s}
 .mk-link svg{display:none}
