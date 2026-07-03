@@ -1,6 +1,19 @@
 {
   "fill" : {
-    "solid" : "display-p3:0.94434,0.93604,0.97949,1.00000"
+    "linear-gradient" : [
+      "display-p3:0.94434,0.93604,0.97949,1.00000",
+      "display-p3:0.85052,0.84155,0.88848,1.00000"
+    ],
+    "orientation" : {
+      "start" : {
+        "x" : 0.5,
+        "y" : 1
+      },
+      "stop" : {
+        "x" : 0.5,
+        "y" : 0.3
+      }
+    }
   },
   "groups" : [
     {
@@ -30,10 +43,10 @@
           "image-name" : "Vector (Stroke).svg",
           "name" : "Vector (Stroke)",
           "position" : {
-            "scale" : 0.45,
+            "scale" : 0.42,
             "translation-in-points" : [
-              0,
-              0
+              0.10170294819630499,
+              0.1529150552804026
             ]
           }
         }
@@ -46,6 +59,19 @@
       "translucency" : {
         "enabled" : true,
         "value" : 0.2
+      }
+    },
+    {
+      "layers" : [
+
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
       }
     }
   ],

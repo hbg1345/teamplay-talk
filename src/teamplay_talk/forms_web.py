@@ -17,7 +17,13 @@ from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse
 
 from . import storage
-from .ui_theme import APP_FONT_LINKS, APP_REACT_LIQUID_BOOTSTRAP, APP_REACT_LIQUID_IMPORTS, APP_THEME_CSS
+from .ui_theme import (
+    APP_FONT_LINKS,
+    APP_REACT_LIQUID_BOOTSTRAP,
+    APP_REACT_LIQUID_IMPORTS,
+    APP_THEME_CSS,
+    APP_WORDMARK_HTML,
+)
 
 _PAGE = """<!doctype html>
 <html lang="ko"><head><meta charset="utf-8">
@@ -154,6 +160,7 @@ __APP_REACT_LIQUID_IMPORTS__
    .schedule__body{padding:.75rem}
  }
 </style></head><body>
+<div class="tp-brandbar">__APP_WORDMARK__</div>
 <div id="surveyContainer"></div>
 <div id="done" class="glass-panel" style="display:none"><h2>응답 완료</h2><p>제출해 주셔서 감사합니다.</p></div>
 <script>
@@ -504,6 +511,7 @@ async def view_form(request: Request) -> HTMLResponse:
         .replace("__APP_REACT_LIQUID_IMPORTS__", APP_REACT_LIQUID_IMPORTS)
         .replace("__APP_REACT_LIQUID_BOOTSTRAP__", APP_REACT_LIQUID_BOOTSTRAP)
         .replace("__APP_THEME_CSS__", APP_THEME_CSS)
+        .replace("__APP_WORDMARK__", APP_WORDMARK_HTML)
         .replace("__SCHEMA__", schema_str)
     )
     return HTMLResponse(page)

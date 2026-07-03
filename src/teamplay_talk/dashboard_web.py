@@ -21,6 +21,7 @@ from starlette.responses import HTMLResponse
 from . import storage
 from .config import settings
 from .ui_theme import (
+    APP_BRAND_MARK_SVG,
     APP_FONT_LINKS,
     APP_LUCIDE_SCRIPT,
     APP_THEME_CSS,
@@ -202,7 +203,9 @@ __APP_LUCIDE_SCRIPT__
   .workspace{position:sticky;top:16px;min-height:calc(100vh - 32px);display:flex;flex-direction:column;padding:14px;background:linear-gradient(180deg,var(--workspace),var(--workspace-2));color:#fff8e8;box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 28px 80px rgba(37,33,29,.20)}
   .workspace__top{display:grid;gap:12px;padding:4px 4px 14px;border-bottom:1px solid rgba(255,255,255,.14)}
   .workspace__mark{display:grid;place-items:center;width:38px;height:38px;border-radius:8px;background:var(--kakao-yellow);color:var(--kakao-black);box-shadow:0 12px 30px rgba(254,229,0,.18);font-family:var(--font-display);font-weight:800}
+  .workspace__mark .tp-mark{width:23px;height:auto}
   .eyebrow{margin:0;color:rgba(255,248,232,.62);font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+  .tp-eyebrow{color:rgba(255,248,232,.74);font-size:.8rem;letter-spacing:.005em;text-transform:none}
   h1{margin:2px 0 0;font-family:var(--font-display);font-size:1.55rem;line-height:1.12;letter-spacing:0;font-weight:800;color:#fff8e8}
   .workspace__sub{margin:7px 0 0;color:rgba(255,248,232,.66);line-height:1.45;font-size:.88rem}
   .workspace__nav{display:grid;gap:3px;margin:14px 0;padding:0;list-style:none}
@@ -370,9 +373,9 @@ __APP_LUCIDE_SCRIPT__
 <div class="shell" id="dashboardShell">
   <aside class="workspace">
     <div class="workspace__top">
-      <div class="workspace__mark">T</div>
+      <div class="workspace__mark">__APP_BRAND_MARK__</div>
       <div class="workspace__copy">
-        <p class="eyebrow">Teamplay room</p>
+        <p class="eyebrow tp-eyebrow">teamplay-talk</p>
         <h1 id="roomName"></h1>
         <p class="workspace__sub" id="roomInvite"></p>
       </div>
@@ -974,6 +977,7 @@ async def view_room_dashboard(request: Request) -> HTMLResponse:
         .replace("__APP_LUCIDE_SCRIPT__", APP_LUCIDE_SCRIPT)
         .replace("__APP_REACT_LIQUID_BOOTSTRAP__", "")
         .replace("__APP_THEME_CSS__", APP_THEME_CSS)
+        .replace("__APP_BRAND_MARK__", APP_BRAND_MARK_SVG)
         .replace("__DATA__", safe_data)
     )
     return HTMLResponse(page)
