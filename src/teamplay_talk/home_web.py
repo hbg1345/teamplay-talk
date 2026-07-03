@@ -185,6 +185,11 @@ h2{font-size:clamp(28px,4.4vw,44px)}
 .maker.b .face{background:var(--violet-2)}
 .maker .face img{width:100%;height:100%;object-fit:cover;object-position:center 12%}
 .maker h3{font-size:19px}
+.mk-head{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.mk-links{display:flex;gap:7px}
+.mk-link{width:31px;height:31px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;color:var(--violet);background:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.6);backdrop-filter:blur(14px) saturate(1.6);-webkit-backdrop-filter:blur(14px) saturate(1.6);box-shadow:0 4px 12px rgba(80,52,140,.1),inset 0 1px 1px rgba(255,255,255,.8);transition:transform .16s,box-shadow .2s,background .2s}
+.mk-link:hover{transform:translateY(-2px);background:rgba(255,255,255,.68);box-shadow:0 8px 18px rgba(80,52,140,.16),inset 0 1px 1px rgba(255,255,255,.92)}
+.mk-link svg{width:15px;height:15px}
 .maker .cred{list-style:none;margin:9px 0 0;padding:0;display:flex;flex-direction:column;gap:5px}
 .maker .cred li{font-size:13px;color:var(--muted);line-height:1.4}
 .maker .cred li b{color:var(--ink);font-weight:700}
@@ -853,7 +858,7 @@ var EN={
   "cta_primary":"Connect on PlayMCP","cta_ghost":"See how it works","chat_head":"teamplay-talk · AI conversation demo",
   "how_h2":"One word from the owner,<br>and it reaches the whole team.","how_p":"No installs, no new app. Teammates get forms and alerts in the KakaoTalk they already use, and reply with a single link.",
   "s1t":"Connect on PlayMCP","s1d":"One Kakao login connects teamplay-talk to your AI agent.",
-  "s2t":"Talk to the AI","s2d":"\"Split the roles,\" \"find a meeting time.\" One line of natural language is enough.",
+  "s2t":"Talk to the AI","s2d":"\"Split the roles,\" \"find a meeting time.\" Just say it — one line is enough.",
   "s3t":"Auto-broadcast to the team","s3d":"Forms, polls, and notices spread to your teammates' KakaoTalk.",
   "s4t":"AI wraps up & decides","s4d":"As replies come in, AI analyzes them and lays out the result and next move.",
   "flow1":"Talk to AI on <b>PlayMCP</b>","flow2":"<b>teamplay-talk</b> runs","flow3":"Team <b>KakaoTalk · forms · calendar</b>",
@@ -985,7 +990,7 @@ def _page() -> str:
     </div>
     <div class="steps">
       <div class="step card rv d1"><div class="no">STEP 1</div><h3 data-i18n="s1t">PlayMCP에서 연결</h3><p data-i18n="s1d">카카오 로그인 한 번으로 teamplay-talk가 AI 에이전트에 연결돼요.</p></div>
-      <div class="step card rv d2"><div class="no">STEP 2</div><h3 data-i18n="s2t">AI에게 말하기</h3><p data-i18n="s2d">"역할 나눠줘", "회의 시간 잡아줘". 자연어 한마디면 충분해요.</p></div>
+      <div class="step card rv d2"><div class="no">STEP 2</div><h3 data-i18n="s2t">AI에게 말하기</h3><p data-i18n="s2d">"역할 나눠줘", "회의 시간 잡아줘". 말하듯 한마디면 충분해요.</p></div>
       <div class="step card rv d3"><div class="no">STEP 3</div><h3 data-i18n="s3t">팀에 자동 전파</h3><p data-i18n="s3d">폼·투표·공지가 팀원들의 카카오톡으로 퍼져요.</p></div>
       <div class="step card rv d1"><div class="no">STEP 4</div><h3 data-i18n="s4t">AI가 정리·결정</h3><p data-i18n="s4d">응답이 모이면 AI가 받아서 분석하고, 결과와 다음 행동까지 정리해줘요.</p></div>
     </div>
@@ -1041,7 +1046,7 @@ def _page() -> str:
       <div class="maker card rv d1 a">
         {_avatar("박", "av-park.png")}
         <div>
-          <h3>박세원</h3>
+          <div class="mk-head"><h3>박세원</h3><div class="mk-links"><a class="mk-link" href="https://sewon-p.github.io" target="_blank" rel="noopener" aria-label="포트폴리오"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg></a><a class="mk-link" href="https://www.linkedin.com/in/sewon-park-328102368/" target="_blank" rel="noopener" aria-label="LinkedIn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.94 5a2 2 0 1 1-4-.002 2 2 0 0 1 4 .002zM7 8.48H3V21h4V8.48zm6.32 0H9.34V21h3.94v-6.57c0-3.66 4.77-4 4.77 0V21H22v-7.93c0-6.17-7.06-5.94-8.72-2.91l.04-1.68z"/></svg></a></div></div>
           <ul class="cred">
             <li><b>University of Seoul</b> · B.Eng. Transportation Eng.</li>
             <li><b>Arthur D. Little</b> · Strategy Consulting Intern</li>
