@@ -321,6 +321,9 @@ footer{padding:50px 0 58px;border-top:1px solid var(--line)}
   .sr-slot{min-height:0}.sr-logo{width:44px;height:44px}.sr-status{position:absolute;left:calc(50% + 34px);top:50%;transform:translateY(-50%);width:auto;max-width:calc(50% - 46px);white-space:nowrap;overflow:hidden;text-align:left}
   .sr-ding{top:50%;margin-top:-22px;width:44px;height:44px}
   .sr-caption span{display:none}
+  .sr-replay{width:34px;height:34px;top:12px;right:12px;font-size:15px}
+  .sr-caption{min-height:36px;padding-right:44px}
+  .sr-flow{margin-top:6px}
 }
 
 @media (prefers-reduced-motion: reduce){
