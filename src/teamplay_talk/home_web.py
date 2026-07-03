@@ -917,10 +917,15 @@ def _page() -> str:
 <meta name="description" content="AI에게 한마디면 투표·회의 시간·역할 분배·로드맵·데일리 리포트까지. 결과는 팀원들의 카카오톡으로. 팀플 조율을 AI가 PM처럼 해내는 Kakao PlayMCP 협업 도구.">
 <meta property="og:title" content="teamplay-talk — 팀플의 PM을, AI에게">
 <meta property="og:description" content="조율은 AI가, 팀은 실행만. Kakao PlayMCP에서 바로 연결하세요.">
-<meta property="og:image" content="/og-image.png">
+<meta property="og:url" content="https://teamplay-talk.tech/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="teamplay-talk">
+<meta property="og:image" content="https://teamplay-talk.tech/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="teamplay-talk">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://teamplay-talk.tech/og-image.png">
 <meta name="theme-color" content="#F4F1FB">
 <link rel="icon" type="image/png" href="/favicon.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
