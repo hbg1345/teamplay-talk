@@ -85,7 +85,7 @@ h2{font-size:clamp(28px,4.4vw,44px)}
 .hero h1{font-size:clamp(40px,6.1vw,64px);letter-spacing:-.035em;margin:24px 0 0}
 .mlg{position:relative;display:inline-block;color:var(--violet);isolation:isolate}
 .mlg::after{content:"";position:absolute;left:-3%;right:-3%;bottom:-17px;height:18px;border-radius:999px;z-index:1;pointer-events:none;opacity:0;background:linear-gradient(100deg,rgba(255,255,255,0),rgba(255,255,255,.62) 30%,rgba(34,184,255,.22) 50%,rgba(124,58,237,.18) 70%,rgba(255,255,255,0));filter:blur(5px);transform:scaleX(.72);transform-origin:center;animation:mlgPrismBreath 8.8s cubic-bezier(.22,1,.36,1) 1.2s infinite}
-.wave-underline{position:absolute;left:-4%;bottom:-15px;width:108%;height:16px;overflow:visible;z-index:2;filter:drop-shadow(0 5px 10px rgba(124,58,237,.13))}
+.wave-underline{position:absolute;left:2%;bottom:-15px;width:108%;height:16px;overflow:visible;z-index:2;filter:drop-shadow(0 5px 10px rgba(124,58,237,.13))}
 .wave-underline path{stroke-linejoin:round;opacity:.96;stroke-dasharray:100;stroke-dashoffset:100;animation:waveDraw 1.05s cubic-bezier(.62,0,.34,1) .4s forwards,waveBreath 4.2s ease-in-out 1.7s infinite}
 @keyframes waveDraw{to{stroke-dashoffset:0}}
 @keyframes waveBreath{0%,100%{stroke-width:4.3;filter:brightness(1)}50%{stroke-width:4.9;filter:brightness(1.16)}}
