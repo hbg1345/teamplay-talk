@@ -64,11 +64,11 @@ h2{font-size:clamp(28px,4.4vw,44px)}
 
 /* ── 나브 ── */
 .nav{position:fixed;top:18px;left:0;right:0;z-index:50}
-.nav-pill{display:flex;align-items:center;gap:6px;max-width:min(760px,calc(100% - 32px));margin:0 auto;padding:8px 10px 8px 12px;border-radius:999px}
+.nav-pill{display:flex;align-items:center;gap:6px;width:fit-content;max-width:calc(100% - 20px);margin:0 auto;padding:8px 10px 8px 12px;border-radius:999px}
 .nav-brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:15px;letter-spacing:-.01em;margin-right:6px;color:var(--ink)}
 .nav-brand img{width:28px;height:28px;border-radius:8px}
-.nav-links{display:flex;gap:2px;margin-left:auto}
-.nav-links a{padding:8px 13px;border-radius:999px;font-size:14px;color:var(--ink-soft);transition:background .18s,color .18s}
+.nav-links{display:flex;gap:2px;margin-left:14px}
+.nav-links a{padding:8px 12px;border-radius:999px;font-size:14px;color:var(--ink-soft);transition:background .18s,color .18s;white-space:nowrap}
 .nav-links a:hover{background:rgba(124,58,237,.09);color:var(--ink)}
 .nav-links a.active{color:var(--violet);background:rgba(255,255,255,.9);box-shadow:0 2px 8px rgba(80,52,140,.14)}
 .nav-cta{margin-left:8px;padding:9px 18px;border-radius:999px;font-size:14px;font-weight:700;color:#fff;
@@ -188,12 +188,12 @@ h2{font-size:clamp(28px,4.4vw,44px)}
 .connect{padding:60px min(6vw,72px);border-radius:28px;text-align:center;position:relative;overflow:hidden;background:var(--card)}
 .connect h2{position:relative;z-index:1}
 .connect p{color:var(--muted);margin:14px auto 0;max-width:480px;position:relative;z-index:1}
-.endpoint{position:relative;z-index:1;display:inline-flex;align-items:center;gap:12px;margin-top:30px;padding:12px 14px 12px 22px;border-radius:999px;background:var(--bg-2);
-  max-width:100%;flex-wrap:wrap;justify-content:center;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px;color:var(--ink-soft);word-break:break-all}
-@media(max-width:480px){.endpoint{font-size:12px;padding:11px 14px;gap:8px}}
-.endpoint button{border:1px solid rgba(255,255,255,.6);border-radius:999px;padding:8px 17px;font-size:13px;font-weight:800;cursor:pointer;color:var(--violet);font-family:var(--font);background:rgba(255,255,255,.5);backdrop-filter:blur(20px) saturate(1.7);-webkit-backdrop-filter:blur(20px) saturate(1.7);box-shadow:0 4px 14px rgba(80,52,140,.12),inset 0 1px 1px rgba(255,255,255,.85);transition:transform .15s,background .18s,box-shadow .18s}
-.endpoint button:hover{background:rgba(255,255,255,.66);box-shadow:0 6px 18px rgba(80,52,140,.16),inset 0 1px 1px rgba(255,255,255,.92)}
-.endpoint button:active{transform:scale(.95)}
+.endpoint{position:relative;z-index:1;display:inline-flex;align-items:center;gap:14px;margin-top:30px;padding:10px 12px 10px 22px;border-radius:999px;background:var(--bg-2);cursor:pointer;
+  max-width:100%;flex-wrap:nowrap;justify-content:center;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px;color:var(--ink-soft);white-space:nowrap;overflow-x:auto}
+@media(max-width:480px){.endpoint{font-size:12px;padding:12px 20px}.ep-copy{display:none}}
+.ep-copy{border:1px solid rgba(255,255,255,.6);border-radius:999px;padding:8px 18px;font-size:13px;font-weight:800;flex:none;cursor:pointer;color:var(--violet);font-family:var(--font);background:rgba(255,255,255,.5);backdrop-filter:blur(20px) saturate(1.7);-webkit-backdrop-filter:blur(20px) saturate(1.7);box-shadow:0 4px 14px rgba(80,52,140,.12),inset 0 1px 1px rgba(255,255,255,.85);transition:transform .15s,background .18s,box-shadow .18s}
+.endpoint:hover .ep-copy{background:rgba(255,255,255,.66);box-shadow:0 6px 18px rgba(80,52,140,.16),inset 0 1px 1px rgba(255,255,255,.92)}
+.endpoint:active .ep-copy{transform:scale(.95)}
 .connect .hero-ctas{justify-content:center;position:relative;z-index:1}
 
 /* ── 푸터 ── */
@@ -202,6 +202,7 @@ footer{padding:50px 0 58px;border-top:1px solid var(--line)}
 .foot-brand{display:flex;align-items:center;gap:11px;font-weight:800;color:var(--ink)}
 .foot-brand img{width:30px;height:30px;border-radius:9px}
 .foot small{color:var(--muted);font-size:13px}
+.foot-end{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 
 /* ── 스크롤 리빌 ── */
 .rv{opacity:0;transform:translateY(24px);transition:opacity .7s cubic-bezier(.2,.8,.2,1),transform .7s cubic-bezier(.2,.8,.2,1)}
@@ -297,7 +298,7 @@ footer{padding:50px 0 58px;border-top:1px solid var(--line)}
 @keyframes srPick{0%{transform:scale(.92);filter:saturate(.8)}100%{transform:none;filter:saturate(1)}}
 @keyframes srSubmit{0%{transform:scale(.92)}70%{transform:scale(1.06)}100%{transform:none}}
 /* 중앙 AI/MCP 허브 */
-.sr-hub{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;position:relative;align-self:stretch;height:100%;margin-top:0;min-width:0;transform:translateY(17px)}
+.sr-hub{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;position:relative;z-index:4;align-self:stretch;height:100%;margin-top:0;min-width:0;transform:translateY(17px)}
 .sr-logo{width:52px;height:52px;border-radius:14px;position:relative;z-index:2;box-shadow:0 8px 22px rgba(109,92,245,.28),0 0 0 1px rgba(255,255,255,.6);transition:filter .3s}
 .sr-hub.dinging .sr-logo{filter:brightness(1.12)}
 .sr-status{font-size:11px;font-weight:800;letter-spacing:.02em;color:var(--violet);opacity:.9;width:120px;height:26px;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.25;overflow:hidden}
@@ -316,8 +317,8 @@ footer{padding:50px 0 58px;border-top:1px solid var(--line)}
 }
 @media(max-width:600px){
   .sr-flow{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto minmax(0,1fr);gap:10px}
-  .sr-slot.owner{order:0}.sr-hub{order:1;flex-direction:row;gap:10px;align-self:auto;height:auto;margin-top:0;transform:none}.sr-slot.member{order:2}
-  .sr-slot{min-height:0}.sr-logo{width:44px;height:44px}
+  .sr-slot.member{order:0}.sr-hub{order:1;flex-direction:row;gap:10px;align-self:auto;height:auto;margin-top:0;transform:none}.sr-slot.owner{order:2}
+  .sr-slot{min-height:0}.sr-logo{width:44px;height:44px}.sr-status{position:absolute;left:calc(50% + 34px);top:50%;transform:translateY(-50%);width:auto;max-width:calc(50% - 46px);white-space:nowrap;overflow:hidden;text-align:left}
   .sr-ding{top:50%;margin-top:-22px;width:44px;height:44px}
 }
 
@@ -348,24 +349,24 @@ document.querySelectorAll('.rv').forEach(el=>io.observe(el));
 })();
 function copyEndpoint(btn){
   const url='https://teamplay-talk.tech/mcp/';
-  if(!btn.dataset.label)btn.dataset.label=btn.textContent;
-  const flash=ok=>{btn.textContent=ok?'복사됨!':'복사 실패';clearTimeout(btn._t);btn._t=setTimeout(()=>{btn.textContent=btn.dataset.label},1600)};
+  const lbl=btn.querySelector('.ep-copy')||btn;
+  const flash=ok=>{lbl.textContent=ok?(LANG==='en'?'Copied!':'복사됨!'):(LANG==='en'?'Copy failed':'복사 실패');clearTimeout(lbl._t);lbl._t=setTimeout(()=>{lbl.textContent=(LANG==='en'?'Copy':'복사')},1600)};
   if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(url).then(()=>flash(true)).catch(()=>flash(false));}
   else{try{const ta=document.createElement('textarea');ta.value=url;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.focus();ta.select();document.execCommand('copy');document.body.removeChild(ta);flash(true)}catch(e){flash(false)}}
 }
 window.copyEndpoint=copyEndpoint;
 
 // 인터랙티브 채팅 데모 — 실제 MCP 흐름(확인 게이트). CD 순서 = 칩 순서.
-const CD=[
+var CD_KO=[
  [{r:'user',t:'카카오 MCP 대회 로드맵 짜줘'},
   {r:'ai',t:'마감(7/14)까지 <b>6단계</b>로 잡았어요.<br>1 주제·기획 <span>~6/20</span><br>2 서버+카카오 인증 <span>~6/26</span><br>3 핵심 기능 <span>~7/4</span><br>4 홈페이지·데모 <span>~7/9</span><br>5 QC·리허설 <span>~7/12</span><br>6 제출 <span>~7/14</span>'},
   {r:'user',t:'좋아'},
-  {r:'ai',t:'확정 — 각 단계를 <b>개인 todo</b>로 쪼개 배정했어요 (함봉구 인증 · 이민지 폼 UI · 김주호 발표). 각자 카톡으로 보냈어요.'}],
+  {r:'ai',t:'확정 — 각 단계를 <b>개인 todo</b>로 쪼개 배정했어요 (함봉구 백엔드 · 이민지 UI · 김주호 프론트). 각자 카톡으로 보냈어요.'}],
  [{r:'user',t:'역할 좀 나눠줘'},
-  {r:'ai',t:'<b>4개 역할</b>(기획·개발·디자인·문서)로 나눴어요. 선호 순위 받을까요?'},
+  {r:'ai',t:'<b>4개 역할</b>(기획·백엔드·프론트·디자인)로 나눴어요. 선호 순위 받을까요?'},
   {r:'user',t:'ㅇㅇ'},
   {r:'ai',t:'팀원들 <b>선호 순위</b>를 받았어요. 이제 배정할게요.'},
-  {r:'ai',t:'선호·난이도 균형으로 배정했어요.<br>박세원 <b>기획·PM</b> · 함봉구 <b>MCP서버</b><br>이민지 <b>데모UX</b> · 김주호 <b>테스트·발표</b><br>확정하고 공지했어요.'}],
+  {r:'ai',t:'선호·난이도 균형으로 배정했어요.<br>박세원 <b>기획·PM</b> · 함봉구 <b>백엔드</b><br>이민지 <b>디자인·UX</b> · 김주호 <b>프론트엔드</b><br>확정하고 공지했어요.'}],
  [{r:'user',t:'이번 주 회의 시간 잡아줘'},
   {r:'ai',t:'오늘부터 2주 <b>가능 시간표</b>를 만들었어요. 팀원 4명에게 보낼까요?'},
   {r:'user',t:'응 보내줘'},
@@ -379,10 +380,11 @@ const CD=[
   {r:'user',t:'보내줘'},
   {r:'ai',t:'집계 완료 — <b>삼겹살</b> 5표로 1등 (초밥 2·파스타 1). 결과 공지했어요.'}],
  [{r:'user',t:'오늘 팀 현황 어때?'},
-  {r:'ai',t:'어젯밤 체크인 요약이에요.<br>완료 4 · 진행 3 · 밀림 1<br>함봉구 인증 <b>완료</b> · 이민지 폼 UI 60% · 김주호 발표 <b>밀림</b>(오늘 이월)<br>아침 리포트 보낼까요?'},
+  {r:'ai',t:'어젯밤 체크인 요약이에요.<br>완료 4 · 진행 3 · 밀림 1<br>함봉구 백엔드 <b>완료</b> · 이민지 UI 60% · 김주호 프론트 <b>밀림</b>(오늘 이월)<br>아침 리포트 보낼까요?'},
   {r:'user',t:'응'},
   {r:'ai',t:'팀 카톡에 <b>아침 리포트</b> 보냈어요. 밀린 일은 오늘 체크인에 자동으로 올라가요.'}]
 ];
+var CD=(LANG==='en')?CD_EN:CD_KO;
 let cdTok=0, cdCur=0;
 function cdPlay(i){
   cdCur=i;
@@ -406,6 +408,7 @@ function cdPlay(i){
     bar.classList.toggle('sc-left', s>1); bar.classList.toggle('sc-right', s<max-1); }
   if(chips){ chips.addEventListener('scroll',fades,{passive:true}); window.addEventListener('resize',fades); fades(); setTimeout(fades,120); }
   if(document.querySelector('.demo-chip')) cdPlay(0);
+  window.__tptReloadCD=function(){ CD=(LANG==='en')?CD_EN:CD_KO; cdPlay(cdCur||0); };
 })();
 
 // 튜토리얼 모션그래픽: 방장 PlayMCP AI → MCP → 팀원 개인카톡+폼 (전체 워크플로우)
@@ -421,7 +424,7 @@ function cdPlay(i){
       replayBtn=document.getElementById('srReplay');
   var reduce=window.matchMedia('(prefers-reduced-motion:reduce)').matches;
   // 채팅창 안에서 누를 '다음 대화' 라벨 (auto는 시간 경과 라벨)
-  var CHIPS=['대회방 만들어줘','로드맵 만들어줘','역할 나눠줘','할 일 만들어줘','클라우드 뭐 쓸지 물어봐','회의 시간 잡아줘','회의 장소 받아봐','⏰ 밤 9시 · 자동 체크인','⏰ 다음날 아침 · 자동 리포트','진행 공지해줘'];
+  var CHIPS=(LANG==='en')?CHIPS_EN:CHIPS_KO;
   // 고정 높이 채팅 패널 안에서만 재생한다. 뷰포트 IO에 맡기면 내부 스크롤 요소의 폼 애니메이션이 누락된다.
   function rev(box,el){
     if(reduce){ el.classList.add('in'); return; }
@@ -429,7 +432,7 @@ function cdPlay(i){
   }
 
   // 전체 워크플로우. member: 'join'(PlayMCP 참여) | 'none' | 'notice' | 'form' | 'auto' | 'autoform'
-  var STEPS=[
+  var STEPS_KO=[
    {cap:'방을 만들어요', sub:'방장은 방 생성 · 팀원은 PlayMCP로 참여', member:'join', who:'이민지', channel:'PlayMCP', think:'방 생성 중',
     cmd:'카카오 MCP 대회방 만들어줘',
     draft:"<b>'카카오 MCP 대회방'</b> 생성 완료.<br>초대 코드 <b>AbC123xY</b> <span>팀원에게 공유하세요</span>",
@@ -445,14 +448,14 @@ function cdPlay(i){
 
    {cap:'역할을 나눠요', sub:'선호 순위 폼 → 균형 배정', member:'form', who:'이민지', channel:'카카오톡', think:'역할 후보 생성 중', send:'선호도 폼 전송',
     cmd:'로드맵 기준 <b>역할분배</b> 시작해줘',
-    draft:'역할 후보 <b>5개</b>.<br>기획·PM / MCP서버 / 카카오OAuth / 데모UX / 테스트·발표<br><span>선호도 조사 보낼까요?</span>',
+    draft:'역할 후보 <b>5개</b>.<br>기획·PM / 백엔드 / 프론트엔드 / 디자인·UX / QA·발표<br><span>선호도 조사 보낼까요?</span>',
     kko:'<b>[팀플톡]</b> 역할 선호도 조사<br><span>응답하기 &#9656;</span>',
-    form:{type:'rank', title:'역할 선호 순위 (5개 모두)', items:['데모UX','테스트·발표','기획·PM','카카오OAuth','MCP서버']},
-    result:'박세원 <b>기획·PM</b> · 함봉구 <b>MCP·OAuth</b><br>이민지 <b>데모UX</b> · 김주호 <b>테스트·발표</b> <span>확정?</span>'},
+    form:{type:'rank', title:'역할 선호 순위 (5개 모두)', items:['디자인·UX','QA·발표','기획·PM','백엔드','프론트엔드']},
+    result:'박세원 <b>기획·PM</b> · 함봉구 <b>백엔드</b><br>이민지 <b>디자인·UX</b> · 김주호 <b>프론트엔드</b> <span>확정?</span>'},
 
-   {cap:'할 일로 쪼개요', sub:'로드맵 단계 × 역할 → 개인별 todo → 일정', member:'notice', who:'이민지', channel:'카카오톡', big:true, think:'로드맵·역할로 todo 분해 중', send:'카톡 전달',
+   {cap:'할 일로 쪼개요', sub:'로드맵 단계 × 역할 → 개인별 todo → 일정', member:'notice', who:'이민지', channel:'카카오톡', big:true, think:'할 일 분해 중', send:'카톡 전달',
     cmd:'로드맵 단계별로 팀원 <b>todo</b> 만들어줘',
-    draft:'로드맵 6단계를 <b>역할별 todo</b>로 쪼개 마감까지 붙였어요.<br>MCP서버 → 함봉구 · 데모UX → 이민지 · 발표 → 김주호',
+    draft:'로드맵 6단계를 <b>역할별 todo</b>로 쪼개 마감까지 붙였어요.<br>백엔드 → 함봉구 · 디자인·UX → 이민지 · 프론트 → 김주호',
     kko:'<b>[팀플톡] 내 할 일 · 이민지</b><br><b>이번 주</b><br>· 폼 화면 UX 다듬기 <span>~7/8</span><br>· 대시보드 정보구조 정리 <span>~7/9</span><br><b>다음 주</b><br>· 데모 화면 최종 점검 <span>~7/10</span><br><span>끝내면 밤 체크인에서 체크하면 돼요</span>',
     result:'전원에게 <b>마감 붙은 todo</b> 배정 완료.<br><span>이제 회의 일정을 잡을까요?</span>'},
 
@@ -463,7 +466,7 @@ function cdPlay(i){
     form:{type:'poll', title:'어떤 클라우드로 갈까?', opts:['AWS','GCP','Azure'], sel:'GCP'},
     result:'집계 완료 — <b>GCP</b> 3표로 결정.<br>팀에 공지했어요.'},
 
-   {cap:'회의 시간을 잡아요', sub:'그리드 체크 → 겹치는 시간 추천 → 톡캘린더 등록', member:'form', who:'이민지', channel:'카카오톡', think:'가능시간 그리드 생성 중', send:'시간 그리드 전송',
+   {cap:'회의 시간을 잡아요', sub:'그리드 체크 → 겹치는 시간 추천 → 톡캘린더 등록', member:'form', who:'이민지', channel:'카카오톡', think:'그리드 생성 중', send:'시간 그리드 전송',
     cmd:'이번 주 <b>전체 회의</b> 시간 잡아줘',
     draft:'날짜×시간 <b>가능표</b>를 만들었어요.<br><span>팀원에게 보낼까요?</span>',
     kko:'<b>[팀플톡]</b> 회의 가능 시간<br><span>되는 칸 모두 체크 &#9656;</span>',
@@ -499,6 +502,7 @@ function cdPlay(i){
     kko:'<b>[팀플톡] 대회 진행 정리</b><br><b>확정</b><br>· 로드맵 6단계 확정<br>· 역할 분배 완료<br>· 회의 <b>7/6(월) 21:00</b><br>· 제출 <b>7/10</b><br><b>오늘 집중</b><br>· MCP 안정화 · OAuth 검증 · 데모 정리 · 발표 초안<br><span>각자 todo 확인해주세요</span>',
     result:'팀 전원에게 공지 전송 완료.<br><span>대시보드에서 전체 흐름을 볼 수 있어요.</span>'}
   ];
+  var STEPS=(LANG==='en')?STEPS_EN:STEPS_KO;
 
   var SR={tok:0,timers:[],playing:false,cur:0,done:false,started:false,formEl:null};
   function after(ms,fn){ SR.timers.push(setTimeout(fn,ms)); }
@@ -518,16 +522,18 @@ function cdPlay(i){
   }
   function setCap(s){
     if(!cap)return;
-    cap.innerHTML='<b>AI PM 워크플로우</b><span>방장 PlayMCP 대화 → 팀원 카카오톡 응답 → AI 정리</span>';
+    cap.innerHTML=(LANG==='en')
+      ? '<b>AI PM workflow</b><span>Owner talks on PlayMCP → team replies in KakaoTalk → AI wraps up</span>'
+      : '<b>AI PM 워크플로우</b><span>방장 PlayMCP 대화 → 팀원 카카오톡 응답 → AI 정리</span>';
   }
-  function setMember(name,chan){ if(memberName)memberName.textContent=name; if(memberChan)memberChan.textContent=chan||'카카오톡'; }
+  function setMember(name,chan){ if(memberName)memberName.textContent=name; if(memberChan)memberChan.textContent=tr(chan||'카카오톡'); }
   // 받음 플래시: 받는 패널이 잠깐 리플-아웃 링으로 반짝 (강제 리플로우 없이 rAF로 재시작 → 안 들썩)
   function flash(el){ if(!el)return; el.classList.remove('rx'); requestAnimationFrame(function(){ el.classList.add('rx'); }); after(650,function(){ el.classList.remove('rx'); }); }
   function divider(box,text){ var d=document.createElement('div'); d.className='sr-chapdiv'; d.textContent=text; box.appendChild(d); rev(box,d); }
   function pulse(){ hub.classList.add('dinging'); ding.classList.remove('go'); void ding.offsetWidth; ding.classList.add('go'); after(560,function(){ hub.classList.remove('dinging'); }); }
-  function setStatus(t){ statusEl.textContent=t; }
-  function kkOn(t){ kk.classList.add('on'); kk.textContent=t||'도착'; }
-  function kkReset(){ kk.classList.remove('on'); kk.textContent='대기'; }
+  function setStatus(t){ statusEl.textContent=tr(t); }
+  function kkOn(t){ kk.classList.add('on'); kk.textContent=tr(t||'도착'); }
+  function kkReset(){ kk.classList.remove('on'); kk.textContent=tr('대기'); }
   function formShell(f){
     if(f.type==='grid'){
       var h='<div class="sr-grid"><div class="sr-gridrow sr-gridhead"><span></span>';
@@ -560,7 +566,7 @@ function cdPlay(i){
   }
   function showForm(f){
     var el=document.createElement('div'); el.className='sr-form';
-    el.innerHTML='<div class="sr-form-h">'+f.title+'</div><div class="sr-form-body">'+formShell(f)+'</div><button class="sr-form-submit" type="button">제출</button>';
+    el.innerHTML='<div class="sr-form-h">'+f.title+'</div><div class="sr-form-body">'+formShell(f)+'</div><button class="sr-form-submit" type="button">'+tr('제출')+'</button>';
     SR.formEl=el;
     memberBox.appendChild(el); rev(memberBox,el); sd(memberBox);
   }
@@ -599,14 +605,17 @@ function cdPlay(i){
   function submitForm(){
     var el=SR.formEl||latestForm(); if(!el)return;
     el.classList.add('done');
-    var b=el.querySelector('.sr-form-submit'); if(b){ b.textContent='제출됨 ✓'; }
+    var b=el.querySelector('.sr-form-submit'); if(b){ b.textContent=tr('제출됨 ✓'); }
   }
   function showJoin(S){
     var el=document.createElement('div'); el.className='sr-join'; el.id='srJoin';
-    el.innerHTML='<div class="sr-join-h"><img src="/icon-mark.png" width="16" height="16" alt="">PlayMCP · teamplay-talk 참여</div>'
-      +'<div class="sr-join-step" id="srJ0"><span class="sr-box"></span>teamplay-talk 추가</div>'
-      +'<div class="sr-join-step" id="srJ1"><span class="sr-box"></span>카카오 로그인 · 인증</div>'
-      +'<div class="sr-join-step" id="srJ2"><span class="sr-box"></span>초대코드 <b>'+(S.code||'')+'</b> 입력</div>';
+    var _jt=(LANG==='en')
+      ? {h:'PlayMCP · join teamplay-talk',a:'Add teamplay-talk',b:'Kakao login · auth',c:'Enter invite code <b>'+(S.code||'')+'</b>'}
+      : {h:'PlayMCP · teamplay-talk 참여',a:'teamplay-talk 추가',b:'카카오 로그인 · 인증',c:'초대코드 <b>'+(S.code||'')+'</b> 입력'};
+    el.innerHTML='<div class="sr-join-h"><img src="/icon-mark.png" width="16" height="16" alt="">'+_jt.h+'</div>'
+      +'<div class="sr-join-step" id="srJ0"><span class="sr-box"></span>'+_jt.a+'</div>'
+      +'<div class="sr-join-step" id="srJ1"><span class="sr-box"></span>'+_jt.b+'</div>'
+      +'<div class="sr-join-step" id="srJ2"><span class="sr-box"></span>'+_jt.c+'</div>';
     memberBox.appendChild(el); rev(memberBox,el); sd(memberBox);
   }
   function joinStep(k){ var e=document.getElementById('srJ'+k); if(e)e.classList.add('on'); }
@@ -679,7 +688,7 @@ function cdPlay(i){
   function showNext(idx){
     hideNext();
     var el=document.createElement('button'); el.className='sr-next'; el.type='button';
-    el.innerHTML=(idx===0?'↻ 처음부터 다시':CHIPS[idx])+' <span>▸</span>';
+    el.innerHTML=(idx===0?(LANG==='en'?'↻ Start over':'↻ 처음부터 다시'):CHIPS[idx])+' <span>▸</span>';
     el.addEventListener('click',function(){ play(idx); });
     (actionBar||ownerBox).appendChild(el);
   }
@@ -707,6 +716,7 @@ function cdPlay(i){
     if(!e.persisted)return;
     if(stageVisible()){ enter(); }
   });
+  window.__tptReloadSR=function(){ STEPS=(LANG==='en')?STEPS_EN:STEPS_KO; CHIPS=(LANG==='en')?CHIPS_EN:CHIPS_KO; SR.started=false; restart(); };
 })();
 
 // 가로 스크롤 바 마우스 드래그 (포인터 캡처 없이 — 클릭 안 깨지게)
@@ -766,15 +776,15 @@ _PIPELINE = [
 
 def _chips_html() -> str:
     return "".join(
-        f'<button class="demo-chip" type="button"><span class="ci">{_icon(ico)}</span>{label}</button>'
-        for ico, label in _CHIPS
+        f'<button class="demo-chip" type="button"><span class="ci">{_icon(ico)}</span><span data-i18n="chip{i}">{label}</span></button>'
+        for i, (ico, label) in enumerate(_CHIPS)
     )
 
 
 def _features_html() -> str:
     return "".join(
         f'<div class="feat card rv d{i % 4 % 3 + 1}">'
-        f'<div class="ico">{_icon(ico)}</div><h3>{title}</h3><p>{desc}</p></div>'
+        f'<div class="ico">{_icon(ico)}</div><h3 data-i18n="feat{i}t">{title}</h3><p data-i18n="feat{i}d">{desc}</p></div>'
         for i, (ico, title, desc) in enumerate(_FEATURES)
     )
 
@@ -782,8 +792,8 @@ def _features_html() -> str:
 def _pipeline_html() -> str:
     return "".join(
         f'<div class="pipe-item rv"><div class="pipe-dot lg">{no}</div>'
-        f'<div class="pipe-card card"><h3>{title}<span class="tag">{tag}</span></h3><p>{desc}</p></div></div>'
-        for no, title, desc, tag in _PIPELINE
+        f'<div class="pipe-card card"><h3><span data-i18n="pipe{i}t">{title}</span><span class="tag">{tag}</span></h3><p data-i18n="pipe{i}d">{desc}</p></div></div>'
+        for i, (no, title, desc, tag) in enumerate(_PIPELINE)
     )
 
 
@@ -802,12 +812,12 @@ def _tutorial_html() -> str:
           <div class="sr-status" id="srStatus">대기</div>
         </div>
         <div class="sr-slot owner" id="srOwner">
-          <div class="sr-slot-tag">방장 · PlayMCP AI</div>
+          <div class="sr-slot-tag" data-i18n="owner_tag">방장 · PlayMCP AI</div>
           <div class="sr-msgs" id="srOwnerMsgs"></div>
           <div class="sr-actionbar" id="srOwnerAction"></div>
         </div>
       </div>
-      <div class="sr-cmdhint">👆 방장 채팅창의 <b>파란 '다음 대화'</b>를 눌러 직접 진행해보세요</div>
+      <div class="sr-cmdhint" data-i18n="cmdhint">👆 방장 채팅창의 <b>파란 '다음 대화'</b>를 눌러 직접 진행해보세요</div>
     </div>"""
 
 
@@ -816,6 +826,11 @@ def _avatar(initial: str, filename: str) -> str:
     if (_STATIC / filename).exists():
         return f'<div class="face"><img src="/{filename}" alt=""></div>'
     return f'<div class="face">{initial}</div>'
+
+
+_I18N_HEAD = 'var LANG=(function(){try{return localStorage.getItem(\'tpt_lang\')||\'ko\'}catch(e){return \'ko\'}})();var KO_TITLE=(document&&document.title)||\'\';var EN={"doc_title": "teamplay-talk — Your team\'s PM, handled by AI", "nav_how": "How it works", "nav_demo": "Demo", "nav_flow": "Workflow", "nav_features": "Features", "nav_makers": "Makers", "nav_cta": "Connect PlayMCP", "hero_badge": "Kakao PlayMCP · team-project MCP", "hero_h1": "Your team\'s PM,<br>handed to <span class=\\"mlg\\">AI<svg class=\\"wave-underline\\" viewBox=\\"0 0 120 14\\" preserveAspectRatio=\\"none\\" aria-hidden=\\"true\\"><defs><linearGradient id=\\"ulg2\\" x1=\\"0\\" y1=\\"0\\" x2=\\"1\\" y2=\\"0\\"><stop stop-color=\\"#7c3aed\\"/><stop offset=\\"1\\" stop-color=\\"#22b8ff\\"/></linearGradient></defs><path d=\\"M3 9 q15 -8 30 0 t30 0 t30 0 t24 0\\" fill=\\"none\\" stroke=\\"url(#ulg2)\\" stroke-width=\\"4.5\\" stroke-linecap=\\"round\\"/></svg></span>", "hero_sub": "Polls, meeting times, role splits, roadmaps, daily reports — all of it. AI takes the busywork of team coordination like a PM, and your teammates just reply in the KakaoTalk they already use.", "cta_primary": "Connect on PlayMCP", "cta_ghost": "See how it works", "chat_head": "teamplay-talk · AI conversation demo", "how_h2": "One word from the owner,<br>and it rains on the whole team.", "how_p": "No installs, no new app. Teammates get forms and alerts in the KakaoTalk they already use, and reply with a single link.", "s1t": "Connect on PlayMCP", "s1d": "One Kakao login connects teamplay-talk to your AI agent.", "s2t": "Talk to the AI", "s2d": "\\"Split the roles,\\" \\"find a meeting time.\\" One line of natural language is enough.", "s3t": "Auto-broadcast to the team", "s3d": "Forms, polls, and notices spread to your teammates\' KakaoTalk.", "s4t": "AI wraps up & decides", "s4d": "As replies come in, the AI analyzes them and lays out the result and the next move.", "flow1": "Talk to AI on <b>PlayMCP</b>", "flow2": "<b>teamplay-talk</b> runs", "flow3": "Team <b>KakaoTalk · forms · calendar</b>", "tut_h2": "From room setup to the final notice,<br>in one flow.", "tut_p": "The owner talks to the AI on PlayMCP; teammates just reply to forms in their own KakaoTalk. The AI organizes it into roadmap, roles, schedule, and reports — then reports back to the owner.", "wf_h2": "From kickoff to deadline,<br>one workflow.", "wf_p": "Not a pile of one-off features — the whole team project runs end to end. Each step\'s output becomes the next step\'s input.", "feat_h2": "Right when you need it, here\'s how it helps.", "feat_p": "One tool for every moment a decision is needed. Teammates just reply with a single link.", "mk_h2": "The makers", "mk_p": "Built by two, serious about making team projects actually run.", "cn_h2": "Connect right from PlayMCP", "cn_p": "One Kakao login and you\'re in. Developers can also connect directly via the MCP endpoint.", "cn_copy": "Copy", "owner_tag": "Owner · PlayMCP AI", "cmdhint": "👆 Tap the <b>\'▸ next\'</b> chip in the owner\'s chat to step through it yourself", "feat0t": "Polls · gather opinions", "feat0d": "From dinner spots to talk topics — when opinions split. Pools the team\'s answers in one place so you see what everyone wants at a glance.", "feat1t": "Match meeting times", "feat1d": "When nobody knows who\'s free. Everyone just checks a date×time grid, and it pinpoints the slot that works for all.", "feat2t": "Pick the place", "feat2d": "When you\'re deciding where to meet. Gathers candidates and lets the team choose, so it\'s not on one person.", "feat3t": "Split the roles", "feat3d": "When who-does-what is fuzzy. Weighs preference and difficulty for a fair split — no grumbling later.", "feat4t": "Roadmap · break down tasks", "feat4d": "When you don\'t know where to start. Sets the big picture and splits each person\'s tasks, so the next step is clear.", "feat5t": "Keep daily progress", "feat5d": "When momentum fizzles. At night it checks what got done; in the morning it lays out who\'s where.", "feat6t": "Notices · schedules, delivered", "feat6d": "So nothing decided slips. Sends decisions and schedules straight to team KakaoTalk and Talk Calendar.", "feat7t": "See team status at a glance", "feat7d": "When you want the whole picture. Gathers votes, check-ins, and decisions on one screen to show where the team stands.", "pipe0t": "Room setup · invite", "pipe0d": "One invite code brings the team in — from here, all coordination revolves around this room.", "pipe1t": "Roadmap · gather input", "pipe1d": "Say the topic; the AI designs milestones and locks them in after team review.", "pipe2t": "Role assignment", "pipe2d": "Preference ranking → difficulty-balanced assignment → owner confirms.", "pipe3t": "Personal todos · schedule", "pipe3d": "Splits personal todos by roadmap-stage × role and assigns deadlines.", "pipe4t": "Meeting · place · calendar", "pipe4d": "Locks the time via a date×time grid, tallies the place, adds it to Talk Calendar.", "pipe5t": "Daily · notices", "pipe5d": "Night check-in → morning report run automatically; decisions go to team KakaoTalk.", "chip0": "Roadmap", "chip1": "Roles", "chip2": "Meeting time", "chip3": "Place", "chip4": "Poll", "chip5": "Daily"};var STEPS_EN=[{"cap": "Create the room", "sub": "Owner creates the room · teammates join via PlayMCP", "member": "join", "who": "Minji", "channel": "PlayMCP", "think": "Creating", "cmd": "Create a room for the Kakao MCP contest", "draft": "<b>\'Kakao MCP contest room\'</b> created.<br>Invite code <b>AbC123xY</b> <span>share it with your team</span>", "code": "AbC123xY", "result": "4 teammates <b>joined via PlayMCP</b>.<br><span>Shall we set the roadmap now?</span>"}, {"cap": "Set the roadmap, gather input", "sub": "AI drafts milestones → team review → lock in", "member": "form", "who": "Minji", "channel": "KakaoTalk", "think": "Planning", "send": "Sending", "cmd": "Make a roadmap for our contest entry. Submission <b>7/10</b>. Gather the team\'s input too", "draft": "<b>6-stage</b> draft.<br>Topic · Core design · MCP server · Kakao OAuth · Demo UX · Test/submit<br><span>Sending a review form to the team</span>", "kko": "<b>[TeamplayTalk]</b> Roadmap review request<br><span>Respond &#9656;</span>", "form": {"type": "text", "title": "Roadmap review · comments", "answer": "Please lock the screen flow (wireframes) during core design too"}, "result": "Feedback applied — <b>screen-flow design</b> added to core design.<br>Roadmap locked in."}, {"cap": "Split the roles", "sub": "Preference-ranking form → balanced assignment", "member": "form", "who": "Minji", "channel": "KakaoTalk", "think": "Roles", "send": "Sending", "cmd": "Start <b>role assignment</b> based on the roadmap", "draft": "<b>5 role</b> candidates.<br>Planning·PM / Backend / Frontend / Design·UX / QA·Demo<br><span>Send the preference survey?</span>", "kko": "<b>[TeamplayTalk]</b> Role preference survey<br><span>Respond &#9656;</span>", "form": {"type": "rank", "title": "Rank role preferences (all 5)", "items": ["Design·UX", "QA·Demo", "Planning·PM", "Backend", "Frontend"]}, "result": "Sewon <b>Planning·PM</b> · Bonggu <b>Backend</b><br>Minji <b>Design·UX</b> · Juho <b>Frontend</b> <span>Confirm?</span>"}, {"cap": "Break into to-dos", "sub": "Roadmap stage × role → personal todos → schedule", "member": "notice", "who": "Minji", "channel": "KakaoTalk", "big": true, "think": "Splitting", "send": "Sending", "cmd": "Create <b>todos</b> for the team by roadmap stage", "draft": "Split the 6 stages into <b>role-based todos</b> with deadlines.<br>Backend → Bonggu · Design·UX → Minji · Frontend → Juho", "kko": "<b>[TeamplayTalk] My to-dos · Minji</b><br><b>This week</b><br>· Polish form-screen UX <span>~7/8</span><br>· Organize dashboard IA <span>~7/9</span><br><b>Next week</b><br>· Final demo-screen check <span>~7/10</span><br><span>Check them off at the night check-in when done</span>", "result": "Assigned <b>todos with deadlines</b> to everyone.<br><span>Shall we set a meeting time now?</span>"}, {"cap": "Ask the team", "sub": "Open question → poll form → tally", "member": "form", "who": "Minji", "channel": "KakaoTalk", "think": "Building", "send": "Sending", "cmd": "Ask the team which cloud platform to use", "draft": "Built a <b>cloud poll</b>.<br>AWS · GCP · Azure <span>Send to the team?</span>", "kko": "<b>[TeamplayTalk]</b> Cloud platform poll<br><span>Respond &#9656;</span>", "form": {"type": "poll", "title": "Which cloud should we go with?", "opts": ["AWS", "GCP", "Azure"], "sel": "GCP"}, "result": "Tallied — <b>GCP</b> wins with 3 votes.<br>Announced to the team."}, {"cap": "Set a meeting time", "sub": "Grid check → suggest overlap → add to Talk Calendar", "member": "form", "who": "Minji", "channel": "KakaoTalk", "think": "Building", "send": "Sending", "cmd": "Find a time for this week\'s <b>full-team meeting</b>", "draft": "Built a date×time <b>availability grid</b>.<br><span>Send it to the team?</span>", "kko": "<b>[TeamplayTalk]</b> Meeting availability<br><span>Check all slots that work &#9656;</span>", "form": {"type": "grid", "title": "Meeting availability", "cols": ["Mon", "Tue", "Wed", "Thu"], "rows": ["7 PM", "8 PM", "9 PM"], "on": ["2,0", "0,1", "1,3", "2,3"], "x": ["0,0", "2,1"]}, "result": "<b>Mon 9:00 PM</b> — all 4 free.<br><span>Lock this time?</span>", "extra": {"cmd": "Yes, add it to Talk Calendar too", "status": "Calendar", "kko": "<b>[Talk Calendar]</b> Event added<br><b>Team meeting</b> · Mon 7/6, 9:00 PM<br><span>Reminder set 30 min before</span>", "result": "<b>Added to Talk Calendar</b> — reminders set for all.<br><span>Collect the meeting place next?</span>"}}, {"cap": "Pick the place", "sub": "Short-answer preferences → dedupe → tally candidates", "member": "form", "who": "Minji", "channel": "KakaoTalk", "think": "Building", "send": "Sending", "cmd": "Collect meeting-place candidates", "draft": "Built a <b>short-answer</b> form for preferred places.<br><span>I\'ll tidy addresses via KakaoMap</span>", "kko": "<b>[TeamplayTalk]</b> Meeting place<br><span>Write where you\'d like to meet &#9656;</span>", "form": {"type": "text", "title": "Meeting place", "answer": "A study cafe near Gangnam Station"}, "result": "Tallied — <b>Gangnam Station</b> leads with 3.<br><span>Set to Gangnam Station and announced.</span>"}, {"cap": "Check progress each night", "sub": "9 PM auto → check off what\'s done", "member": "autoform", "who": "Minji", "channel": "KakaoTalk", "think": "Check-in", "send": "Auto-send", "sched": "&#9200; Daily 9:00 PM · auto", "draft": "Sent the night check-in form to team KakaoTalk.", "kko": "<b>[TeamplayTalk]</b> Today\'s progress · 9:00 PM<br><span>Check off what you finished &#9656;</span>", "form": {"type": "check", "title": "Today\'s check-in", "items": [{"t": "Polish form-screen UX", "on": true}, {"t": "Organize dashboard IA", "on": true}, {"t": "Final demo-screen check", "on": false}], "note": "Blocked: the form breaks responsively on mobile"}, "result": "Check-ins <b>collected</b>.<br><span>Auto-rolled into tomorrow\'s morning report.</span>"}, {"cap": "A report every morning", "sub": "9 AM auto → yesterday·today·tomorrow·meeting", "member": "auto", "who": "Minji", "channel": "KakaoTalk", "big": true, "think": "Report", "send": "Auto-send", "sched": "&#9200; Daily 9:00 AM · auto", "draft": "Built the morning report from last night\'s check-ins.", "kko": "<b>[TeamplayTalk] Today\'s progress report · 9:00 AM</b><br><b>Done yesterday</b><br>· Polish form-screen UX<br>· Organize dashboard IA<br><b>Today</b><br>· Final demo-screen check · fix mobile responsiveness<br><b>Tomorrow</b><br>· Tidy demo-rehearsal screens<br><b>Meeting today</b> 9:00 PM<br><b>Blocked</b><br>· Form breaks responsively on mobile", "result": "Auto-sent to everyone\'s KakaoTalk.<br><span>Delays·risks are summarized separately to the owner.</span>"}, {"cap": "Wrap up & announce", "sub": "Check the dashboard · announce to team KakaoTalk", "member": "notice", "who": "Minji", "channel": "KakaoTalk", "big": true, "think": "Summing", "send": "Announce", "cmd": "Announce everything decided so far to the team", "draft": "Summarized the confirmed items.", "kko": "<b>[TeamplayTalk] Contest progress summary</b><br><b>Confirmed</b><br>· Roadmap: 6 stages<br>· Roles assigned<br>· Meeting <b>Mon 7/6, 9:00 PM</b><br>· Submission <b>7/10</b><br><b>Focus today</b><br>· Stabilize backend · verify OAuth · polish demo · draft the pitch<br><span>Please check your todos</span>", "result": "Announcement sent to the whole team.<br><span>See the full flow on the dashboard.</span>"}];var CD_EN=[[{"r": "user", "t": "Plan a roadmap for the Kakao MCP contest"}, {"r": "ai", "t": "Mapped it in <b>6 stages</b> to the deadline (7/14).<br>1 Topic·plan <span>~6/20</span><br>2 Server + Kakao auth <span>~6/26</span><br>3 Core features <span>~7/4</span><br>4 Homepage·demo <span>~7/9</span><br>5 QC·rehearsal <span>~7/12</span><br>6 Submit <span>~7/14</span>"}, {"r": "user", "t": "Nice"}, {"r": "ai", "t": "Locked in — split each stage into <b>personal todos</b> (Bonggu backend · Minji UI · Juho frontend). Sent to each via KakaoTalk."}], [{"r": "user", "t": "Split the roles"}, {"r": "ai", "t": "Split into <b>4 roles</b> (planning·backend·frontend·design). Collect preference rankings?"}, {"r": "user", "t": "yep"}, {"r": "ai", "t": "Got everyone\'s <b>preference rankings</b>. Assigning now."}, {"r": "ai", "t": "Balanced by preference·difficulty.<br>Sewon <b>Planning·PM</b> · Bonggu <b>Backend</b><br>Minji <b>Design·UX</b> · Juho <b>Frontend</b><br>Confirmed and announced."}], [{"r": "user", "t": "Find a meeting time this week"}, {"r": "ai", "t": "Built a 2-week <b>availability grid</b> from today. Send to all 4?"}, {"r": "user", "t": "yes, send it"}, {"r": "ai", "t": "All replied — <b>Tue 8:00 PM</b> works for all 4.<br>Announced and added to Talk Calendar."}], [{"r": "user", "t": "Let\'s pick a place"}, {"r": "ai", "t": "I\'ll collect each person\'s <b>preferred area</b> via a form. Send it?"}, {"r": "user", "t": "yep"}, {"r": "ai", "t": "Result: <b>Gangnam Station</b> 3 votes (Hongdae 1). Set to Gangnam and announced."}], [{"r": "user", "t": "Let\'s pick the dinner menu"}, {"r": "ai", "t": "Built an <b>anonymous poll</b> with 4 options. Send it?"}, {"r": "user", "t": "send it"}, {"r": "ai", "t": "Tallied — <b>samgyeopsal</b> wins with 5 (sushi 2·pasta 1). Result announced."}], [{"r": "user", "t": "How\'s the team doing today?"}, {"r": "ai", "t": "Here\'s last night\'s check-in.<br>Done 4 · In progress 3 · Behind 1<br>Bonggu backend <b>done</b> · Minji UI 60% · Juho frontend <b>behind</b> (rolled to today)<br>Send the morning report?"}, {"r": "user", "t": "yes"}, {"r": "ai", "t": "Sent the <b>morning report</b> to team KakaoTalk. Behind items auto-carry to today\'s check-in."}]];var CHIPS_KO=["대회방 만들어줘", "로드맵 만들어줘", "역할 나눠줘", "할 일 만들어줘", "클라우드 뭐 쓸지 물어봐", "회의 시간 잡아줘", "회의 장소 받아봐", "⏰ 밤 9시 · 자동 체크인", "⏰ 다음날 아침 · 자동 리포트", "진행 공지해줘"];var CHIPS_EN=["Create the contest room", "Build a roadmap", "Split the roles", "Make the to-dos", "Ask which cloud to use", "Find a meeting time", "Collect meeting places", "⏰ 9 PM · auto check-in", "⏰ Next morning · auto report", "Announce the progress"];var _LB={"대기": "Idle", "자동 실행": "Auto", "방장 입력": "Input", "명령 수신": "Received", "처리 중": "Working", "완료 ✓": "Done ✓", "카톡 전송": "Sending", "폼 작성": "Filling", "제출": "Submit", "응답 수집": "Collecting", "PlayMCP 참여": "Joining", "초대코드 입력": "Code", "합류": "Joined", "폼 도착": "Form in", "도착": "Received", "알림": "Alert", "응답": "Reply", "카카오톡": "KakaoTalk", "팀원": "Member", "제출됨 ✓": "Submitted ✓"};function tr(s){return (LANG===\'en\'&&_LB[s]!==undefined)?_LB[s]:s;}'
+_I18N_TAIL = "(function(){function apply(){var els=document.querySelectorAll('[data-i18n]');for(var i=0;i<els.length;i++){var el=els[i];if(el.__ko===undefined)el.__ko=el.innerHTML;var k=el.getAttribute('data-i18n');el.innerHTML=(LANG==='en'&&EN[k]!==undefined)?EN[k]:el.__ko;}document.documentElement.lang=LANG;document.title=(LANG==='en'&&EN.doc_title)?EN.doc_title:KO_TITLE;}window.__tptApply=apply;if(LANG==='en')apply();var btn=document.getElementById('langToggle');if(btn){btn.setAttribute('data-lang',LANG);btn.addEventListener('click',function(){LANG=(LANG==='en')?'ko':'en';try{localStorage.setItem('tpt_lang',LANG)}catch(e){}apply();btn.setAttribute('data-lang',LANG);if(window.__tptReloadCD)window.__tptReloadCD();if(window.__tptReloadSR)window.__tptReloadSR();});}})();"
+_LANG_CSS = '.lang-toggle{display:inline-flex;align-items:center;gap:0;padding:3px;border-radius:999px;cursor:pointer;font-family:inherit;font-weight:800;font-size:12px;line-height:1;color:var(--muted);margin-left:0}.lang-toggle span{padding:6px 9px;border-radius:999px;transition:color .2s,background .2s,box-shadow .2s;letter-spacing:.03em}.lang-toggle[data-lang="ko"] span:first-child,.lang-toggle[data-lang="en"] span:last-child{color:var(--violet);background:rgba(255,255,255,.72);box-shadow:0 2px 8px rgba(80,52,140,.14),inset 0 1px 1px rgba(255,255,255,.9)}'
 
 
 def _page() -> str:
@@ -838,7 +853,7 @@ def _page() -> str:
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" href="{_FONT_CSS}" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="{_FONT_CSS}"></noscript>
-<style>{_CSS}</style>
+<style>{_CSS}{_LANG_CSS}</style>
 </head>
 <body>
 
@@ -846,28 +861,28 @@ def _page() -> str:
   <div class="nav-pill lg">
     <a class="nav-brand" href="#top"><img src="/icon-mark.png" alt="teamplay-talk" width="28" height="28"> teamplay-talk</a>
     <div class="nav-links">
-      <a href="#how">작동 방식</a><a href="#tutorial">데모</a><a href="#flow">워크플로우</a><a href="#features">기능</a><a href="#makers">제작자</a>
+      <a href="#how" data-i18n="nav_how">작동 방식</a><a href="#tutorial" data-i18n="nav_demo">데모</a><a href="#flow" data-i18n="nav_flow">워크플로우</a><a href="#features" data-i18n="nav_features">기능</a><a href="#makers" data-i18n="nav_makers">제작자</a>
     </div>
-    <a class="nav-cta" href="https://playmcp.kakao.com" target="_blank" rel="noopener">PlayMCP 연결</a>
+    <a class="nav-cta" href="https://playmcp.kakao.com" target="_blank" rel="noopener" data-i18n="nav_cta">PlayMCP 연결</a>
   </div>
 </nav>
 
 <header class="hero" id="top">
   <div class="wrap hero-inner">
     <div>
-      <span class="hero-badge lg"><span class="dot"></span>Kakao PlayMCP · 팀플 협업 MCP</span>
-      <h1>팀플의 PM을,<br>AI에게 <span class="mlg">맡기세요<svg class="wave-underline" viewBox="0 0 120 14" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="ulg" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#7c3aed"/><stop offset="1" stop-color="#22b8ff"/></linearGradient></defs><path d="M3 9 q15 -8 30 0 t30 0 t30 0 t24 0" fill="none" stroke="url(#ulg)" stroke-width="4.5" stroke-linecap="round"/></svg></span></h1>
-      <p class="hero-sub">투표, 회의 시간, 역할 분배, 로드맵, 데일리 리포트까지.
+      <span class="hero-badge lg"><span class="dot"></span><span data-i18n="hero_badge">Kakao PlayMCP · 팀플 협업 MCP</span></span>
+      <h1 data-i18n="hero_h1">팀플의 PM을,<br>AI에게 <span class="mlg">맡기세요<svg class="wave-underline" viewBox="0 0 120 14" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="ulg" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#7c3aed"/><stop offset="1" stop-color="#22b8ff"/></linearGradient></defs><path d="M3 9 q15 -8 30 0 t30 0 t30 0 t24 0" fill="none" stroke="url(#ulg)" stroke-width="4.5" stroke-linecap="round"/></svg></span></h1>
+      <p class="hero-sub" data-i18n="hero_sub">투표, 회의 시간, 역할 분배, 로드맵, 데일리 리포트까지.
       손 많이 가는 팀플 조율은 AI가 PM처럼 맡고, 팀원은 늘 쓰던 카카오톡으로 응답만 하면 돼요.</p>
       <div class="hero-ctas">
-        <a class="btn btn-primary" href="https://playmcp.kakao.com" target="_blank" rel="noopener">PlayMCP에서 연결하기</a>
-        <a class="btn btn-ghost lg" href="#how">작동 방식 보기</a>
+        <a class="btn btn-primary" href="https://playmcp.kakao.com" target="_blank" rel="noopener" data-i18n="cta_primary">PlayMCP에서 연결하기</a>
+        <a class="btn btn-ghost lg" href="#how" data-i18n="cta_ghost">작동 방식 보기</a>
       </div>
     </div>
     <div class="hero-visual">
       <div class="chat-demo">
         <div class="cd-card lg">
-          <div class="cd-head"><span class="cd-dot"></span>teamplay-talk · AI 대화 예시</div>
+          <div class="cd-head"><span class="cd-dot"></span><span data-i18n="chat_head">teamplay-talk · AI 대화 예시</span></div>
           <div class="cd-window" id="cdWindow"></div>
         </div>
         <div class="cd-dock">
@@ -883,19 +898,19 @@ def _page() -> str:
   <div class="wrap">
     <div class="sec-head rv">
       <span class="eyebrow">How it works</span>
-      <h2>방장이 한마디면,<br>팀 전체에 후두둑.</h2>
-      <p>설치도, 새 앱도 없습니다. 팀원들은 늘 쓰던 카카오톡으로 폼과 알림을 받고, 링크 하나로 응답합니다.</p>
+      <h2 data-i18n="how_h2">방장이 한마디면,<br>팀 전체에 후두둑.</h2>
+      <p data-i18n="how_p">설치도, 새 앱도 없습니다. 팀원들은 늘 쓰던 카카오톡으로 폼과 알림을 받고, 링크 하나로 응답합니다.</p>
     </div>
     <div class="steps">
-      <div class="step card rv d1"><div class="no">STEP 1</div><h3>PlayMCP에서 연결</h3><p>카카오 로그인 한 번으로 teamplay-talk가 AI 에이전트에 연결됩니다.</p></div>
-      <div class="step card rv d2"><div class="no">STEP 2</div><h3>AI에게 말하기</h3><p>"역할 나눠줘", "회의 시간 잡아줘". 자연어 한마디면 충분합니다.</p></div>
-      <div class="step card rv d3"><div class="no">STEP 3</div><h3>팀에 자동 전파</h3><p>폼·투표·공지가 팀원들의 카카오톡으로 퍼집니다.</p></div>
-      <div class="step card rv d1"><div class="no">STEP 4</div><h3>AI가 정리·결정</h3><p>응답이 모이면 AI가 받아서 분석하고, 결과와 다음 행동까지 정리해줘요.</p></div>
+      <div class="step card rv d1"><div class="no">STEP 1</div><h3 data-i18n="s1t">PlayMCP에서 연결</h3><p data-i18n="s1d">카카오 로그인 한 번으로 teamplay-talk가 AI 에이전트에 연결됩니다.</p></div>
+      <div class="step card rv d2"><div class="no">STEP 2</div><h3 data-i18n="s2t">AI에게 말하기</h3><p data-i18n="s2d">"역할 나눠줘", "회의 시간 잡아줘". 자연어 한마디면 충분합니다.</p></div>
+      <div class="step card rv d3"><div class="no">STEP 3</div><h3 data-i18n="s3t">팀에 자동 전파</h3><p data-i18n="s3d">폼·투표·공지가 팀원들의 카카오톡으로 퍼집니다.</p></div>
+      <div class="step card rv d1"><div class="no">STEP 4</div><h3 data-i18n="s4t">AI가 정리·결정</h3><p data-i18n="s4d">응답이 모이면 AI가 받아서 분석하고, 결과와 다음 행동까지 정리해줘요.</p></div>
     </div>
     <div class="flow-line rv">
-      <span class="flow-node card"><b>PlayMCP</b>에서 AI와 대화</span><span class="flow-arrow" aria-hidden="true">→</span>
-      <span class="flow-node card"><b>teamplay-talk</b>가 실행</span><span class="flow-arrow" aria-hidden="true">→</span>
-      <span class="flow-node card">팀원 <b>카톡 · 폼 · 캘린더</b></span>
+      <span class="flow-node card" data-i18n="flow1"><b>PlayMCP</b>에서 AI와 대화</span><span class="flow-arrow" aria-hidden="true">→</span>
+      <span class="flow-node card" data-i18n="flow2"><b>teamplay-talk</b>가 실행</span><span class="flow-arrow" aria-hidden="true">→</span>
+      <span class="flow-node card" data-i18n="flow3">팀원 <b>카톡 · 폼 · 캘린더</b></span>
     </div>
   </div>
 </section>
@@ -904,8 +919,8 @@ def _page() -> str:
   <div class="wrap">
     <div class="sec-head rv">
       <span class="eyebrow">Live demo</span>
-      <h2>방 개설부터 공지까지,<br>한 흐름으로.</h2>
-      <p>방장은 PlayMCP로 AI에게 말하고, 팀원은 개인 카카오톡으로 온 폼에 응답만. AI가 로드맵·역할·일정·리포트로 정리해 다시 방장에게 보고합니다.</p>
+      <h2 data-i18n="tut_h2">방 개설부터 공지까지,<br>한 흐름으로.</h2>
+      <p data-i18n="tut_p">방장은 PlayMCP로 AI에게 말하고, 팀원은 개인 카카오톡으로 온 폼에 응답만. AI가 로드맵·역할·일정·리포트로 정리해 다시 방장에게 보고합니다.</p>
     </div>
     {_tutorial_html()}
   </div>
@@ -915,8 +930,8 @@ def _page() -> str:
   <div class="wrap">
     <div class="sec-head rv">
       <span class="eyebrow">Workflow</span>
-      <h2>결성부터 마감까지,<br>하나의 워크플로우.</h2>
-      <p>단발 기능의 나열이 아니라, 팀플의 전 과정이 이어집니다. 각 단계의 결과가 다음 단계의 입력이 됩니다.</p>
+      <h2 data-i18n="wf_h2">결성부터 마감까지,<br>하나의 워크플로우.</h2>
+      <p data-i18n="wf_p">단발 기능의 나열이 아니라, 팀플의 전 과정이 이어집니다. 각 단계의 결과가 다음 단계의 입력이 됩니다.</p>
     </div>
     <div class="pipe">{_pipeline_html()}</div>
   </div>
@@ -926,8 +941,8 @@ def _page() -> str:
   <div class="wrap">
     <div class="sec-head rv">
       <span class="eyebrow">Features</span>
-      <h2>이럴 때, 이렇게 도와줘요.</h2>
-      <p>어떤 결정이 필요한 순간마다 하나씩. 팀원은 링크 하나로 응답하면 끝입니다.</p>
+      <h2 data-i18n="feat_h2">이럴 때, 이렇게 도와줘요.</h2>
+      <p data-i18n="feat_p">어떤 결정이 필요한 순간마다 하나씩. 팀원은 링크 하나로 응답하면 끝입니다.</p>
     </div>
     <div class="grid">{_features_html()}</div>
   </div>
@@ -937,8 +952,8 @@ def _page() -> str:
   <div class="wrap">
     <div class="sec-head rv">
       <span class="eyebrow">Makers</span>
-      <h2>만든 사람들</h2>
-      <p>둘이서 만들었습니다. 팀플이 잘 굴러가게 하는 데 진심입니다.</p>
+      <h2 data-i18n="mk_h2">만든 사람들</h2>
+      <p data-i18n="mk_p">둘이서 만들었습니다. 팀플이 잘 굴러가게 하는 데 진심입니다.</p>
     </div>
     <div class="makers">
       <div class="maker card rv d1 a">
@@ -973,11 +988,11 @@ def _page() -> str:
   <div class="wrap">
     <div class="connect card rv">
       <span class="eyebrow">Connect</span>
-      <h2 style="margin-top:14px">PlayMCP에서 바로 연결하세요</h2>
-      <p>카카오 로그인 한 번이면 끝. 개발자는 MCP 엔드포인트로 직접 연결할 수도 있습니다.</p>
-      <div class="endpoint">https://teamplay-talk.tech/mcp/<button onclick="copyEndpoint(this)">복사</button></div>
+      <h2 style="margin-top:14px" data-i18n="cn_h2">PlayMCP에서 바로 연결하세요</h2>
+      <p data-i18n="cn_p">카카오 로그인 한 번이면 끝. 개발자는 MCP 엔드포인트로 직접 연결할 수도 있습니다.</p>
+      <div class="endpoint" role="button" tabindex="0" onclick="copyEndpoint(this)"><span class="ep-url">https://teamplay-talk.tech/mcp/</span><span class="ep-copy" data-i18n="cn_copy">복사</span></div>
       <div class="hero-ctas" style="margin-top:32px">
-        <a class="btn btn-primary" href="https://playmcp.kakao.com" target="_blank" rel="noopener">PlayMCP에서 연결하기</a>
+        <a class="btn btn-primary" href="https://playmcp.kakao.com" target="_blank" rel="noopener" data-i18n="cta_primary">PlayMCP에서 연결하기</a>
       </div>
     </div>
   </div>
@@ -986,11 +1001,11 @@ def _page() -> str:
 <footer>
   <div class="wrap foot">
     <div class="foot-brand"><img src="/icon-mark.png" alt="" width="30" height="30"> teamplay-talk</div>
-    <small>Kakao PlayMCP · AGENTIC PLAYER · © 2026 teamplay-talk</small>
+    <div class="foot-end"><small>Kakao PlayMCP · AGENTIC PLAYER · © 2026 teamplay-talk</small><button class="lang-toggle lg" id="langToggle" type="button" aria-label="Language / 언어"><span>KO</span><span>EN</span></button></div>
   </div>
 </footer>
 
-<script>{_JS}</script>
+<script>{_I18N_HEAD}{_JS}{_I18N_TAIL}</script>
 </body>
 </html>"""
 
