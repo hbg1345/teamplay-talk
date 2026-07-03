@@ -86,7 +86,8 @@ h2{font-size:clamp(28px,4.4vw,44px)}
 .mlg{position:relative;display:inline-block;color:var(--violet);isolation:isolate}
 .mlg::after{content:"";position:absolute;left:-3%;right:-3%;bottom:-17px;height:18px;border-radius:999px;z-index:1;pointer-events:none;opacity:0;background:linear-gradient(100deg,rgba(255,255,255,0),rgba(255,255,255,.62) 30%,rgba(34,184,255,.22) 50%,rgba(124,58,237,.18) 70%,rgba(255,255,255,0));filter:blur(5px);transform:scaleX(.72);transform-origin:center;animation:mlgPrismBreath 8.8s cubic-bezier(.22,1,.36,1) 1.2s infinite}
 .wave-underline{position:absolute;left:-4%;bottom:-15px;width:108%;height:16px;overflow:visible;z-index:2;filter:drop-shadow(0 5px 10px rgba(124,58,237,.13))}
-.wave-underline path{stroke-linejoin:round;vector-effect:non-scaling-stroke;opacity:.96}
+.wave-underline path{stroke-linejoin:round;vector-effect:non-scaling-stroke;opacity:.96;animation:waveGlass 3.6s ease-in-out infinite}
+@keyframes waveGlass{0%,100%{stroke-width:4.4;filter:brightness(1)}50%{stroke-width:5;filter:brightness(1.18)}}
 @keyframes mlgPrismBreath{0%,76%,100%{opacity:0;transform:scaleX(.72)}82%,90%{opacity:.38;transform:scaleX(1)}}
 .hero-sub{color:var(--muted);font-size:clamp(16px,1.6vw,19px);max-width:500px;margin:28px 0 0}
 .hero-ctas{display:flex;gap:14px;margin-top:36px;flex-wrap:wrap}
@@ -206,8 +207,6 @@ footer{padding:50px 0 58px;border-top:1px solid var(--line)}
 .foot-brand img{width:30px;height:30px;border-radius:9px}
 .foot small{color:var(--muted);font-size:13px}
 .foot-end{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-.lt-nav{margin-left:6px}.lt-foot{display:none}
-@media(max-width:760px){.lt-nav{display:none}.lt-foot{display:inline-flex}}
 
 /* ── 스크롤 리빌 ── */
 .rv{opacity:0;transform:translateY(24px);transition:opacity .7s cubic-bezier(.2,.8,.2,1),transform .7s cubic-bezier(.2,.8,.2,1)}
@@ -938,7 +937,6 @@ def _page() -> str:
       <a href="#how" data-i18n="nav_how">작동 방식</a><a href="#tutorial" data-i18n="nav_demo">데모</a><a href="#flow" data-i18n="nav_flow">워크플로우</a><a href="#features" data-i18n="nav_features">기능</a><a href="#makers" data-i18n="nav_makers">제작자</a>
     </div>
     <a class="nav-cta" href="https://playmcp.kakao.com" target="_blank" rel="noopener" data-i18n="nav_cta">PlayMCP 연결</a>
-    <button class="lang-toggle lg lt-nav" type="button" aria-label="Language / 언어"><span>KO</span><span>EN</span></button>
   </div>
 </nav>
 
@@ -1076,7 +1074,7 @@ def _page() -> str:
 <footer>
   <div class="wrap foot">
     <div class="foot-brand"><img src="/icon-mark.png" alt="" width="30" height="30"> teamplay-talk</div>
-    <div class="foot-end"><small>Kakao PlayMCP · AGENTIC PLAYER · © 2026 teamplay-talk</small><button class="lang-toggle lg lt-foot" type="button" aria-label="Language / 언어"><span>KO</span><span>EN</span></button></div>
+    <div class="foot-end"><small>Kakao PlayMCP · AGENTIC PLAYER · © 2026 teamplay-talk</small><button class="lang-toggle lg" type="button" aria-label="Language / 언어"><span>KO</span><span>EN</span></button></div>
   </div>
 </footer>
 
