@@ -185,11 +185,9 @@ h2{font-size:clamp(28px,4.4vw,44px)}
 .maker.b .face{background:var(--violet-2)}
 .maker .face img{width:100%;height:100%;object-fit:cover;object-position:center 12%}
 .maker h3{font-size:19px}
-.mk-head{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
-.mk-links{display:flex;gap:7px}
-.mk-link{width:31px;height:31px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;color:var(--violet);background:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.6);backdrop-filter:blur(14px) saturate(1.6);-webkit-backdrop-filter:blur(14px) saturate(1.6);box-shadow:0 4px 12px rgba(80,52,140,.1),inset 0 1px 1px rgba(255,255,255,.8);transition:transform .16s,box-shadow .2s,background .2s}
-.mk-link:hover{transform:translateY(-2px);background:rgba(255,255,255,.68);box-shadow:0 8px 18px rgba(80,52,140,.16),inset 0 1px 1px rgba(255,255,255,.92)}
-.mk-link svg{width:15px;height:15px}
+.mk-links{display:flex;gap:8px;margin:8px 0 2px}
+.mk-link{display:inline-flex;align-items:center;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.01em;color:var(--muted);background:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.5);backdrop-filter:blur(11px) saturate(1.35);-webkit-backdrop-filter:blur(11px) saturate(1.35);box-shadow:0 2px 7px rgba(80,52,140,.05);transition:color .18s,background .18s,transform .16s,box-shadow .18s}
+.mk-link:hover{color:var(--ink);background:rgba(255,255,255,.62);transform:translateY(-1px);box-shadow:0 5px 12px rgba(80,52,140,.1)}
 .maker .cred{list-style:none;margin:9px 0 0;padding:0;display:flex;flex-direction:column;gap:5px}
 .maker .cred li{font-size:13px;color:var(--muted);line-height:1.4}
 .maker .cred li b{color:var(--ink);font-weight:700}
@@ -1046,7 +1044,7 @@ def _page() -> str:
       <div class="maker card rv d1 a">
         {_avatar("박", "av-park.png")}
         <div>
-          <div class="mk-head"><h3>박세원</h3><div class="mk-links"><a class="mk-link" href="https://sewon-p.github.io" target="_blank" rel="noopener" aria-label="포트폴리오"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg></a><a class="mk-link" href="https://www.linkedin.com/in/sewon-park-328102368/" target="_blank" rel="noopener" aria-label="LinkedIn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.94 5a2 2 0 1 1-4-.002 2 2 0 0 1 4 .002zM7 8.48H3V21h4V8.48zm6.32 0H9.34V21h3.94v-6.57c0-3.66 4.77-4 4.77 0V21H22v-7.93c0-6.17-7.06-5.94-8.72-2.91l.04-1.68z"/></svg></a></div></div>
+          <h3>박세원</h3><div class="mk-links"><a class="mk-link" href="https://sewon-p.github.io" target="_blank" rel="noopener">Portfolio</a><a class="mk-link" href="https://www.linkedin.com/in/sewon-park-328102368/" target="_blank" rel="noopener">LinkedIn</a></div>
           <ul class="cred">
             <li><b>University of Seoul</b> · B.Eng. Transportation Eng.</li>
             <li><b>Arthur D. Little</b> · Strategy Consulting Intern</li>
