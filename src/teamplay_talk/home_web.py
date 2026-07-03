@@ -320,6 +320,7 @@ footer{padding:50px 0 58px;border-top:1px solid var(--line)}
   .sr-slot.member{order:0}.sr-hub{order:1;flex-direction:row;gap:10px;align-self:auto;height:auto;margin-top:0;transform:none}.sr-slot.owner{order:2}
   .sr-slot{min-height:0}.sr-logo{width:44px;height:44px}.sr-status{position:absolute;left:calc(50% + 34px);top:50%;transform:translateY(-50%);width:auto;max-width:calc(50% - 46px);white-space:nowrap;overflow:hidden;text-align:left}
   .sr-ding{top:50%;margin-top:-22px;width:44px;height:44px}
+  .sr-caption span{display:none}
 }
 
 @media (prefers-reduced-motion: reduce){
