@@ -40,78 +40,86 @@ def _is_task_like_role(name: str) -> bool:
     stripped = name.strip()
     if stripped in _BAD_GENERIC_ROLES:
         return True
-    task_markers = [
-        "선정",
-        "브레인스토밍",
+    task_like_phrases = {
+        "주제 선정",
+        "아이디어 브레인스토밍",
         "테스트 및 피드백",
         "최종 제출",
-        "제출",
-        "준비",
-        "작업",
-    ]
-    return any(marker in stripped for marker in task_markers)
+        "결과 제출",
+        "중간 점검",
+        "최종 점검",
+    }
+    return stripped in task_like_phrases
 
 
-def _role_suggestions_from_roadmap(tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """로드맵 태스크에서 최종 산출물 중심의 역할 후보를 추천한다."""
-    text = " ".join(
-        str(part or "")
+def _role_design_brief(
+    roadmap: dict[str, Any],
+    member_count: int,
+) -> dict[str, Any]:
+    """AI가 고정 역할명 없이 역할을 설계하도록 넘기는 구조화된 지침."""
+    tasks = roadmap.get("tasks", [])
+    task_lines = [
+        {
+            "id": task.get("id"),
+            "title": task.get("title"),
+            "details": task.get("details"),
+            "start_at": str(task.get("start_at") or ""),
+            "end_at": str(task.get("end_at") or ""),
+        }
         for task in tasks
-        for part in [task.get("title"), task.get("details"), task.get("assignee_role")]
-    )
-    suggestions: list[dict[str, Any]] = []
-
-    def add(name: str, difficulty: int) -> None:
-        if name not in {s["name"] for s in suggestions}:
-            suggestions.append({"name": name, "difficulty": difficulty})
-
-    def has_any(words: list[str]) -> bool:
-        return any(word in text for word in words)
-
-    is_technical = has_any(["MCP", "서버", "API", "OAuth", "토큰", "캘린더", "지도", "연동", "프로토타입", "개발", "구현", "UI", "UX", "대시보드", "SurveyJS"])
-    is_production = has_any(["빵", "소보로", "레시피", "재료", "식품", "조리", "시제품", "포장", "생산", "양산", "제조"])
-    is_presentation = has_any(["책", "발표", "자료", "슬라이드", "대본", "리허설", "질의", "토론", "분석", "조사", "연구", "평가"])
-
-    if has_any(["주제", "아이디어", "기획", "계획", "일정", "팀원", "역할", "조율"]):
-        add("기획·일정 조율", 6)
-
-    if is_technical:
-        if has_any(["MCP", "서버", "프로토타입", "개발", "구현"]):
-            add("MCP 서버·도구 구현", 9)
-        if has_any(["카카오", "OAuth", "토큰", "캘린더", "지도", "연동", "MCP", "API"]):
-            add("카카오 API·OAuth 연동", 8)
-        if has_any(["폼", "대시보드", "UX", "UI", "SurveyJS"]):
-            add("폼·대시보드 UX", 6)
-        if has_any(["테스트", "피드백", "QA", "검증", "디버깅"]):
-            add("테스트·QA", 6)
-        if has_any(["문서", "발표", "제출", "데모"]):
-            add("문서·데모·발표", 5)
-    elif is_production:
-        add("레시피·품질 설계", 7)
-        add("재료·구매 관리", 5)
-        add("제조·시제품 운영", 8)
-        if has_any(["피드백", "개선", "검증", "맛", "품질", "위생"]):
-            add("품질·피드백 개선", 6)
-        if has_any(["발표", "시현", "마무리"]):
-            add("시현·발표 운영", 5)
-    elif is_presentation:
-        add("자료 조사·내용 분석", 7)
-        add("발표 구조·대본 구성", 6)
-        add("슬라이드·시각자료 제작", 5)
-        add("발표·질의응답 준비", 5)
-
-    if not suggestions:
-        suggestions = [
-            {"name": "기획·일정 조율", "difficulty": 6},
-            {"name": "자료 조사·분석", "difficulty": 6},
-            {"name": "결과물 제작", "difficulty": 7},
-            {"name": "검토·개선", "difficulty": 5},
-            {"name": "최종 정리·공유", "difficulty": 4},
-        ]
-    return suggestions
+        if (task.get("task_type") or "milestone") == "milestone"
+    ]
+    target_role_count = max(2, min(8, max(member_count, len(task_lines) // 2 or 2)))
+    if member_count:
+        target_role_count = min(8, max(member_count, min(member_count + 2, len(task_lines) or member_count)))
+    return {
+        "principle": (
+            "역할명은 미리 정해진 직무 사전에서 고르지 않는다. 로드맵을 읽고, 최종 산출물을 만들기 위해 "
+            "반복적으로 등장하는 책임 축을 직접 추출해 이름 붙인다."
+        ),
+        "roadmap_milestones": task_lines,
+        "team_size": member_count,
+        "target_role_count": target_role_count,
+        "role_design_steps": [
+            "1. 최종 산출물을 한 문장으로 정의한다.",
+            "2. 각 마일스톤을 완료 기준이 분명한 작업 단위로 쪼갠다.",
+            "3. 작업을 지식/제작/검증/조율 같은 추상 카테고리가 아니라, 이 프로젝트의 실제 산출물 언어로 묶는다.",
+            "4. 각 묶음마다 책임자가 판단하고 끝낼 수 있는 범위를 역할로 만든다.",
+            "5. 역할명은 2~12자 안팎의 명사구로 만들고, 로드맵 단계명과 똑같이 쓰지 않는다.",
+            "6. 팀원이 선호 순위를 매길 수 있게 역할 간 경계가 겹치지 않도록 한다.",
+            "7. 빠지면 전체 결과가 무너지는 병목 역할은 slots를 2 이상으로 잡고, 나머지는 1로 둔다.",
+        ],
+        "difficulty_rubric": {
+            "base": 3,
+            "effort": "작업량이 많거나 여러 마일스톤에 걸치면 +1~3",
+            "ambiguity": "정답이 불명확하고 판단이 많이 필요하면 +1~2",
+            "dependency": "다른 역할이 이 결과를 받아야 하면 +1~2",
+            "deadline_risk": "마감 직전 품질을 좌우하면 +1~2",
+            "communication": "팀 조율·외부 확인이 많으면 +1",
+            "range": "최종 difficulty는 1~10 정수. 멤버에게 보여주지 않고 균형 배분에만 쓴다.",
+        },
+        "slot_rubric": (
+            "slots는 필요한 자리 수다. 한 역할이 전체 작업의 큰 병목이거나 동시에 병렬 처리해야 하면 2 이상, "
+            "대부분은 1. 팀원 수와 역할 수가 같을 필요는 없다."
+        ),
+        "hard_rules": [
+            "로드맵 단계명을 그대로 역할명으로 쓰지 않는다.",
+            "방장·팀장·관리자 같은 운영 지위는 프로젝트 실행 역할로 보지 않는다.",
+            "프로젝트 텍스트에 없는 기술명·직무명을 끼워 넣지 않는다.",
+            "모든 역할은 적어도 두 개 이상의 작업 또는 하나의 넓은 책임을 설명해야 한다.",
+            "역할 목록을 만들면 곧바로 role_manage(action='start')에 roles로 다시 넣는다.",
+        ],
+        "output_schema": [
+            {"name": "프로젝트 어휘로 만든 역할명", "difficulty": "1~10", "slots": "1~10"}
+        ],
+    }
 
 
-def _validate_role_names(names: list[str], roadmap: dict[str, Any]) -> dict[str, Any] | None:
+def _validate_role_names(
+    names: list[str],
+    roadmap: dict[str, Any],
+    member_count: int,
+) -> dict[str, Any] | None:
     task_titles = [str(t.get("title") or "") for t in roadmap.get("tasks", [])]
     normalized_task_titles = {_norm_label(title) for title in task_titles}
     exact_task_matches = [
@@ -125,15 +133,15 @@ def _validate_role_names(names: list[str], roadmap: dict[str, Any]) -> dict[str,
     return {
         "ok": False,
         "error": (
-            "역할 후보가 로드맵 단계/할일명처럼 보입니다. 역할은 '대회 주제 선정' 같은 단계명이 아니라 "
-            "'자료 조사·내용 분석', '발표 구조·대본 구성', 'MCP 서버·도구 구현'처럼 여러 태스크를 책임지는 역량/워크스트림이어야 합니다."
+            "역할 후보가 로드맵 단계/할일명처럼 보입니다. 역할은 단계명을 그대로 복사한 것이 아니라 "
+            "여러 작업을 책임지는 산출물 중심의 책임 범위여야 합니다."
         ),
         "invalid_roles": bad,
         "roadmap_task_titles": task_titles,
-        "recommended_roles": _role_suggestions_from_roadmap(roadmap.get("tasks", [])),
+        "role_design_brief": _role_design_brief(roadmap, member_count),
         "role_design_rule": (
-            "로드맵 단계명=할일, 역할명=담당 역량/책임영역. 로드맵 이후 역할분담을 할 때는 "
-            "태스크들을 묶어 워크스트림 역할로 바꾼 뒤 역할분배를 다시 시작하세요."
+            "로드맵 단계명=할일, 역할명=책임 범위. 로드맵 이후 역할분담을 할 때는 "
+            "태스크들을 묶어 프로젝트 산출물에 맞는 책임 범위로 바꾼 뒤 역할분배를 다시 시작하세요."
         ),
     }
 
@@ -141,19 +149,22 @@ def _validate_role_names(names: list[str], roadmap: dict[str, Any]) -> dict[str,
 class Role(BaseModel):
     """역할 1개 (이름 + 난이도)."""
 
-    name: str = Field(description="역할 이름 (예: 기구설계)")
+    name: str = Field(description="프로젝트 산출물에서 직접 도출한 역할 이름")
     difficulty: int = Field(
         default=5,
         ge=1,
         le=10,
-        description="난이도·업무량 1~10. **멤버에겐 안 보이고** 균형 배분에만 쓰인다. 무거운 역할일수록 크게(기구설계 8, 문서 3 등).",
+        description=(
+            "난이도·업무량 1~10. 멤버에겐 안 보이고 균형 배분에만 쓰인다. "
+            "작업량, 불확실성, 의존도, 마감 리스크가 클수록 높게 준다."
+        ),
     )
     slots: int = Field(
         default=1,
         ge=1,
         le=10,
         description=(
-            "이 역할에 필요한 인원/자리 수. 핵심 구현처럼 2명이 필요하면 2. "
+            "이 역할에 필요한 인원/자리 수. 병목이거나 병렬 처리가 필요하면 2 이상. "
             "멤버에게는 중복 선택지로 보이지 않고, 서버가 배정 시 여러 자리로 확장한다."
         ),
     )
@@ -240,23 +251,20 @@ def register(mcp: FastMCP) -> None:
         역할 분배 **시작**. **너(AI)가 PM처럼 과제를 분해해 역할+난이도를 직접 생성**해서
         넘겨라 (사용자에게 역할·팀원 이름 묻지 마 — 팀원은 room_info로 확인).
 
-        ⚠️ **로드맵 단계명/태스크명을 역할로 쓰지 말 것.** "대회 주제 선정", "아이디어
-        브레인스토밍", "프로토타입 개발", "최종 제출"은 역할이 아니라 할일/마일스톤이다.
-        역할은 여러 태스크를 책임지는 역량/워크스트림이어야 한다.
-        역할명은 최종 산출물에 맞춰 달라져야 한다. 발표 과제면 자료 조사·내용 분석,
-        발표 구조·대본 구성, 슬라이드·시각자료 제작, 발표·질의응답 준비처럼 만들고,
-        개발 과제일 때만 MCP 서버·도구 구현, 카카오 API·OAuth 연동, 폼·대시보드 UX,
-        테스트·QA처럼 기술 역할을 만든다.
+        ⚠️ **고정 역할명 사전을 쓰지 말 것.** 개발 과제라고 항상 같은 기술 역할을 쓰거나,
+        발표 과제라고 항상 같은 발표 역할을 쓰면 안 된다. 역할명은 로드맵의 실제 산출물,
+        반복 작업, 의존관계에서 매번 새로 만든다.
 
-        역할 생성 = **PM 분해 5단계**:
-        ① 산출물 파악 — 그 과제가 최종적으로 내야 할 결과물이 무엇인지
-        ② 작업 분해 — 그 산출물을 만드는 데 필요한 작업을 **최대한 잘게** 나열
-        ③ 역할화 — **비슷한 작업끼리 묶어** 응집성 있는 역할로. **역할 수 > 팀원 수 OK**
-           (난이도 균형으로 한 명이 여러 역할). 순위 매기기 좋게 보통 팀원수~2배.
-        ④ 필요 인원(slots) — 핵심 구현처럼 병목 역할은 2, 보통 역할은 1.
-        ⑤ 난이도 — 역할별 업무량 1~10 (넓고 어려울수록 높게). **난이도는 균형 배분용 내부값 —
-           사용자에게 점수를 보여주지 말고 역할 *이름*만 확인받을 것.**
-        형식: roles=[{"name":"<과제에 맞는 역할명>","difficulty":<1~10 정수>,"slots":<필요 인원>}, ...]
+        역할 생성 = **역할 설계 7단계**:
+        ① 최종 산출물 파악 — 이 팀이 마지막에 무엇을 제출/시연/완료해야 하는지 한 문장으로 정의
+        ② 작업 분해 — 각 마일스톤을 완료 기준이 있는 작은 작업으로 분해
+        ③ 책임 축 추출 — 여러 작업에 반복 등장하는 책임, 판단, 산출물 소유권을 찾기
+        ④ 역할화 — 비슷한 책임을 묶되 역할명은 프로젝트 어휘로 새로 만들기
+        ⑤ 경계 점검 — 팀원이 선호 순위를 매길 수 있게 역할 간 중복을 줄이기
+        ⑥ 필요 인원(slots) — 병목·병렬 작업이면 2 이상, 보통은 1
+        ⑦ 난이도(difficulty) — 작업량, 불확실성, 의존도, 마감 리스크, 커뮤니케이션 부담을 합쳐 1~10
+
+        형식: roles=[{"name":"<프로젝트에서 도출한 역할명>","difficulty":<1~10 정수>,"slots":<필요 인원>}, ...]
 
         난이도(difficulty)는 **멤버에겐 안 보이고**, 일을 공평하게 나누는 균형 배분에만 쓰인다.
         역할 수는 팀원 수와 달라도 됨 — finalize_roles가 **모든 역할을 멤버에 골고루 채운다**
@@ -267,7 +275,7 @@ def register(mcp: FastMCP) -> None:
         set_roles. ※ (1)(2) 확인 없이 send_form/set_roles 하지 말 것.
 
         Args:
-            roles: **AI가 생성한** 역할+난이도 목록. 생략하면 현재 로드맵에서 워크스트림 역할을 자동 추천한다.
+            roles: **AI가 생성한** 역할+난이도 목록. 생략하면 폼을 만들지 않고 역할 설계 브리프를 반환한다.
             room_id: 대상 방 (생략 시 현재 작업 방)
             close_minutes: 마감까지 분 (기본 1440=1일; 전원 응답 시엔 더 일찍 자동 마감)
         """
@@ -276,11 +284,27 @@ def register(mcp: FastMCP) -> None:
             return error
         room_id = room["id"]
         roadmap = storage.get_roadmap(room_id)
+        members = storage.list_members(room_id)
         generated_from_roadmap = False
         if not roles:
-            suggestions = _role_suggestions_from_roadmap(roadmap.get("tasks", []))
-            roles = [Role(**suggestion) for suggestion in suggestions]
-            generated_from_roadmap = True
+            return {
+                "ok": True,
+                "created": False,
+                "needs_role_design": True,
+                "role_design_brief": _role_design_brief(roadmap, len(members)),
+                "required_next_tool": "role_manage",
+                "required_next_action": "start",
+                "required_next_arguments": {
+                    "room_id": room_id,
+                    "roles": "<generate from role_design_brief>",
+                    "close_minutes": close_minutes,
+                },
+                "chat_response_hint": (
+                    "사용자에게 역할명을 다시 묻지 마세요. role_design_brief를 기준으로 이 프로젝트에 맞는 "
+                    "역할명, difficulty, slots를 직접 만든 뒤 즉시 role_manage(action='start')를 다시 호출하세요. "
+                    "고정 예시 역할명은 쓰지 말고 로드맵의 실제 산출물 언어를 사용하세요."
+                ),
+            }
         if len(roles) < 2:
             return {
                 "ok": False,
@@ -291,7 +315,7 @@ def register(mcp: FastMCP) -> None:
         names = [r.name for r in roles]
         difficulties = {r.name: r.difficulty for r in roles}
         slots = {r.name: r.slots for r in roles}
-        invalid = _validate_role_names(names, roadmap)
+        invalid = _validate_role_names(names, roadmap, len(members))
         if invalid is not None:
             return invalid
 
@@ -336,7 +360,6 @@ def register(mcp: FastMCP) -> None:
             close_on_all=True,
         )
         fid = form["id"]
-        members = storage.list_members(room_id)
         storage.create_invites(fid, [m["id"] for m in members])
         return {
             "ok": True,
@@ -364,7 +387,7 @@ def register(mcp: FastMCP) -> None:
                 "이 배정안으로 역할 확정하고 공지해줘",
             ],
             "chat_response_hint": (
-                "내부 도구명은 말하지 말고, 현재 로드맵을 참고해 만든 워크스트림 역할 목록과 필요한 인원을 "
+                "내부 도구명은 말하지 말고, 현재 로드맵을 참고해 만든 역할 목록과 필요한 인원을 "
                 "팀장에게 보여준 뒤 '이대로 선호도 조사를 보낼까요?'처럼 자연어로 확인을 받으세요. "
                 "로드맵 단계명을 역할로 쓰지 않았다는 점을 짧게 설명하세요."
             ),

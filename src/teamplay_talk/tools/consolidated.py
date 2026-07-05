@@ -326,7 +326,7 @@ def _general_guide_payload(
     ]
     topic_notes = {
         "roadmap": "로드맵은 프로젝트 주제를 큰 단계로 나누고, 팀 의견을 받아 수정한 뒤 역할과 할 일의 기준으로 씁니다.",
-        "roles": "역할분배는 로드맵을 기준으로 워크스트림 역할을 만들고, 팀원 선호도와 난이도를 함께 봐서 배정합니다.",
+        "roles": "역할분배는 로드맵을 기준으로 프로젝트 산출물에 맞는 책임 범위를 만들고, 팀원 선호도와 난이도를 함께 봐서 배정합니다.",
         "todo": "개인별 할 일은 확정된 로드맵과 역할을 1~2일 안에 끝낼 수 있는 실행 단위로 쪼개 관리합니다.",
         "forms": "투표와 의견수렴은 카카오톡으로 폼을 보내고, 응답이 모이면 AI가 결과와 다음 결정을 정리합니다.",
         "daily": "데일리는 밤 체크인으로 완료·막힘을 받고, 아침 리포트로 오늘 할 일과 지연 이슈를 정리합니다.",
@@ -464,7 +464,7 @@ async def _guide_room(room_id: int | None, guide_topic: str | None = None) -> di
     topic = (guide_topic or "").strip().lower()
     topic_guides = {
         "roadmap": ["로드맵은 큰 milestone부터 만들고, 필요하면 팀 의견을 받아 수정합니다.", "그 다음 역할분배와 개인별 할 일로 이어갑니다."],
-        "roles": ["역할은 로드맵 태스크명이 아니라 여러 일을 책임지는 워크스트림으로 나눕니다.", "예: 기획·PM, 구현, 연동, QA, 문서·발표."],
+        "roles": ["역할은 로드맵 태스크명이 아니라 여러 일을 책임지는 범위로 나눕니다.", "고정 직무명보다 이 프로젝트의 산출물과 책임 경계를 기준으로 정합니다."],
         "todo": ["할 일은 milestone 아래에 1~2일 단위 실행 항목으로 쪼갭니다.", "역할이 확정돼 있으면 실제 팀원에게 자동으로 연결합니다."],
         "forms": ["폼은 만들기와 발송이 분리됩니다.", "만든 뒤 팀원에게 보낼지 확인하고, 응답이 모이면 결과를 정리합니다."],
         "daily": ["밤에는 체크인으로 완료·막힘을 받고, 아침에는 리포트로 오늘 할 일을 정리합니다."],
@@ -583,7 +583,7 @@ def _missing_next_hint(name: str, missing: list[str]) -> str:
             "AI가 4~6개 큰 마일스톤 초안을 먼저 제안한 뒤 확인되면 그 초안으로 로드맵 생성을 이어가세요."
         )
     if name == "assign_roles" and "roles" in missing:
-        return "현재 로드맵을 기준으로 워크스트림 역할 후보를 생성해 role_manage(action='start')로 다시 시도하세요."
+        return "현재 로드맵을 기준으로 역할의 책임 범위를 다시 설계한 뒤 역할분배를 시작하세요."
     if name in {"send_form", "get_poll_results", "close_poll", "finalize_roles", "apply_daily_checkin"}:
         return "대상 form_id를 확인한 뒤 다시 시도하세요."
     return "빠진 값을 채운 뒤 다시 시도하세요."

@@ -87,7 +87,7 @@ def _room_onboarding(room: dict[str, Any]) -> dict[str, Any]:
                 },
                 {
                     "label": "역할분배하기",
-                    "description": "로드맵을 보고 기획·PM, 구현, 연동, QA, 문서·발표처럼 워크스트림 역할을 나눕니다.",
+                    "description": "로드맵을 보고 프로젝트 산출물에 맞는 책임 범위를 나눕니다.",
                     "internal_next_tool": "assign_roles",
                     "user_can_say": "우리 팀 역할 분배해줘",
                 },

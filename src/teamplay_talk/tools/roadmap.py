@@ -48,6 +48,10 @@ def _iso(dt: Any) -> str | None:
     return dt.isoformat() if dt is not None and hasattr(dt, "isoformat") else dt
 
 
+def _compact_text(value: str) -> str:
+    return "".join(ch for ch in value.strip().lower() if ch.isalnum())
+
+
 def _task_payload(t: dict[str, Any]) -> dict[str, Any]:
     assignee = t.get("assignee_nickname") or t.get("assignee_role")
     return {
@@ -174,26 +178,15 @@ def _split_task_days(parent: dict[str, Any], count: int) -> list[tuple[str | Non
 
 def _role_match_score(role: str, text: str) -> int:
     score = 0
-    pairs = [
-        (("자료", "조사", "분석", "내용"), ("책", "자료", "조사", "분석", "연구", "읽기", "핵심")),
-        (("구조", "대본", "구성"), ("발표", "구조", "대본", "흐름", "논지", "스토리")),
-        (("슬라이드", "시각자료", "콘텐츠", "제작"), ("슬라이드", "자료", "시각", "제작", "디자인")),
-        (("발표", "질의응답", "리허설"), ("발표", "질의", "응답", "리허설", "피드백", "평가")),
-        (("레시피", "품질", "맛", "연구", "조사"), ("레시피", "품질", "연구", "맛", "개선")),
-        (("재료", "구매", "준비"), ("재료", "구매", "준비", "도구")),
-        (("제조", "시제품", "운영", "제작", "생산"), ("제조", "시제품", "제작", "반죽", "토핑", "굽")),
-        (("테스트", "QA", "검증", "피드백", "개선"), ("테스트", "검증", "피드백", "개선", "시식")),
-        (("시현", "발표", "문서", "데모", "제출"), ("시현", "발표", "데모", "최종", "제출", "포장")),
-        (("기획", "PM", "관리"), ("기획", "일정", "조율", "관리", "정리")),
-        (("구현", "개발", "서버", "도구"), ("구현", "개발", "서버", "도구", "API")),
-    ]
-    for role_words, text_words in pairs:
-        if any(word in role for word in role_words) and any(word in text for word in text_words):
-            score += 3
+    role_norm = _compact_text(role)
+    text_norm = _compact_text(text)
+    if role_norm and role_norm in text_norm:
+        score += 6
     role_tokens = {token for token in re.split(r"[·,\s/]+", role) if token}
+    stopwords = {"역할", "담당", "담당자", "관리", "운영", "준비", "작업", "팀", "프로젝트"}
     for token in role_tokens:
-        if token and token in text:
-            score += 1
+        if len(token) >= 2 and token not in stopwords and token in text:
+            score += 2
     return score
 
 
@@ -565,7 +558,7 @@ def _format(roadmap: dict[str, Any]) -> dict[str, Any]:
         )
         roadmap_suggestions = [
             "로드맵이 맞는지 팀원 의견을 모아 수정·보완하기",
-            "이 로드맵 기준으로 워크스트림 역할 나누기",
+            "이 로드맵 기준으로 역할 책임 범위 나누기",
             "역할 선호도 조사를 팀원에게 보내기",
             "진행 흐름을 대시보드에서 확인하기",
         ]
@@ -642,8 +635,9 @@ def _format(roadmap: dict[str, Any]) -> dict[str, Any]:
         ),
         "role_assignment_guidance": (
             "로드맵 단계명은 역할이 아닙니다. 역할을 나눌 때는 여러 태스크를 책임지는 "
-            "역량/워크스트림 역할로 만드세요. 발표 과제는 자료 조사·내용 분석, 발표 구조·대본 구성, "
-            "슬라이드·시각자료 제작, 발표·질의응답 준비처럼 나누고, 개발 과제일 때만 서버 구현, API 연동, UX, QA 같은 기술 역할을 쓰세요."
+            "책임 범위를 만들어야 합니다. 고정 역할명 사전에서 고르지 말고, 최종 산출물·반복 작업·의존관계에서 "
+            "이 프로젝트만의 역할명을 직접 도출하세요. 역할별 difficulty는 작업량·불확실성·의존도·마감 리스크로 매기고, "
+            "병목 역할은 slots를 2 이상으로 잡으세요."
         ),
         "chat_response_hint": chat_hint,
         "user_prompt_examples": [
