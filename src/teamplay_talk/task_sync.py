@@ -219,6 +219,34 @@ async def clear_form_pending(
         await clear_form(int(room_id), int(target_form_id), user_id=user_id)
 
 
+async def pend_form_review(room_id: int, form_id: int, creator_user_id: int, title: str) -> None:
+    """폼 마감 nudge 후 방장에게 '결과 확인' 할 일을 생성한다."""
+    member = storage.get_user(creator_user_id)
+    if member is None or not member.get("kakao_access_token"):
+        return
+    due, alarm = _soon(2)
+    content = f"📋 [{_room_name(room_id)}] 결과 확인: {title}"[:100]
+    tid = await _create(member, content=content, due_date=due, alarm_time=alarm)
+    if tid:
+        storage.record_kakao_task_link(room_id, "form_review", str(form_id), creator_user_id, tid)
+
+
+async def clear_form_review(room_id: int, form_id: int, *, user_id: int | None = None) -> None:
+    """폼 결과를 확인하면 방장의 '결과 확인' 할 일을 삭제한다."""
+    members = {m["id"]: m for m in kakao_store.list_members_with_tokens(room_id)}
+    if user_id is not None and user_id not in members:
+        user = storage.get_user(user_id)
+        if user and user.get("kakao_access_token"):
+            members[user_id] = user
+    for link in storage.list_kakao_task_links(room_id=room_id, kind="form_review", ref_id=str(form_id)):
+        if user_id and link["user_id"] != user_id:
+            continue
+        member = members.get(link["user_id"])
+        if member:
+            await _delete(member, link["kakao_task_id"])
+        storage.delete_kakao_task_link(link["id"])
+
+
 # ─────────────────────────── 개인 todo ───────────────────────────
 async def sync_todos(room_id: int, *, alarm_time: str = "0900") -> None:
     """활성 개인 todo(배정됨·todo/doing)마다 '할 일' 생성. 이미 있으면 skip.

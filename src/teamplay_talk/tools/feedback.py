@@ -811,6 +811,10 @@ def register(mcp: FastMCP) -> None:
         results = storage.get_results(form_id)
         if results is None:
             return {"ok": False, "error": "존재하지 않는 폼입니다."}
+        try:
+            await task_sync.clear_form_review(_form["room_id"], form_id, user_id=_caller["id"])
+        except Exception:
+            pass
         return {"ok": True, **results}
 
     @mcp.tool(

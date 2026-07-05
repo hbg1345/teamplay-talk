@@ -36,11 +36,11 @@ def _log_once(key: str, message: str) -> None:
     _log(message)
 
 
-async def _send_kakao(user_id: int, message: str) -> None:
+async def _send_kakao(user_id: int, message: str) -> int | None:
     """user_id의 저장된 카카오 토큰으로 발송 (401이면 refresh 후 1회 재시도)."""
     user = storage.get_user(user_id)
     if user is None or not user.get("kakao_access_token"):
-        return
+        return None
     status, _ = await kakao.send_to_me(user["kakao_access_token"], message)
     if status == 401 and user.get("kakao_refresh_token"):
         refreshed = await kakao.refresh_access_token(
@@ -55,7 +55,8 @@ async def _send_kakao(user_id: int, message: str) -> None:
                 refreshed.get("refresh_token") or user["kakao_refresh_token"],
                 refreshed.get("expires_in"),
             )
-            await kakao.send_to_me(refreshed["access_token"], message)
+            status, _ = await kakao.send_to_me(refreshed["access_token"], message)
+    return status
 
 
 async def process_closed_form(form_id: int) -> None:
@@ -74,7 +75,17 @@ async def process_closed_form(form_id: int) -> None:
         f"📋 '{claimed['title']}' 폼이 마감됐어요.\n"
         f'팀플톡에서 "결과 정리해서 팀에 보내줘" 라고 하면 AI가 집계해 알려드려요.'
     )
-    await _send_kakao(claimed["creator_user_id"], msg)
+    status = await _send_kakao(claimed["creator_user_id"], msg)
+    if status == 200:
+        try:
+            await task_sync.pend_form_review(
+                claimed["room_id"],
+                form_id,
+                claimed["creator_user_id"],
+                claimed["title"],
+            )
+        except Exception:
+            pass
 
 
 async def process_daily_task_digests() -> None:
