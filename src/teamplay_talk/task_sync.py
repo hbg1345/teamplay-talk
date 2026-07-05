@@ -55,6 +55,23 @@ def _due_in(days: int = 0) -> str:
     return (datetime.now(KST).date() + timedelta(days=days)).strftime("%Y%m%d")
 
 
+def _soon(minutes: int = 2) -> tuple[str, str]:
+    """지금(KST)+minutes → (due_date 'yyyyMMdd', alarm_time 'HHMM'). 발송 직후 울리는 리마인더용."""
+    t = datetime.now(KST) + timedelta(minutes=minutes)
+    return t.strftime("%Y%m%d"), t.strftime("%H%M")
+
+
+def _room_name(room_id: int) -> str:
+    """방 이름(없으면 '팀플')."""
+    try:
+        room = storage.get_room(room_id)
+        if room and room.get("name"):
+            return str(room["name"])
+    except Exception:  # noqa: BLE001
+        pass
+    return "팀플"
+
+
 async def _refresh(member: dict[str, Any]) -> str | None:
     """멤버 access token 갱신 후 새 토큰 반환(실패 None). 저장까지 수행."""
     rt = member.get("kakao_refresh_token")
@@ -115,11 +132,12 @@ async def _delete(member: dict[str, Any], task_id: str) -> None:
 
 
 # ─────────────────────────── 체크인 ───────────────────────────
-async def sync_checkin(room_id: int, day: Any, *, alarm_time: str = "2100") -> None:
-    """밤 체크인 발송 시: 멤버별 '오늘 체크인' 할 일 생성 + 링크 기록."""
-    due = _yyyymmdd(day) or _due_in(0)
+async def sync_checkin(room_id: int, day: Any) -> None:
+    """밤 체크인 발송 시: 멤버별 '오늘 체크인' 할 일 생성(발송 직후 알림) + 링크 기록."""
+    due, alarm = _soon(2)
+    content = f"✅ [{_room_name(room_id)}] 오늘 체크인"[:100]
     for m in kakao_store.list_members_with_tokens(room_id):
-        tid = await _create(m, content="✅ 오늘 체크인", due_date=due, alarm_time=alarm_time)
+        tid = await _create(m, content=content, due_date=due, alarm_time=alarm)
         if tid:
             storage.record_kakao_task_link(room_id, "checkin", str(day), m["id"], tid)
 
@@ -137,14 +155,12 @@ async def clear_checkin(room_id: int, day: Any, *, user_ids: list[int] | None = 
 
 
 # ─────────────────────────── 폼 / 투표 ───────────────────────────
-async def sync_form(room_id: int, form_id: int, title: str, *,
-                    due_date: str | None = None, alarm_time: str = "1000") -> None:
-    """폼/투표 발송 시: 멤버별 '응답하기' 할 일 생성 + 링크 기록."""
-    if not due_date:
-        due_date = _due_in(1)
-    content = f"🗳️ 응답하기 · {title}"[:100]
+async def sync_form(room_id: int, form_id: int, title: str) -> None:
+    """폼/투표 발송 시: 멤버별 '응답하기' 할 일 생성(발송 직후 알림) + 링크 기록."""
+    due, alarm = _soon(2)
+    content = f"🗳️ [{_room_name(room_id)}] 응답: {title}"[:100]
     for m in kakao_store.list_members_with_tokens(room_id):
-        tid = await _create(m, content=content, due_date=due_date, alarm_time=alarm_time)
+        tid = await _create(m, content=content, due_date=due, alarm_time=alarm)
         if tid:
             storage.record_kakao_task_link(room_id, "form", str(form_id), m["id"], tid)
 
@@ -188,7 +204,8 @@ async def sync_todos(room_id: int, *, alarm_time: str = "0900") -> None:
         if (str(t["id"]), uid) in existing:
             continue
         due = _yyyymmdd(t.get("end_at")) or _due_in(3)
-        tid = await _create(member, content=f"📌 {t['title']}"[:100], due_date=due, alarm_time=alarm_time)
+        content = f"📌 [{_room_name(room_id)}] {t['title']}"[:100]
+        tid = await _create(member, content=content, due_date=due, alarm_time=alarm_time)
         if tid:
             storage.record_kakao_task_link(room_id, "todo", str(t["id"]), uid, tid)
 
@@ -212,7 +229,7 @@ async def add_meeting(room_id: int, member: dict[str, Any], title: str, start_at
     due = _yyyymmdd(start_at)
     if not due:
         return
-    tid = await _create(member, content=f"🗓️ 회의: {title}"[:100], due_date=due, alarm_time=alarm_time)
+    tid = await _create(member, content=f"🗓️ [{_room_name(room_id)}] 회의: {title}"[:100], due_date=due, alarm_time=alarm_time)
     if tid:
         storage.record_kakao_task_link(
             room_id, "meeting", str(decision_id or start_at), member["id"], tid
