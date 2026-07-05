@@ -80,7 +80,10 @@ def _to_surveyjs(title: str, description: str | None, questions: list[PollQuesti
 def _send_form_followup(form: dict[str, Any]) -> dict[str, Any]:
     schema = form.get("schema_json") or {}
     workflow = schema.get("_workflow_kind")
-    if any(e.get("type") == "ranking" and e.get("name") == "roles" for e in schema.get("elements", [])):
+    if any(
+        (e.get("type") == "ranking" and e.get("name") == "roles") or e.get("name") == "role_wants"
+        for e in schema.get("elements", [])
+    ):
         workflow = "role_assignment"
     if any(e.get("type") == "matrixdropdown" and e.get("name") == "availability" for e in schema.get("elements", [])):
         workflow = "meeting_time"
@@ -148,12 +151,15 @@ def _send_form_followup(form: dict[str, Any]) -> dict[str, Any]:
 def _form_feed_copy(form: dict[str, Any]) -> tuple[str, str]:
     schema = form.get("schema_json") or {}
     workflow = schema.get("_workflow_kind")
-    if any(e.get("type") == "ranking" and e.get("name") == "roles" for e in schema.get("elements", [])):
+    if any(
+        (e.get("type") == "ranking" and e.get("name") == "roles") or e.get("name") == "role_wants"
+        for e in schema.get("elements", [])
+    ):
         workflow = "role_assignment"
     if any(e.get("type") == "matrixdropdown" and e.get("name") == "availability" for e in schema.get("elements", [])):
         workflow = "meeting_time"
     descriptions = {
-        "role_assignment": "역할 선호도를 순서대로 골라주세요. 응답이 모이면 팀장이 확정합니다.",
+        "role_assignment": "맡고 싶은 책임 카드와 피하고 싶은 책임 카드를 골라주세요. 응답이 모이면 팀장이 확정합니다.",
         "meeting_time": "가능한 시간은 O, 절대 안 되는 시간은 X로 표시해주세요.",
         "location": "선호하는 약속 장소 후보만 한 칸에 하나씩 적어주세요.",
         "daily_checkin": "밀린 일과 오늘 끝낸 일을 체크하고, 필요한 메모만 남겨주세요.",

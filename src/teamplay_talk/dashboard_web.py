@@ -114,7 +114,7 @@ def _form_kind(schema: dict[str, Any], title: str) -> str:
     elements = _schema_elements(schema)
     if any(el.get("type") == "matrixdropdown" and el.get("name") == "availability" for el in elements):
         return "schedule"
-    if any(el.get("type") == "ranking" and el.get("name") == "roles" for el in elements):
+    if any((el.get("type") == "ranking" and el.get("name") == "roles") or el.get("name") == "role_wants" for el in elements):
         return "roles"
     if len(elements) == 1 and elements[0].get("type") == "comment":
         return "opinion"
@@ -314,7 +314,7 @@ __APP_LUCIDE_SCRIPT__
   .preference-card b,.assignment-card b{display:block;color:var(--ink);font-size:.86rem;font-weight:820;line-height:1.35}
   .preference-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
   .preference-chip{display:inline-flex;align-items:center;gap:5px;border:1px solid rgba(33,24,8,.10);border-radius:999px;background:rgba(255,251,241,.76);padding:5px 8px;color:var(--ink-soft);font-size:.78rem;font-weight:720;line-height:1.25}
-  .preference-rank{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:999px;background:var(--workspace);color:#fff8e8;font-size:.68rem;font-weight:820;font-variant-numeric:tabular-nums}
+  .preference-rank{display:inline-grid;place-items:center;min-width:18px;height:18px;border-radius:999px;background:var(--workspace);color:#fff8e8;font-size:.68rem;font-weight:820;font-variant-numeric:tabular-nums;padding:0 5px}
   .assignment-role{display:block;margin-top:5px;color:var(--ink-soft);font-size:.86rem;font-weight:740;line-height:1.4;overflow-wrap:anywhere}
   .decision-callout{display:grid;gap:10px;border:1px solid rgba(33,24,8,.10);border-radius:var(--radius);background:linear-gradient(180deg,rgba(255,253,247,.84),rgba(255,250,240,.58));padding:12px 14px;box-shadow:inset 0 1px 0 rgba(255,255,255,.72)}
   .decision-time{display:inline-flex;width:max-content;max-width:100%;align-items:center;min-height:30px;border:1px solid rgba(33,24,8,.11);border-radius:999px;background:rgba(255,251,241,.78);padding:0 10px;color:var(--ink);font-size:.86rem;font-weight:820;line-height:1.2;box-shadow:inset 0 1px 0 rgba(255,255,255,.68)}
@@ -619,10 +619,19 @@ function renderRolePreferences(form) {
   if (!responses.length) return "";
   const cards = responses.map((response) => {
     const answers = response.answers || {};
-    const prefs = Array.isArray(answers.roles) ? answers.roles : [];
-    const chips = prefs.length
-      ? prefs.map((role, index) => `<span class="preference-chip"><span class="preference-rank">${index + 1}</span>${escapeText(role)}</span>`).join("")
-      : `<span class="preference-chip">응답 없음</span>`;
+    const ranked = Array.isArray(answers.roles) ? answers.roles : [];
+    const wants = Array.isArray(answers.role_wants) ? answers.role_wants : [];
+    const avoids = Array.isArray(answers.role_avoids) ? answers.role_avoids : [];
+    let chips = "";
+    if (ranked.length) {
+      chips = ranked.map((role, index) => `<span class="preference-chip"><span class="preference-rank">${index + 1}</span>${escapeText(role)}</span>`).join("");
+    } else if (wants.length || avoids.length) {
+      const wantChips = wants.map((role) => `<span class="preference-chip"><span class="preference-rank">선호</span>${escapeText(role)}</span>`).join("");
+      const avoidChips = avoids.map((role) => `<span class="preference-chip"><span class="preference-rank">회피</span>${escapeText(role)}</span>`).join("");
+      chips = `${wantChips}${avoidChips}`;
+    } else {
+      chips = `<span class="preference-chip">응답 없음</span>`;
+    }
     return `
       <article class="preference-card">
         <b>${escapeText(response.nickname || "익명 응답")}</b>
@@ -649,7 +658,8 @@ function renderResult(result, form) {
   if (result.counts) {
     const top = topCount(result.counts);
     const lead = top ? `현재 1위: ${escapeText(top[0])} · ${escapeText(top[1])}표` : "아직 응답이 없습니다.";
-    return `<section class="block"><h3>${escapeText(result.question)}</h3><p>${lead}</p>${renderBars(result.counts)}</section>`;
+    const details = form && form.kind === "roles" && result.question && String(result.question).includes("맡고 싶은") ? renderRolePreferences(form) : "";
+    return `<section class="block"><h3>${escapeText(result.question)}</h3><p>${lead}</p>${renderBars(result.counts)}${details}</section>`;
   }
   if (result.ranking_scores) {
     const details = form && form.kind === "roles" ? renderRolePreferences(form) : "";

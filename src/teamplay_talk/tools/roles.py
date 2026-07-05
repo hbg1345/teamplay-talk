@@ -1,12 +1,12 @@
 """역할 분배 도구 (③ AI 결정형).
 
-흐름: assign_roles(AI가 만든 역할+난이도) → 순위폼 → send_form 개인별 →
-멤버 순위 → finalize_roles(전체 역할을 난이도 균형으로 배분) → 팀장 확인 → set_roles.
+흐름: assign_roles(AI가 만든 책임 카드+난이도) → 선호/회피 폼 → send_form 개인별 →
+멤버 선호 → finalize_roles(전체 책임 카드를 난이도 균형으로 배분) → 팀장 확인 → set_roles.
 
 핵심:
-- **전체집합 커버**: 모든 역할이 누군가에게 배정된다(멤버<역할이면 한 명이 여러 역할).
+- **전체집합 커버**: 모든 책임 카드가 누군가에게 배정된다(멤버<카드면 한 명이 여러 책임).
 - **난이도 균형**: 각 멤버의 난이도 합이 비슷하게 (LPT 그리디).
-- **선호 반영**: 동률일 때 그 역할을 더 선호한 멤버에게.
+- **선호/회피 반영**: 동률일 때 그 책임을 선호한 멤버에게, 회피한 멤버는 뒤로.
 - 난이도 점수는 **멤버 폼엔 안 보이고**(균형 배분용), 매칭은 서버에서 결정적으로.
 """
 
@@ -56,7 +56,7 @@ def _role_design_brief(
     roadmap: dict[str, Any],
     member_count: int,
 ) -> dict[str, Any]:
-    """AI가 고정 역할명 없이 역할을 설계하도록 넘기는 구조화된 지침."""
+    """AI가 고정 역할명 없이 책임 카드를 설계하도록 넘기는 구조화된 지침."""
     tasks = roadmap.get("tasks", [])
     task_lines = [
         {
@@ -69,25 +69,24 @@ def _role_design_brief(
         for task in tasks
         if (task.get("task_type") or "milestone") == "milestone"
     ]
-    target_role_count = max(2, min(8, max(member_count, len(task_lines) // 2 or 2)))
-    if member_count:
-        target_role_count = min(8, max(member_count, min(member_count + 2, len(task_lines) or member_count)))
+    card_bounds = _responsibility_card_bounds(member_count)
     return {
         "principle": (
-            "역할명은 미리 정해진 직무 사전에서 고르지 않는다. 로드맵을 읽고, 최종 산출물을 만들기 위해 "
-            "반복적으로 등장하는 책임 축을 직접 추출해 이름 붙인다."
+            "처음부터 큰 역할명을 정하지 않는다. 로드맵을 읽고, 최종 산출물을 만들기 위해 필요한 "
+            "책임 카드를 MECE하게 분해한 뒤 난이도와 연관도를 붙인다. 최종 역할 묶음은 팀원 응답 후 배정 단계에서 만든다."
         ),
         "roadmap_milestones": task_lines,
         "team_size": member_count,
-        "target_role_count": target_role_count,
+        "responsibility_card_count": card_bounds,
+        "preference_limits_if_preferred_count": _preference_limits(card_bounds["preferred"]),
         "role_design_steps": [
             "1. 최종 산출물을 한 문장으로 정의한다.",
-            "2. 각 마일스톤을 완료 기준이 분명한 작업 단위로 쪼갠다.",
-            "3. 작업을 지식/제작/검증/조율 같은 추상 카테고리가 아니라, 이 프로젝트의 실제 산출물 언어로 묶는다.",
-            "4. 각 묶음마다 책임자가 판단하고 끝낼 수 있는 범위를 역할로 만든다.",
-            "5. 역할명은 2~12자 안팎의 명사구로 만들고, 로드맵 단계명과 똑같이 쓰지 않는다.",
-            "6. 팀원이 선호 순위를 매길 수 있게 역할 간 경계가 겹치지 않도록 한다.",
-            "7. 빠지면 전체 결과가 무너지는 병목 역할은 slots를 2 이상으로 잡고, 나머지는 1로 둔다.",
+            "2. 각 마일스톤에서 빠지면 안 되는 책임 단위를 뽑는다.",
+            "3. 책임 카드는 팀원 수의 1~2배 범위로 만든다. preferred 개수에 최대한 맞춘다.",
+            "4. 너무 작은 할일은 합치고, 너무 큰 책임은 둘로 나눈다.",
+            "5. 카드명은 2~14자 안팎의 명사구로 만들고, 로드맵 단계명과 똑같이 쓰지 않는다.",
+            "6. 각 카드는 서로 겹치지 않게 만들고, 전체 로드맵 책임이 빠지지 않게 한다.",
+            "7. slots는 호환 필드다. 특별히 공동 책임이 필요한 경우가 아니면 1로 둔다. 큰 일은 slots를 늘리기보다 책임 카드를 나눈다.",
         ],
         "difficulty_rubric": {
             "base": 3,
@@ -99,19 +98,48 @@ def _role_design_brief(
             "range": "최종 difficulty는 1~10 정수. 멤버에게 보여주지 않고 균형 배분에만 쓴다.",
         },
         "slot_rubric": (
-            "slots는 필요한 자리 수다. 한 역할이 전체 작업의 큰 병목이거나 동시에 병렬 처리해야 하면 2 이상, "
-            "대부분은 1. 팀원 수와 역할 수가 같을 필요는 없다."
+            "slots는 과거 호환용이다. 책임 카드 방식에서는 기본 1. 병목이면 slots를 올리기보다 "
+            "작업을 더 작은 책임 카드로 분리한다."
         ),
         "hard_rules": [
             "로드맵 단계명을 그대로 역할명으로 쓰지 않는다.",
             "방장·팀장·관리자 같은 운영 지위는 프로젝트 실행 역할로 보지 않는다.",
             "프로젝트 텍스트에 없는 기술명·직무명을 끼워 넣지 않는다.",
-            "모든 역할은 적어도 두 개 이상의 작업 또는 하나의 넓은 책임을 설명해야 한다.",
-            "역할 목록을 만들면 곧바로 role_manage(action='start')에 roles로 다시 넣는다.",
+            "책임 카드 개수는 team_size의 1~2배 범위를 벗어나지 않는다.",
+            "각 책임 카드는 난이도와 업무량이 너무 가볍거나 무겁지 않게 조정한다.",
+            "책임 카드 목록을 만들면 곧바로 role_manage(action='start')에 roles로 다시 넣는다.",
         ],
         "output_schema": [
-            {"name": "프로젝트 어휘로 만든 역할명", "difficulty": "1~10", "slots": "1~10"}
+            {"name": "프로젝트 어휘로 만든 책임 카드명", "difficulty": "1~10", "slots": "대부분 1"}
         ],
+    }
+
+
+def _responsibility_card_bounds(member_count: int) -> dict[str, int]:
+    """팀원 수의 1~2배 범위에서 책임 카드 목표치를 계산한다."""
+    size = max(1, int(member_count or 1))
+    min_count = max(2, size)
+    max_count = max(min_count, min(12, size * 2))
+    preferred = round(size * 1.5)
+    preferred = min(max(preferred, min_count), max_count)
+    return {"min": min_count, "max": max_count, "preferred": preferred}
+
+
+def _preference_limits(card_count: int) -> dict[str, int]:
+    """책임 카드 수에 맞춰 캐주얼한 선호/회피 선택 개수를 정한다."""
+    count = max(1, int(card_count or 1))
+    if count <= 2:
+        want_max = 1
+    elif count <= 4:
+        want_max = 2
+    elif count <= 8:
+        want_max = 3
+    else:
+        want_max = 4
+    avoid_max = 0 if count <= 1 else (1 if count <= 8 else 2)
+    return {
+        "want_max": min(want_max, count),
+        "avoid_max": min(avoid_max, max(0, count - 1)),
     }
 
 
@@ -189,13 +217,14 @@ def _balanced_assign(
     roles: list[str],
     difficulties: dict[str, int],
     prefs: dict[str, list[str]],
+    avoids: dict[str, set[str]] | None = None,
     slots: dict[str, int] | None = None,
 ) -> tuple[dict[str, list[str]], dict[str, int]]:
-    """모든 역할을 멤버에 배분(전체집합 커버) + 난이도 합 균형 + 선호 반영.
+    """모든 책임 카드를 멤버에 배분(전체집합 커버) + 난이도 합 균형 + 선호/회피 반영.
 
-    slots가 2 이상인 역할은 여러 자리로 확장한다. 같은 역할 자리는 가능하면 서로
+    slots가 2 이상인 카드는 여러 자리로 확장한다. 같은 카드는 가능하면 서로
     다른 멤버에게 먼저 퍼뜨리고, 멤버가 부족할 때만 한 사람이 같은 역할을 중복 담당한다.
-    무거운 역할부터(LPT) 가장 덜 일한 멤버에게 — 동률이면 그 역할을 더 선호한 멤버에게.
+    무거운 카드부터(LPT) 가장 덜 일한 멤버에게 — 동률이면 선호/회피를 반영한다.
     return: ({멤버: [역할들]}, {멤버: 난이도합}). 멤버<역할이면 한 명이 여러 역할.
     """
     members = list(prefs.keys())
@@ -212,6 +241,8 @@ def _balanced_assign(
         except ValueError:
             return len(roles)  # 선호 안 한 역할은 최하 순위
 
+    avoid_sets = avoids or {}
+
     for role in sorted(role_units, key=lambda r: -difficulties.get(r, 5)):
         d = difficulties.get(role, 5)
         best = min(
@@ -219,6 +250,7 @@ def _balanced_assign(
             key=lambda m: (
                 role in assigned[m],
                 loads[m] + d,
+                role in avoid_sets.get(m, set()),
                 pref_rank(m, role),
                 loads[m],
             ),
@@ -246,36 +278,36 @@ def register(mcp: FastMCP) -> None:
         room_id: int | None = None,
         close_minutes: int | None = 1440,
     ) -> dict[str, Any]:
-        """Starts role assignment by creating a ranked-preference poll for the team.
+        """Starts role assignment by creating a responsibility-card preference form for the team.
 
-        역할 분배 **시작**. **너(AI)가 PM처럼 과제를 분해해 역할+난이도를 직접 생성**해서
-        넘겨라 (사용자에게 역할·팀원 이름 묻지 마 — 팀원은 room_info로 확인).
+        역할 분배 **시작**. **너(AI)가 PM처럼 로드맵을 책임 카드+난이도로 직접 분해**해서
+        넘겨라 (사용자에게 책임 카드·팀원 이름 묻지 마 — 팀원은 room_info로 확인).
 
         ⚠️ **고정 역할명 사전을 쓰지 말 것.** 개발 과제라고 항상 같은 기술 역할을 쓰거나,
         발표 과제라고 항상 같은 발표 역할을 쓰면 안 된다. 역할명은 로드맵의 실제 산출물,
         반복 작업, 의존관계에서 매번 새로 만든다.
 
-        역할 생성 = **역할 설계 7단계**:
+        역할 생성 = **책임 카드 설계 7단계**:
         ① 최종 산출물 파악 — 이 팀이 마지막에 무엇을 제출/시연/완료해야 하는지 한 문장으로 정의
-        ② 작업 분해 — 각 마일스톤을 완료 기준이 있는 작은 작업으로 분해
-        ③ 책임 축 추출 — 여러 작업에 반복 등장하는 책임, 판단, 산출물 소유권을 찾기
-        ④ 역할화 — 비슷한 책임을 묶되 역할명은 프로젝트 어휘로 새로 만들기
-        ⑤ 경계 점검 — 팀원이 선호 순위를 매길 수 있게 역할 간 중복을 줄이기
-        ⑥ 필요 인원(slots) — 병목·병렬 작업이면 2 이상, 보통은 1
+        ② 책임 분해 — 각 마일스톤에서 빠지면 안 되는 책임 단위를 추출
+        ③ 개수 조절 — 책임 카드는 팀원 수의 1~2배, 되도록 1.5배 근처로 만들기
+        ④ MECE 점검 — 책임끼리 겹치지 않고 전체 로드맵이 빠지지 않게 하기
+        ⑤ 카드명 작성 — 프로젝트 어휘로 짧게 만들고 로드맵 단계명을 그대로 쓰지 않기
+        ⑥ slots — 기본 1. 큰 책임은 slots를 늘리기보다 카드 자체를 나누기
         ⑦ 난이도(difficulty) — 작업량, 불확실성, 의존도, 마감 리스크, 커뮤니케이션 부담을 합쳐 1~10
 
-        형식: roles=[{"name":"<프로젝트에서 도출한 역할명>","difficulty":<1~10 정수>,"slots":<필요 인원>}, ...]
+        형식: roles=[{"name":"<프로젝트에서 도출한 책임 카드명>","difficulty":<1~10 정수>,"slots":1}, ...]
 
         난이도(difficulty)는 **멤버에겐 안 보이고**, 일을 공평하게 나누는 균형 배분에만 쓰인다.
-        역할 수는 팀원 수와 달라도 됨 — finalize_roles가 **모든 역할을 멤버에 골고루 채운다**
-        (멤버가 적으면 한 명이 여러 역할). close_minutes 기본 1일, 전원 응답 시 자동 마감.
+        책임 카드 수는 팀원 수와 달라도 됨 — finalize_roles가 **모든 책임 카드를 멤버에 골고루 채운다**
+        (멤버가 적으면 한 명이 여러 책임). close_minutes 기본 1일, 전원 응답 시 자동 마감.
 
-        생성 후 흐름: **(1) 역할 목록을 팀장에게 보여주고 '이대로?' 확인받기** →
-        send_form(form_id) → 멤버 순위 → finalize_roles 매칭 → **(2) 결과 팀장 확인** →
+        생성 후 흐름: **(1) 책임 카드 목록을 팀장에게 보여주고 '이대로?' 확인받기** →
+        send_form(form_id) → 멤버 선호/회피 → finalize_roles 매칭 → **(2) 결과 팀장 확인** →
         set_roles. ※ (1)(2) 확인 없이 send_form/set_roles 하지 말 것.
 
         Args:
-            roles: **AI가 생성한** 역할+난이도 목록. 생략하면 폼을 만들지 않고 역할 설계 브리프를 반환한다.
+            roles: **AI가 생성한** 책임 카드+난이도 목록. 생략하면 폼을 만들지 않고 설계 브리프를 반환한다.
             room_id: 대상 방 (생략 시 현재 작업 방)
             close_minutes: 마감까지 분 (기본 1440=1일; 전원 응답 시엔 더 일찍 자동 마감)
         """
@@ -308,7 +340,7 @@ def register(mcp: FastMCP) -> None:
         if len(roles) < 2:
             return {
                 "ok": False,
-                "error": "역할을 2개 이상 구성할 수 없습니다. 먼저 로드맵을 만들거나 프로젝트 주제를 더 구체화하세요.",
+                "error": "책임 카드를 2개 이상 구성할 수 없습니다. 먼저 로드맵을 만들거나 프로젝트 주제를 더 구체화하세요.",
                 "roadmap_task_titles": [t.get("title") for t in roadmap.get("tasks", [])],
             }
 
@@ -318,6 +350,26 @@ def register(mcp: FastMCP) -> None:
         invalid = _validate_role_names(names, roadmap, len(members))
         if invalid is not None:
             return invalid
+        card_bounds = _responsibility_card_bounds(len(members))
+        if len(names) < card_bounds["min"] or len(names) > card_bounds["max"]:
+            return {
+                "ok": False,
+                "error": (
+                    f"책임 카드 수가 팀원 수 기준 범위를 벗어났습니다. 현재 팀원 {len(members)}명 기준 "
+                    f"{card_bounds['min']}~{card_bounds['max']}개가 적절하고, 추천은 {card_bounds['preferred']}개입니다."
+                ),
+                "responsibility_card_count": card_bounds,
+                "received_count": len(names),
+                "received_cards": names,
+                "role_design_brief": _role_design_brief(roadmap, len(members)),
+                "required_next_tool": "role_manage",
+                "required_next_action": "start",
+                "chat_response_hint": (
+                    "사용자에게 카드 수 오류를 길게 설명하지 말고, 로드맵을 기준으로 책임 카드를 "
+                    f"{card_bounds['preferred']}개 안팎으로 다시 묶어 role_manage(action='start')를 재호출하세요."
+                ),
+            }
+        limits = _preference_limits(len(names))
 
         closes_at = None
         if close_minutes:
@@ -327,29 +379,51 @@ def register(mcp: FastMCP) -> None:
 
         schema = {
             "title": "역할 선호도 조사",
-            "description": "하고 싶은 역할을 위에서부터 끌어 **전부 정렬**해주세요 (위=1순위).",
+            "description": (
+                f"로드맵을 기준으로 나눈 책임 카드입니다. 맡고 싶은 카드는 최대 {limits['want_max']}개, "
+                f"피하고 싶은 카드는 최대 {limits['avoid_max']}개만 골라주세요."
+            ),
             "completeText": "제출",
             "showQuestionNumbers": "off",
             "elements": [
                 {
-                    "type": "ranking",
-                    "name": "roles",
-                    "title": "역할을 선호 순서대로 정렬해주세요",
+                    "type": "checkbox",
+                    "name": "role_wants",
+                    "title": f"맡고 싶은 책임 카드를 골라주세요 (최대 {limits['want_max']}개)",
                     "choices": names,
+                    "maxSelectedChoices": limits["want_max"],
                     "isRequired": True,
-                },
-                {
-                    "type": "comment",
-                    "name": "notes",
-                    "title": "꼭 하고 싶은 / 절대 못 하는 역할, 참고사항이 있으면 적어주세요 (선택)",
-                    "isRequired": False,
                 },
             ],
             "_role_difficulty": difficulties,  # 멤버 폼엔 안 보임(SurveyJS 무시), finalize가 읽음
             "_role_slots": slots,
+            "_role_cards": names,
+            "_role_card_count": len(names),
+            "_role_preference_limits": limits,
+            "_role_assignment_mode": "responsibility_cards",
             "_workflow_kind": "role_assignment",
             "_workflow_stage": "role_preference_collection",
         }
+        if limits["avoid_max"] > 0:
+            schema["elements"].append(
+                {
+                    "type": "checkbox",
+                    "name": "role_avoids",
+                    "title": f"되도록 피하고 싶은 책임 카드가 있으면 골라주세요 (최대 {limits['avoid_max']}개)",
+                    "description": "위에서 고른 카드와 겹치지 않게 골라주세요.",
+                    "choices": names,
+                    "maxSelectedChoices": limits["avoid_max"],
+                    "isRequired": False,
+                }
+            )
+        schema["elements"].append(
+            {
+                "type": "comment",
+                "name": "notes",
+                "title": "혹시 꼭 전하고 싶은 말이 있으면 적어주세요 (선택)",
+                "isRequired": False,
+            }
+        )
         form = storage.create_form(
             room_id=room_id,
             title="역할 선호도 조사",
@@ -364,9 +438,15 @@ def register(mcp: FastMCP) -> None:
         return {
             "ok": True,
             "form_id": fid,
-            "roles": names,  # 역할 이름만 — 난이도는 내부 균형값이라 노출 X
+            "roles": names,  # 공개 호환 필드: 실제 의미는 책임 카드
+            "responsibility_cards": names,
             "role_slots": slots,
             "total_role_slots": sum(slots.values()),
+            "responsibility_card_count": {
+                **card_bounds,
+                "actual": len(names),
+            },
+            "preference_limits": limits,
             "generated_from_roadmap": generated_from_roadmap,
             "roadmap_task_titles": [t.get("title") for t in roadmap.get("tasks", [])],
             "members": [m["nickname"] for m in members],
@@ -376,10 +456,9 @@ def register(mcp: FastMCP) -> None:
             "send_form_arguments": {"form_id": fid},
             "do_not_claim_sent_before_send_form": True,
             "action_required": (
-                "⚠️ 아직 보내지 마세요. 위 역할 **이름**을 사용자(팀장)에게 보여주고 "
-                "'이대로 보낼까요? 바꿀 역할 있나요?'라고 물어 **명시적 확인**을 받으세요. "
-                "(난이도 점수는 보여주지 마세요 — 내부 균형용입니다. slots는 필요 인원 설명용입니다.) "
-                "동의를 받은 뒤에만 역할 선호 폼을 발송하세요."
+                "⚠️ 아직 보내지 마세요. 위 책임 카드 **이름**을 사용자(팀장)에게 보여주고 "
+                "'이대로 선호도 조사를 보낼까요? 바꿀 책임 카드가 있나요?'라고 물어 **명시적 확인**을 받으세요. "
+                "(난이도 점수는 보여주지 마세요 — 내부 균형용입니다.) 동의를 받은 뒤에만 역할 선호 폼을 발송하세요."
             ),
             "user_prompt_examples": [
                 "이 역할 목록으로 팀원들에게 선호도 조사 보내줘",
@@ -387,9 +466,10 @@ def register(mcp: FastMCP) -> None:
                 "이 배정안으로 역할 확정하고 공지해줘",
             ],
             "chat_response_hint": (
-                "내부 도구명은 말하지 말고, 현재 로드맵을 참고해 만든 역할 목록과 필요한 인원을 "
-                "팀장에게 보여준 뒤 '이대로 선호도 조사를 보낼까요?'처럼 자연어로 확인을 받으세요. "
-                "로드맵 단계명을 역할로 쓰지 않았다는 점을 짧게 설명하세요."
+                "내부 도구명은 말하지 말고, 현재 로드맵을 참고해 만든 책임 카드 목록을 "
+                f"팀장에게 보여준 뒤 '팀원은 맡고 싶은 것 최대 {limits['want_max']}개, "
+                f"피하고 싶은 것 최대 {limits['avoid_max']}개만 고르면 됩니다. 이대로 보낼까요?'처럼 확인을 받으세요. "
+                "로드맵 단계명을 그대로 쓰지 않고 책임 단위로 나눴다는 점을 짧게 설명하세요."
             ),
         }
 
@@ -404,59 +484,85 @@ def register(mcp: FastMCP) -> None:
         },
     )
     async def finalize_roles(form_id: int) -> dict[str, Any]:
-        """Computes a balanced, full-coverage role assignment from a teamplay-talk(팀플톡) ranking poll.
+        """Computes a balanced, full-coverage role assignment from a teamplay-talk(팀플톡) preference form.
 
-        역할 순위 폼의 응답을 읽어 **모든 역할을 멤버에 배분**(전체집합 커버)하되 **난이도
-        합을 균형**있게, **선호를 반영**해 계산한다(아직 기록·발송 X). 멤버가 역할보다 적으면
-        한 명이 여러 역할을 받는다. 결과를 팀장에게 보여주고 set_roles로 확정한다.
+        역할 선호 폼의 응답을 읽어 **모든 책임 카드를 멤버에 배분**(전체집합 커버)하되 **난이도
+        합을 균형**있게, **선호/회피를 반영**해 계산한다(아직 기록·발송 X). 멤버가 카드보다 적으면
+        한 명이 여러 책임을 받는다. 결과를 팀장에게 보여주고 set_roles로 확정한다.
 
         Args:
-            form_id: 순위 선호 폼의 ID (assign_roles가 만든 것)
+            form_id: 역할 선호 폼의 ID (assign_roles가 만든 것)
         """
         _caller, form, error = await require_form(form_id)
         if error:
             return error
         schema = form.get("schema_json") or {}
+        elements = schema.get("elements", [])
         rank_el = next(
             (e for e in schema.get("elements", []) if e.get("type") == "ranking"), None
         )
-        if rank_el is None:
-            return {"ok": False, "error": "순위(rank) 질문이 있는 폼이 아닙니다."}
-        roles = list(rank_el.get("choices", []))
+        want_el = next((e for e in elements if e.get("name") == "role_wants"), None)
+        avoid_el = next((e for e in elements if e.get("name") == "role_avoids"), None)
+        if rank_el is None and want_el is None:
+            return {"ok": False, "error": "역할 선호 질문이 있는 폼이 아닙니다."}
+        roles = list(
+            schema.get("_role_cards")
+            or (rank_el or want_el or {}).get("choices", [])
+        )
         difficulties = {str(k): int(v) for k, v in (schema.get("_role_difficulty") or {}).items()}
         slots = {
             str(k): max(1, int(v))
             for k, v in (schema.get("_role_slots") or {}).items()
         }
-        qname = rank_el.get("name")
+        qname = rank_el.get("name") if rank_el else None
 
         results = storage.get_results(form_id)
         responses = (results or {}).get("responses", [])
         prefs: dict[str, list[str]] = {}
+        avoids: dict[str, set[str]] = {}
         notes: dict[str, str] = {}
+        preference_summary: dict[str, dict[str, Any]] = {}
         for r in responses:
             ans = r.get("answers") or {}
             key = r.get("nickname") or f"user{r.get('member_id')}"
-            ranking = ans.get(qname)
+            wants = ans.get("role_wants")
+            avoided = ans.get("role_avoids")
+            ranking = ans.get(qname) if qname else None
             if isinstance(ranking, list) and ranking:
                 prefs[key] = [str(x) for x in ranking]
+                avoids[key] = set()
+            elif isinstance(wants, list) and wants:
+                want_list = [str(x) for x in wants]
+                avoid_set = {str(x) for x in avoided} if isinstance(avoided, list) else set()
+                avoid_set.difference_update(want_list)
+                prefs[key] = want_list
+                avoids[key] = avoid_set
             if ans.get("notes"):
                 notes[key] = str(ans["notes"]).strip()
+            if key in prefs:
+                preference_summary[key] = {
+                    "wants": prefs.get(key, []),
+                    "avoids": sorted(avoids.get(key, set())),
+                    "note": notes.get(key, ""),
+                }
         if not prefs:
             return {
                 "ok": False,
-                "error": "응답이 없습니다. (anonymous=False로 만들고 멤버가 순위를 제출해야 매칭 가능)",
+                "error": "응답이 없습니다. (anonymous=False로 만들고 멤버가 선호 카드를 제출해야 매칭 가능)",
             }
 
-        assigned, loads = _balanced_assign(roles, difficulties, prefs, slots)
+        assigned, loads = _balanced_assign(roles, difficulties, prefs, avoids, slots)
         assignments = [
             {
                 "nickname": m,
                 "roles": _compact_roles(assigned[m]),
+                "responsibility_cards": _compact_roles(assigned[m]),
                 "raw_roles": assigned[m],
                 "role": ", ".join(_compact_roles(assigned[m])),
                 "workload": loads[m],
                 "note": notes.get(m, ""),  # 멤버 자유기입(제약/사정) — 리더가 확정 전에 볼 것
+                "wanted": prefs.get(m, []),
+                "avoided": sorted(avoids.get(m, set())),
             }
             for m in prefs
         ]
@@ -468,6 +574,8 @@ def register(mcp: FastMCP) -> None:
         return {
             "ok": True,
             "assignments": assignments,
+            "assignment_mode": schema.get("_role_assignment_mode") or ("ranking" if rank_el else "responsibility_cards"),
+            "preference_summary": preference_summary,
             "role_slots": required_slots,
             "covered_role_slots": covered_counts,
             "all_roles_covered": all(covered_counts.get(role, 0) >= required_slots[role] for role in roles),
@@ -485,9 +593,9 @@ def register(mcp: FastMCP) -> None:
                 ]
             },
             "note": (
-                "모든 역할을 난이도 균형 배분(workload=난이도 합, 비슷할수록 공평) + 선호 반영. "
-                "⚠️ **각 멤버의 note(자유기입: 못 하는 역할·사정)를 반드시 팀장에게 보여주고**, "
-                "필요하면 조정한 뒤 역할을 확정. AI 단독 확정 X — 팀장이 메모 보고 최종 판단."
+                "모든 책임 카드를 난이도 균형 배분(workload=난이도 합, 비슷할수록 공평) + 선호/회피 반영. "
+                "⚠️ 각 멤버의 note가 있으면 팀장에게 보여주고, 필요하면 조정한 뒤 역할을 확정. "
+                "AI 단독 확정 X — 팀장이 메모 보고 최종 판단."
             ),
             "next": "배정안은 아직 저장되지 않았습니다. 팀장에게 멤버 메모와 배정안을 보여주고, 확인되면 역할을 확정하세요.",
             "suggested_next_actions": [
