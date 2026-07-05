@@ -60,9 +60,12 @@ def _soon(minutes: int = 2) -> tuple[str, str]:
 
     카카오 톡캘린더 할 일 알림은 **5분 단위**만 허용 → 임의 분(예: 14:37)은 거부됨.
     """
-    t = datetime.now(KST) + timedelta(minutes=minutes)
-    bump = (5 - t.minute % 5) % 5 or 5  # 다음 5분 경계로 올림(과거 알림 방지)
+    now = datetime.now(KST)
+    t = now + timedelta(minutes=minutes)
+    bump = (5 - t.minute % 5) % 5  # 5분 경계면 그대로 사용한다.
     t = (t + timedelta(minutes=bump)).replace(second=0, microsecond=0)
+    if t <= now:
+        t += timedelta(minutes=5)
     return t.strftime("%Y%m%d"), t.strftime("%H%M")
 
 
@@ -300,7 +303,13 @@ async def pend_from_message(member: dict[str, Any], *, title: str,
     room_id = reminder.get("room_id")
     prefix = f"[{_room_name(room_id)}] " if room_id else ""
     due, alarm = _soon(2)
-    content = f"📌 {prefix}{title}"[:100]
+    kind = reminder.get("kind")
+    if kind == "form":
+        content = f"🗳️ {prefix}응답: {title}"[:100]
+    elif kind == "checkin":
+        content = f"✅ {prefix}오늘 체크인"[:100]
+    else:
+        content = f"📌 {prefix}{title}"[:100]
     tid = await _create(member, content=content, due_date=due, alarm_time=alarm)
     if tid and room_id and reminder.get("kind") and reminder.get("ref_id") is not None:
         storage.record_kakao_task_link(
