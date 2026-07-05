@@ -20,6 +20,18 @@ _FONT_CSS = "https://cdn.jsdelivr.net/gh/wanteddev/wanted-sans@v1.0.3/packages/w
 _STATIC = Path(__file__).resolve().parent / "static"
 _PUBLIC_URL = "https://teamplay-talk.tech"
 _HAM_BONGKOO_LINKEDIN = "https://www.linkedin.com/in/bongkoo-ham-1a49a8325/"
+_CONTACT_EMAIL = "teamplaytalk@gmail.com"
+_GTM_HEAD = """<!-- Google Tag Manager -->
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-PFT7HB5P');</script>
+<!-- End Google Tag Manager -->"""
+_GTM_NOSCRIPT = """<!-- Google Tag Manager (noscript) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-PFT7HB5P"
+height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->"""
 
 
 def _json_ld() -> str:
@@ -263,6 +275,8 @@ footer{padding:50px 0 58px;border-top:1px solid var(--line)}
 .foot-brand img{width:30px;height:30px;border-radius:9px}
 .foot small{color:var(--muted);font-size:13px}
 .foot-end{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.foot-contact{color:var(--muted);font-size:13px;font-weight:700;transition:color .18s}
+.foot-contact:hover{color:var(--violet)}
 
 /* ── 스크롤 리빌 ── */
 .rv{opacity:0;transform:translateY(24px);transition:opacity .7s cubic-bezier(.2,.8,.2,1),transform .7s cubic-bezier(.2,.8,.2,1)}
@@ -971,6 +985,7 @@ def _page() -> str:
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+{_GTM_HEAD}
 <title>teamplay-talk — 팀플의 PM을, AI에게</title>
 <meta name="description" content="AI에게 한마디면 투표·회의 시간·역할 분배·로드맵·데일리 리포트까지. 결과는 팀원들의 카카오톡으로. 팀플 조율을 AI가 PM처럼 해내는 Kakao PlayMCP 협업 도구.">
 <meta property="og:title" content="teamplay-talk — 팀플의 PM을, AI에게">
@@ -997,6 +1012,7 @@ def _page() -> str:
 <style>{_CSS}{_LANG_CSS}</style>
 </head>
 <body>
+{_GTM_NOSCRIPT}
 
 <nav class="nav">
   <div class="nav-pill lg">
@@ -1142,7 +1158,7 @@ def _page() -> str:
 <footer>
   <div class="wrap foot">
     <div class="foot-brand"><img src="/icon-mark.png" alt="" width="30" height="30"> teamplay-talk</div>
-    <div class="foot-end"><small>Kakao PlayMCP · AGENTIC PLAYER · © 2026 teamplay-talk</small><button class="lang-toggle lg" type="button" aria-label="Language / 언어"><span>KO</span><span>EN</span></button></div>
+    <div class="foot-end"><small>Kakao PlayMCP · AGENTIC PLAYER · © 2026 teamplay-talk</small><a class="foot-contact" href="mailto:{_CONTACT_EMAIL}">문의 {_CONTACT_EMAIL}</a><button class="lang-toggle lg" type="button" aria-label="Language / 언어"><span>KO</span><span>EN</span></button></div>
   </div>
 </footer>
 

@@ -202,6 +202,9 @@ __APP_LUCIDE_SCRIPT__
   .shell{position:relative;z-index:1;display:grid;grid-template-columns:260px minmax(0,1fr) 336px;gap:16px;width:min(1440px,100%);margin:0 auto;padding:16px clamp(12px,2vw,24px) 44px;align-items:start}
   .workspace{position:sticky;top:16px;min-height:calc(100vh - 32px);display:flex;flex-direction:column;padding:14px;background:linear-gradient(180deg,var(--workspace),var(--workspace-2));color:#fff8e8;box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 28px 80px rgba(37,33,29,.20)}
   .workspace__top{display:grid;gap:12px;padding:4px 4px 14px;border-bottom:1px solid rgba(255,255,255,.14)}
+  .workspace__home{display:grid;grid-template-columns:38px minmax(0,1fr);gap:12px;align-items:start;color:inherit;text-decoration:none;border-radius:12px;padding:2px;transition:background .16s ease,transform .16s cubic-bezier(.2,.8,.2,1)}
+  .workspace__home:hover{background:rgba(255,255,255,.07);transform:translateY(-1px)}
+  .workspace__home:focus-visible{outline:2px solid var(--kakao-yellow);outline-offset:3px}
   .workspace__mark{display:grid;place-items:center;width:38px;height:38px;border-radius:8px;background:var(--kakao-yellow);color:var(--kakao-black);box-shadow:0 12px 30px rgba(254,229,0,.18);font-family:var(--font-display);font-weight:800}
   .workspace__mark .tp-mark{width:23px;height:auto}
   .eyebrow{margin:0;color:rgba(255,248,232,.62);font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
@@ -373,12 +376,14 @@ __APP_LUCIDE_SCRIPT__
 <div class="shell" id="dashboardShell">
   <aside class="workspace">
     <div class="workspace__top">
-      <div class="workspace__mark">__APP_BRAND_MARK__</div>
-      <div class="workspace__copy">
-        <p class="eyebrow tp-eyebrow">teamplay-talk</p>
-        <h1 id="roomName"></h1>
-        <p class="workspace__sub" id="roomInvite"></p>
-      </div>
+      <a class="workspace__home" href="/" aria-label="teamplay-talk 홈페이지">
+        <div class="workspace__mark">__APP_BRAND_MARK__</div>
+        <div class="workspace__copy">
+          <p class="eyebrow tp-eyebrow">teamplay-talk</p>
+          <h1 id="roomName"></h1>
+          <p class="workspace__sub" id="roomInvite"></p>
+        </div>
+      </a>
     </div>
     <nav class="workspace__nav" aria-label="방 요약">
       <button class="nav-item is-active" type="button" data-nav="all"><span class="nav-icon"><i data-lucide="list"></i></span><span>활동 피드</span><b id="sideEventCount">0</b></button>
