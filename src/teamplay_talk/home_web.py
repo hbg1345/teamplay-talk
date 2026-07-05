@@ -9,13 +9,61 @@
 
 from __future__ import annotations
 
+import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 from starlette.requests import Request
-from starlette.responses import FileResponse, HTMLResponse
+from starlette.responses import FileResponse, HTMLResponse, PlainTextResponse
 
 _FONT_CSS = "https://cdn.jsdelivr.net/gh/wanteddev/wanted-sans@v1.0.3/packages/wanted-sans/fonts/webfonts/variable/split/WantedSansVariable.min.css"
 _STATIC = Path(__file__).resolve().parent / "static"
+_PUBLIC_URL = "https://teamplay-talk.tech"
+_HAM_BONGKOO_LINKEDIN = "https://www.linkedin.com/in/bongkoo-ham-1a49a8325/"
+
+
+def _json_ld() -> str:
+    graph = {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "WebSite",
+                "@id": f"{_PUBLIC_URL}/#website",
+                "url": f"{_PUBLIC_URL}/",
+                "name": "teamplay-talk",
+                "alternateName": "팀플톡",
+                "description": "카카오톡으로 투표, 역할 분배, 회의 조율, 데일리 리포트를 돕는 PlayMCP 팀플 협업 도구",
+                "inLanguage": ["ko-KR", "en"],
+            },
+            {
+                "@type": "Organization",
+                "@id": f"{_PUBLIC_URL}/#organization",
+                "name": "teamplay-talk",
+                "alternateName": "팀플톡",
+                "url": f"{_PUBLIC_URL}/",
+                "logo": {
+                    "@type": "ImageObject",
+                    "url": f"{_PUBLIC_URL}/logo.png",
+                    "width": 1088,
+                    "height": 1088,
+                },
+            },
+            {
+                "@type": "Person",
+                "name": "박세원",
+                "url": "https://sewon-p.github.io",
+                "sameAs": ["https://www.linkedin.com/in/sewon-park-328102368/"],
+                "affiliation": {"@id": f"{_PUBLIC_URL}/#organization"},
+            },
+            {
+                "@type": "Person",
+                "name": "함봉구",
+                "sameAs": [_HAM_BONGKOO_LINKEDIN],
+                "affiliation": {"@id": f"{_PUBLIC_URL}/#organization"},
+            },
+        ],
+    }
+    return json.dumps(graph, ensure_ascii=False, separators=(",", ":"))
 
 _CSS = """
 :root{
@@ -936,12 +984,16 @@ def _page() -> str:
 <meta property="og:image:alt" content="teamplay-talk">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://teamplay-talk.tech/og-image.png">
+<meta name="robots" content="index,follow">
 <meta name="theme-color" content="#F4F1FB">
-<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="canonical" href="https://teamplay-talk.tech/">
+<link rel="icon" type="image/png" sizes="512x512" href="/favicon.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" href="{_FONT_CSS}" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="{_FONT_CSS}"></noscript>
+<script type="application/ld+json">{_json_ld()}</script>
 <style>{_CSS}{_LANG_CSS}</style>
 </head>
 <body>
@@ -1060,7 +1112,7 @@ def _page() -> str:
       <div class="maker card rv d2 b">
         {_avatar("함", "av-hbg.png")}
         <div>
-          <h3>함봉구</h3>
+          <div class="mk-head"><h3>함봉구</h3><div class="mk-links"><a class="mk-link" href="{_HAM_BONGKOO_LINKEDIN}" target="_blank" rel="noopener" aria-label="LinkedIn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.94 5a2 2 0 1 1-4-.002 2 2 0 0 1 4 .002zM7 8.48H3V21h4V8.48zm6.32 0H9.34V21h3.94v-6.57c0-3.66 4.77-4 4.77 0V21H22v-7.93c0-6.17-7.06-5.94-8.72-2.91l.04-1.68z"/></svg><span class="mk-txt">LinkedIn</span></a></div></div>
           <ul class="cred">
             <li><b>KAIST</b> · B.S. School of Computing</li>
             <li><b>Kaggle</b> · Orbit Wars Silver Medalist</li>
@@ -1104,6 +1156,55 @@ async def view_home(_request: Request) -> HTMLResponse:
     return HTMLResponse(_page())
 
 
+async def view_robots(_request: Request) -> PlainTextResponse:
+    return PlainTextResponse(
+        (
+            "User-agent: *\n"
+            "Allow: /\n"
+            "Disallow: /mcp/\n"
+            "Disallow: /dashboard/\n"
+            "Disallow: /form/\n"
+            f"Sitemap: {_PUBLIC_URL}/sitemap.xml\n"
+        ),
+        media_type="text/plain",
+    )
+
+
+async def view_sitemap(_request: Request) -> PlainTextResponse:
+    lastmod = datetime.now(timezone.utc).date().isoformat()
+    body = f"""<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>{_PUBLIC_URL}/</loc>
+    <lastmod>{lastmod}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>
+"""
+    return PlainTextResponse(body, media_type="application/xml")
+
+
+async def view_webmanifest(_request: Request) -> PlainTextResponse:
+    manifest = {
+        "name": "teamplay-talk",
+        "short_name": "teamplay-talk",
+        "description": "카카오톡으로 팀플 조율을 돕는 PlayMCP 협업 도구",
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": "#F4F1FB",
+        "theme_color": "#F4F1FB",
+        "icons": [
+            {"src": "/favicon.png", "sizes": "512x512", "type": "image/png"},
+            {"src": "/logo.png", "sizes": "1088x1088", "type": "image/png"},
+        ],
+    }
+    return PlainTextResponse(
+        json.dumps(manifest, ensure_ascii=False, separators=(",", ":")),
+        media_type="application/manifest+json",
+    )
+
+
 def _png(name: str) -> FileResponse:
     return FileResponse(_STATIC / name, media_type="image/png")
 
@@ -1111,8 +1212,12 @@ def _png(name: str) -> FileResponse:
 def register_home_routes(mcp) -> None:
     """홈페이지 + 아이콘 라우트 등록."""
     mcp.custom_route("/", methods=["GET"])(view_home)
+    mcp.custom_route("/robots.txt", methods=["GET"])(view_robots)
+    mcp.custom_route("/sitemap.xml", methods=["GET"])(view_sitemap)
+    mcp.custom_route("/site.webmanifest", methods=["GET"])(view_webmanifest)
     mcp.custom_route("/favicon.png", methods=["GET"])(lambda r: _png("web-favicon-512.png"))
     mcp.custom_route("/favicon.ico", methods=["GET"])(lambda r: _png("web-favicon-512.png"))
+    mcp.custom_route("/logo.png", methods=["GET"])(lambda r: _png("site-logo-1088.png"))
     mcp.custom_route("/icon-mark.png", methods=["GET"])(lambda r: _png("web-mark-256.png"))
     mcp.custom_route("/apple-touch-icon.png", methods=["GET"])(lambda r: _png("apple-touch-180.png"))
     mcp.custom_route("/og-image.png", methods=["GET"])(lambda r: _png("og-image.png"))
