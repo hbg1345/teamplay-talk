@@ -77,20 +77,31 @@ def _role_design_brief(
         for task in tasks
         if (task.get("task_type") or "milestone") == "milestone"
     ]
-    card_bounds = _responsibility_card_bounds(member_count)
+    member_ready = member_count >= 2
+    card_bounds = (
+        _responsibility_card_bounds(member_count)
+        if member_ready
+        else {"min": 4, "max": 6, "preferred": 5}
+    )
     return {
         "principle": (
             "처음부터 큰 역할명을 정하지 않는다. 로드맵을 읽고, 최종 산출물을 만들기 위해 필요한 "
             "책임 카드를 MECE하게 분해한 뒤 난이도와 연관도를 붙인다. 최종 역할 묶음은 팀원 응답 후 배정 단계에서 만든다."
         ),
         "roadmap_milestones": task_lines,
-        "team_size": member_count,
+        "active_member_count": member_count,
+        "member_readiness": "ready_for_preference_form" if member_ready else "needs_more_members_before_sending",
         "responsibility_card_count": card_bounds,
         "preference_limits_if_preferred_count": _preference_limits(card_bounds["preferred"]),
+        "member_count_rule": (
+            "If fewer than 2 active members are in the room, design only a draft card set for owner review. "
+            "Do not shrink the project into 2 cards just because only the owner has joined. "
+            "Do not send a preference form until teammates join."
+        ),
         "role_design_steps": [
             "1. 최종 산출물을 한 문장으로 정의한다.",
             "2. 각 마일스톤에서 빠지면 안 되는 책임 단위를 뽑는다.",
-            "3. 책임 카드는 팀원 수의 1~2배 범위로 만든다. preferred 개수에 최대한 맞춘다.",
+            "3. 팀원이 2명 이상이면 책임 카드는 팀원 수의 1~2배 범위로 만든다. 팀원이 아직 1명뿐이면 초안으로 4~6개를 만든 뒤 초대 후 발송한다.",
             "4. 너무 작은 할일은 합치고, 너무 큰 책임은 둘로 나눈다.",
             "5. 카드명은 2~14자 안팎의 명사구로 만들고, 로드맵 단계명과 똑같이 쓰지 않는다.",
             "6. 각 카드는 서로 겹치지 않게 만들고, 전체 로드맵 책임이 빠지지 않게 한다.",
@@ -114,7 +125,8 @@ def _role_design_brief(
             "로드맵 단계명을 그대로 역할명으로 쓰지 않는다.",
             "방장·팀장·관리자 같은 운영 지위는 프로젝트 실행 역할로 보지 않는다.",
             "프로젝트 텍스트에 없는 기술명·직무명을 끼워 넣지 않는다.",
-            "책임 카드 개수는 team_size의 1~2배 범위를 벗어나지 않는다.",
+            "팀원이 2명 이상일 때만 책임 카드 개수를 active_member_count의 1~2배로 강제한다.",
+            "팀원이 1명뿐이면 카드 수를 2개로 줄이지 말고, 방장 확인용 초안으로만 제시한다.",
             "각 책임 카드는 난이도와 업무량이 너무 가볍거나 무겁지 않게 조정한다.",
             "'담당', '리드', '총괄' 같은 최종 역할명 표현을 카드명에 붙이지 않는다.",
             "책임 카드 목록을 만들면 곧바로 role_manage(action='start')에 roles로 다시 넣는다.",
@@ -151,6 +163,16 @@ def _preference_limits(card_count: int) -> dict[str, int]:
         "want_max": min(want_max, count),
         "avoid_max": min(avoid_max, max(0, count - 1)),
     }
+
+
+def _invite_share_text(room: dict[str, Any]) -> str:
+    invite_code = str(room.get("invite_code") or "")
+    name = str(room.get("name") or "팀플톡 방")
+    return (
+        f"팀플톡 '{name}' 방에 참여해 주세요.\n"
+        f"초대 코드: {invite_code}\n"
+        f'PlayMCP에서 teamplay-talk를 열고 "초대 코드 {invite_code}로 방에 참여할래"라고 요청하면 됩니다.'
+    )
 
 
 def _validate_role_names(
@@ -441,6 +463,33 @@ def register(mcp: FastMCP) -> None:
         invalid = _validate_role_names(names, roadmap, len(members))
         if invalid is not None:
             return invalid
+        if len(members) < 2:
+            return {
+                "ok": False,
+                "created": False,
+                "needs_more_members": True,
+                "error": "역할 선호도 조사는 팀원이 2명 이상일 때 보내는 것이 자연스럽습니다.",
+                "room": room["name"],
+                "active_member_count": len(members),
+                "members": [m["nickname"] for m in members],
+                "received_cards": names,
+                "draft_cards_preserved": True,
+                "invite_code": room.get("invite_code"),
+                "invite_share_text": _invite_share_text(room),
+                "next": (
+                    "지금 만든 책임 카드 초안은 유지해서 팀장에게 보여주고, 팀원을 먼저 초대하세요. "
+                    "팀원이 들어온 뒤 같은 카드 구성으로 선호/회피 조사를 보내면 됩니다."
+                ),
+                "suggested_next_actions": [
+                    "초대 코드를 팀원에게 공유하기",
+                    "팀원이 들어온 뒤 같은 책임 카드로 선호/회피 조사 보내기",
+                    "팀원 수가 예상과 다르면 책임 카드 수만 다시 조정하기",
+                ],
+                "chat_response_hint": (
+                    "책임 카드를 2개로 다시 병합하지 마세요. 현재는 방장 1명뿐이라 발송만 보류된 상태입니다. "
+                    "이미 제안한 책임 카드 초안을 보여주고, 팀원 초대 후 이 구성으로 조사하자고 안내하세요."
+                ),
+            }
         card_bounds = _responsibility_card_bounds(len(members))
         if len(names) < card_bounds["min"] or len(names) > card_bounds["max"]:
             return {
