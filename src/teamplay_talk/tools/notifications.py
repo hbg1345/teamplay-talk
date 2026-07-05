@@ -11,7 +11,7 @@ from typing import Any
 
 from fastmcp import FastMCP
 
-from .. import kakao_store, storage
+from .. import kakao_store, storage, task_sync
 from ..config import settings
 from ..dashboard_web import create_dashboard_token
 from .guards import require_room
@@ -89,6 +89,11 @@ def register(mcp: FastMCP) -> None:
                 "count": 0,
                 "error": "모든 공지 발송이 실패했습니다. 카카오 인증/토큰 상태를 확인해야 합니다.",
             }
+
+        try:  # 공지 발송 시 '확인' 할 일도 팬딩(발송 직후 알림)
+            await task_sync.sync_notice(room_id, first_line)
+        except Exception:
+            pass
 
         decision_kind = _decision_kind_from_message(message)
         decision = None

@@ -56,8 +56,13 @@ def _due_in(days: int = 0) -> str:
 
 
 def _soon(minutes: int = 2) -> tuple[str, str]:
-    """지금(KST)+minutes → (due_date 'yyyyMMdd', alarm_time 'HHMM'). 발송 직후 울리는 리마인더용."""
+    """지금(KST)+minutes 를 5분 단위로 올림한 (due 'yyyyMMdd', alarm 'HHMM').
+
+    카카오 톡캘린더 할 일 알림은 **5분 단위**만 허용 → 임의 분(예: 14:37)은 거부됨.
+    """
     t = datetime.now(KST) + timedelta(minutes=minutes)
+    bump = (5 - t.minute % 5) % 5 or 5  # 다음 5분 경계로 올림(과거 알림 방지)
+    t = (t + timedelta(minutes=bump)).replace(second=0, microsecond=0)
     return t.strftime("%Y%m%d"), t.strftime("%H%M")
 
 
@@ -234,3 +239,15 @@ async def add_meeting(room_id: int, member: dict[str, Any], title: str, start_at
         storage.record_kakao_task_link(
             room_id, "meeting", str(decision_id or start_at), member["id"], tid
         )
+
+
+# ─────────────────────────── 공지 ───────────────────────────
+async def sync_notice(room_id: int, title: str) -> None:
+    """방장 공지(notify_room) 발송 시: 멤버별 '확인' 할 일 생성(발송 직후 알림).
+
+    일회성이라 링크 기록/삭제 추적은 안 한다.
+    """
+    due, alarm = _soon(2)
+    content = f"📢 [{_room_name(room_id)}] {title}"[:100]
+    for m in kakao_store.list_members_with_tokens(room_id):
+        await _create(m, content=content, due_date=due, alarm_time=alarm)
