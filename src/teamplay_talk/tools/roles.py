@@ -268,6 +268,7 @@ def _balanced_assign(
     다른 멤버에게 먼저 퍼뜨리고, 멤버가 부족할 때만 한 사람이 같은 역할을 중복 담당한다.
     무거운 카드부터(LPT) 가장 덜 일한 멤버에게 — 동률이면 선호/회피를 반영한다.
     return: ({멤버: [역할들]}, {멤버: 난이도합}). 멤버<역할이면 한 명이 여러 역할.
+    역할<멤버(카드 부족)면 무배정 멤버에게 공동 담당으로 최소 1장 보장한다.
     """
     members = list(prefs.keys())
     loads = {m: 0 for m in members}
@@ -299,6 +300,28 @@ def _balanced_assign(
         )
         assigned[best].append(role)
         loads[best] += d
+
+    # 안전망: 카드보다 멤버가 많아 무배정된 멤버에게 최소 1장 보장(공동 담당).
+    # 카드 수는 advisory라 AI가 적게 만들 수 있다. 정상(카드>=멤버)이면 이 루프는 아무 것도 안 한다.
+    for m in members:
+        if assigned[m] or not role_units:
+            continue
+        owner_count = {r: 0 for r in role_units}
+        for member_roles in assigned.values():
+            for r in member_roles:
+                if r in owner_count:
+                    owner_count[r] += 1
+        pick = min(
+            role_units,
+            key=lambda r: (
+                r in avoid_sets.get(m, set()),   # 회피한 카드는 뒤로
+                owner_count.get(r, 0),           # 담당자 적은 카드 먼저(공동담당 분산)
+                pref_rank(m, r),                 # 원한 카드 먼저
+                -difficulties.get(r, 5),         # 무거운 카드 먼저(도움 가치)
+            ),
+        )
+        assigned[m].append(pick)
+        loads[m] += difficulties.get(pick, 5)
     return assigned, loads
 
 
