@@ -318,6 +318,18 @@ def save_response(
     return response_id
 
 
+def has_form_response(form_id: int, member_id: int) -> bool:
+    """식별 폼에서 해당 멤버의 응답이 이미 저장됐는지 확인한다."""
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                "SELECT 1 FROM form_responses "
+                "WHERE form_id = %s AND member_id = %s LIMIT 1",
+                (form_id, member_id),
+            )
+            return cur.fetchone() is not None
+
+
 def _ranked_counts(counts: dict[str, int]) -> list[dict[str, Any]]:
     return [
         {"choice": choice, "count": count}

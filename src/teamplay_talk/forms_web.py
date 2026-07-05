@@ -496,12 +496,15 @@ async def view_form(request: Request) -> HTMLResponse:
     form = storage.get_form(form_id)
     if form is None:
         return _message("폼을 찾을 수 없음", "존재하지 않는 폼입니다.", 404)
-    if form["closed"]:
-        return _message("마감된 폼", "이 폼은 응답이 마감되었습니다.", 403)
     if not form["anonymous"] and member_id is None:
         return _message("개인 링크 필요", "이 폼은 개인별 링크로만 응답할 수 있습니다.", 403)
     if member_id is not None and not storage.is_form_member(form_id, member_id):
         return _message("권한이 없습니다", "이 방의 현재 멤버만 응답할 수 있습니다.", 403)
+    allow_edit = not form["closed"] and request.query_params.get("edit") in {"1", "true", "yes"}
+    if member_id is not None and storage.has_form_response(form_id, member_id) and not allow_edit:
+        return _message("응답 완료", "이미 응답이 저장되었습니다. 팀장이 결과를 확인하면 다음 단계가 안내됩니다.")
+    if form["closed"]:
+        return _message("마감된 폼", "이 폼은 응답이 마감되었습니다.", 403)
 
     schema = form.get("schema_json") or {"elements": []}
     schema_str = jsonlib.dumps(schema, ensure_ascii=False).replace("</", "<\\/")

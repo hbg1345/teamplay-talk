@@ -280,7 +280,7 @@ def register(mcp: FastMCP) -> None:
             description: 폼 설명 (선택)
             anonymous: 공유링크(True·기본) vs 멤버별 식별 링크(False·매칭 필요시만)
             close_minutes: N분 뒤 자동 마감 (선택)
-            close_on_all: 전원 응답 시 자동 마감 (선택)
+            close_on_all: 전원 응답 시 자동 마감 (식별 폼은 기본적으로 적용)
         """
         caller, room, error = await require_room(room_id)
         if error:
@@ -303,6 +303,7 @@ def register(mcp: FastMCP) -> None:
         if inferred_scope:
             context_description = _attach_task_opinion_context(schema, room_id, inferred_scope)
 
+        effective_close_on_all = bool(close_on_all or not anonymous)
         form = storage.create_form(
             room_id=room_id,
             title=title,
@@ -311,7 +312,7 @@ def register(mcp: FastMCP) -> None:
             anonymous=anonymous,
             creator_user_id=creator_id,
             closes_at=closes_at,
-            close_on_all=close_on_all,
+            close_on_all=effective_close_on_all,
         )
         fid = form["id"]
         base = f"{settings.public_base_url}{storage.form_public_path(fid)}"
@@ -323,6 +324,7 @@ def register(mcp: FastMCP) -> None:
             "question_count": len(questions),
             "context_attached": bool(inferred_scope),
             "workflow_scope": inferred_scope,
+            "close_on_all": effective_close_on_all,
             "sent": False,
             "required_next_tool": "send_form",
             "send_form_arguments": {"form_id": fid},
