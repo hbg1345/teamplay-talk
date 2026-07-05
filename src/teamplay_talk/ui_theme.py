@@ -445,4 +445,7 @@ button{cursor:pointer}
 .tp-mark{width:15px;height:auto;flex:0 0 auto;display:block}
 .tp-wordmark .tp-mark{opacity:.85}
 .tp-brandbar{position:relative;z-index:1;width:min(920px,100%);margin:2px auto 14px;display:flex;justify-content:center}
+.tp-brandbar--link{color:inherit;text-decoration:none;border-radius:999px}
+.tp-brandbar--link:hover .tp-wordmark{color:var(--ink-soft)}
+.tp-brandbar--link:focus-visible{outline:2px solid var(--kakao-yellow);outline-offset:4px}
 """

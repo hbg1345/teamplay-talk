@@ -160,7 +160,7 @@ __APP_REACT_LIQUID_IMPORTS__
    .schedule__body{padding:.75rem}
  }
 </style></head><body>
-<div class="tp-brandbar">__APP_WORDMARK__</div>
+<a class="tp-brandbar tp-brandbar--link" href="/" aria-label="teamplay-talk 홈페이지">__APP_WORDMARK__</a>
 <div id="surveyContainer"></div>
 <div id="done" class="glass-panel" style="display:none"><h2>응답 완료</h2><p>제출해 주셔서 감사합니다.</p></div>
 <script>
