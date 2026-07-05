@@ -809,10 +809,22 @@ function renderDecisionSummary(decision) {
         <span class="assignment-role">${escapeText(assignment.role || "역할 미정")}</span>
       </article>
     `).join("");
+    const helpers = Array.isArray(payload.helpers) ? payload.helpers : [];
+    const helperCards = helpers.length ? `
+      <div class="assignment-grid" style="margin-top:8px">
+        ${helpers.map((helper) => `
+          <article class="assignment-card">
+            <b>${escapeText(helper.card || "함께 진행")}</b>
+            <span class="assignment-role">메인 ${escapeText(helper.owner || "-")} · 함께 ${escapeText(helper.helper || "-")}</span>
+          </article>
+        `).join("")}
+      </div>
+    ` : "";
     return `
       <section class="block">
         <h3>확정된 역할</h3>
         <div class="assignment-grid">${cards}</div>
+        ${helperCards ? `<h3 style="margin-top:14px">함께 진행</h3>${helperCards}` : ""}
       </section>
     `;
   }

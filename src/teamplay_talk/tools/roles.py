@@ -30,6 +30,8 @@ _BAD_GENERIC_ROLES = {
     "최종 제출",
 }
 
+_FINAL_ROLE_MARKERS = ("담당", "리드", "총괄", "매니저", "관리자")
+
 
 def _norm_label(value: str) -> str:
     return "".join(ch for ch in value.strip().lower() if ch.isalnum())
@@ -50,6 +52,12 @@ def _is_task_like_role(name: str) -> bool:
         "최종 점검",
     }
     return stripped in task_like_phrases
+
+
+def _looks_like_final_role_bundle(name: str) -> bool:
+    """책임 카드가 아니라 사람에게 붙일 최종 역할명처럼 보이는 이름을 잡는다."""
+    stripped = name.strip()
+    return any(stripped.endswith(marker) for marker in _FINAL_ROLE_MARKERS)
 
 
 def _role_design_brief(
@@ -87,6 +95,7 @@ def _role_design_brief(
             "5. 카드명은 2~14자 안팎의 명사구로 만들고, 로드맵 단계명과 똑같이 쓰지 않는다.",
             "6. 각 카드는 서로 겹치지 않게 만들고, 전체 로드맵 책임이 빠지지 않게 한다.",
             "7. slots는 호환 필드다. 특별히 공동 책임이 필요한 경우가 아니면 1로 둔다. 큰 일은 slots를 늘리기보다 책임 카드를 나눈다.",
+            "8. 난이도 8 이상이거나 실습·제작·테스트처럼 혼자 하기 무거운 카드는 finalize 단계에서 helper가 붙을 수 있다.",
         ],
         "difficulty_rubric": {
             "base": 3,
@@ -107,6 +116,7 @@ def _role_design_brief(
             "프로젝트 텍스트에 없는 기술명·직무명을 끼워 넣지 않는다.",
             "책임 카드 개수는 team_size의 1~2배 범위를 벗어나지 않는다.",
             "각 책임 카드는 난이도와 업무량이 너무 가볍거나 무겁지 않게 조정한다.",
+            "'담당', '리드', '총괄' 같은 최종 역할명 표현을 카드명에 붙이지 않는다.",
             "책임 카드 목록을 만들면 곧바로 role_manage(action='start')에 roles로 다시 넣는다.",
         ],
         "output_schema": [
@@ -155,29 +165,30 @@ def _validate_role_names(
         if _norm_label(name) in normalized_task_titles and _norm_label(name)
     ]
     task_like = [name for name in names if _is_task_like_role(name)]
-    bad = sorted(set(exact_task_matches + task_like), key=names.index)
+    final_role_like = [name for name in names if _looks_like_final_role_bundle(name)]
+    bad = sorted(set(exact_task_matches + task_like + final_role_like), key=names.index)
     if not bad:
         return None
     return {
         "ok": False,
         "error": (
-            "역할 후보가 로드맵 단계/할일명처럼 보입니다. 역할은 단계명을 그대로 복사한 것이 아니라 "
-            "여러 작업을 책임지는 산출물 중심의 책임 범위여야 합니다."
+            "역할 후보가 로드맵 단계/할일명 또는 최종 역할명처럼 보입니다. 이 단계에서는 사람에게 붙일 "
+            "역할 묶음이 아니라, 선호도 조사용 책임 카드를 만들어야 합니다."
         ),
         "invalid_roles": bad,
         "roadmap_task_titles": task_titles,
         "role_design_brief": _role_design_brief(roadmap, member_count),
         "role_design_rule": (
-            "로드맵 단계명=할일, 역할명=책임 범위. 로드맵 이후 역할분담을 할 때는 "
-            "태스크들을 묶어 프로젝트 산출물에 맞는 책임 범위로 바꾼 뒤 역할분배를 다시 시작하세요."
+            "로드맵 단계명=할일, 책임 카드=선호도 조사용 작업 책임 단위, 최종 역할명=배정 후 사람별 묶음 이름. "
+            "'담당/리드/총괄' 표현은 finalize 이후 배정 결과에 붙이고, 지금은 책임 카드명만 넣으세요."
         ),
     }
 
 
 class Role(BaseModel):
-    """역할 1개 (이름 + 난이도)."""
+    """책임 카드 1개 (이름 + 난이도)."""
 
-    name: str = Field(description="프로젝트 산출물에서 직접 도출한 역할 이름")
+    name: str = Field(description="프로젝트 산출물에서 직접 도출한 책임 카드 이름. 담당/리드/총괄 같은 최종 역할명은 쓰지 않는다.")
     difficulty: int = Field(
         default=5,
         ge=1,
@@ -192,8 +203,8 @@ class Role(BaseModel):
         ge=1,
         le=10,
         description=(
-            "이 역할에 필요한 인원/자리 수. 병목이거나 병렬 처리가 필요하면 2 이상. "
-            "멤버에게는 중복 선택지로 보이지 않고, 서버가 배정 시 여러 자리로 확장한다."
+            "호환 필드. 책임 카드 방식에서는 기본 1. 병목이거나 함께 진행이 필요하면 2로 둘 수 있지만, "
+            "서버는 owner 1명을 두고 helper를 별도로 제안한다."
         ),
     )
 
@@ -203,6 +214,15 @@ class RoleAssignment(BaseModel):
 
     nickname: str = Field(description="멤버 닉네임")
     role: str = Field(description="배정할 역할(여러 개면 ', '로 연결)")
+
+
+class RoleHelperAssignment(BaseModel):
+    """무거운 책임 카드의 보조 배정 1건."""
+
+    card: str = Field(description="함께 진행할 책임 카드명")
+    owner: str = Field(description="메인 담당 멤버 닉네임")
+    helper: str = Field(description="보조/함께 진행 멤버 닉네임")
+    reason: str | None = Field(default=None, description="보조를 붙인 이유")
 
 
 def _compact_roles(roles: list[str]) -> list[str]:
@@ -258,6 +278,77 @@ def _balanced_assign(
         assigned[best].append(role)
         loads[best] += d
     return assigned, loads
+
+
+def _helper_candidates(
+    roles: list[str],
+    difficulties: dict[str, int],
+    prefs: dict[str, list[str]],
+    avoids: dict[str, set[str]],
+    assigned: dict[str, list[str]],
+    loads: dict[str, int],
+    slots: dict[str, int] | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    """무거운 책임 카드에 helper를 제안한다.
+
+    저장 역할은 owner 카드만 유지하고, helper는 공지/결정기록용 제안으로만 둔다.
+    이렇게 해야 todo의 역할명 매칭이 보조자에게 잘못 흘러가지 않는다.
+    """
+    members = list(assigned.keys())
+    helper_loads = {member: 0 for member in members}
+    if len(members) < 2:
+        return [], helper_loads
+
+    owner_by_role: dict[str, str] = {}
+    for member, member_roles in assigned.items():
+        for role in member_roles:
+            owner_by_role.setdefault(role, member)
+
+    def pref_rank(member: str, role: str) -> int:
+        try:
+            return prefs.get(member, []).index(role)
+        except ValueError:
+            return len(roles)
+
+    helpers: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    heavy_roles = [
+        role for role in roles
+        if difficulties.get(role, 5) >= 8 or max(1, int((slots or {}).get(role, 1))) > 1
+    ]
+    for role in sorted(heavy_roles, key=lambda r: -difficulties.get(r, 5)):
+        if role in seen:
+            continue
+        seen.add(role)
+        owner = owner_by_role.get(role)
+        if not owner:
+            continue
+        candidates = [member for member in members if member != owner]
+        if not candidates:
+            continue
+        helper = min(
+            candidates,
+            key=lambda member: (
+                role in avoids.get(member, set()),
+                loads.get(member, 0) + helper_loads.get(member, 0),
+                pref_rank(member, role),
+                len(assigned.get(member, [])),
+            ),
+        )
+        helper_weight = max(1, round(difficulties.get(role, 5) * 0.4))
+        helper_loads[helper] += helper_weight
+        reason = "난이도 높은 책임이라 함께 진행을 권장합니다."
+        if max(1, int((slots or {}).get(role, 1))) > 1:
+            reason = "공동 진행이 필요한 책임으로 표시되어 helper를 붙였습니다."
+        helpers.append({
+            "card": role,
+            "owner": owner,
+            "helper": helper,
+            "difficulty": difficulties.get(role, 5),
+            "helper_weight": helper_weight,
+            "reason": reason,
+        })
+    return helpers, helper_loads
 
 
 def register(mcp: FastMCP) -> None:
@@ -551,7 +642,21 @@ def register(mcp: FastMCP) -> None:
                 "error": "응답이 없습니다. (anonymous=False로 만들고 멤버가 선호 카드를 제출해야 매칭 가능)",
             }
 
-        assigned, loads = _balanced_assign(roles, difficulties, prefs, avoids, slots)
+        assignment_mode = schema.get("_role_assignment_mode") or ("ranking" if rank_el else "responsibility_cards")
+        owner_slots = {role: 1 for role in roles} if assignment_mode == "responsibility_cards" else slots
+        assigned, loads = _balanced_assign(roles, difficulties, prefs, avoids, owner_slots)
+        helper_assignments, helper_loads = _helper_candidates(
+            roles,
+            difficulties,
+            prefs,
+            avoids,
+            assigned,
+            loads,
+            slots,
+        )
+        helper_cards_by_member: dict[str, list[dict[str, Any]]] = {}
+        for helper in helper_assignments:
+            helper_cards_by_member.setdefault(str(helper["helper"]), []).append(helper)
         assignments = [
             {
                 "nickname": m,
@@ -560,6 +665,9 @@ def register(mcp: FastMCP) -> None:
                 "raw_roles": assigned[m],
                 "role": ", ".join(_compact_roles(assigned[m])),
                 "workload": loads[m],
+                "helper_workload": helper_loads.get(m, 0),
+                "total_workload": loads[m] + helper_loads.get(m, 0),
+                "helper_cards": helper_cards_by_member.get(m, []),
                 "note": notes.get(m, ""),  # 멤버 자유기입(제약/사정) — 리더가 확정 전에 볼 것
                 "wanted": prefs.get(m, []),
                 "avoided": sorted(avoids.get(m, set())),
@@ -570,11 +678,12 @@ def register(mcp: FastMCP) -> None:
             role: sum(rs.count(role) for rs in assigned.values())
             for role in roles
         }
-        required_slots = {role: max(1, slots.get(role, 1)) for role in roles}
+        required_slots = {role: max(1, owner_slots.get(role, 1)) for role in roles}
         return {
             "ok": True,
             "assignments": assignments,
-            "assignment_mode": schema.get("_role_assignment_mode") or ("ranking" if rank_el else "responsibility_cards"),
+            "helper_assignments": helper_assignments,
+            "assignment_mode": assignment_mode,
             "preference_summary": preference_summary,
             "role_slots": required_slots,
             "covered_role_slots": covered_counts,
@@ -590,16 +699,27 @@ def register(mcp: FastMCP) -> None:
             "set_roles_arguments": {
                 "assignments": [
                     {"nickname": a["nickname"], "role": a["role"]} for a in assignments
-                ]
+                ],
+                "helpers": [
+                    {
+                        "card": h["card"],
+                        "owner": h["owner"],
+                        "helper": h["helper"],
+                        "reason": h.get("reason"),
+                    }
+                    for h in helper_assignments
+                ],
             },
             "note": (
-                "모든 책임 카드를 난이도 균형 배분(workload=난이도 합, 비슷할수록 공평) + 선호/회피 반영. "
+                "모든 책임 카드는 owner 1명에게 배정하고, 난이도 높은 카드는 helper를 별도로 제안합니다. "
+                "workload는 owner 난이도 합, helper_workload는 함께 진행 부담입니다. "
                 "⚠️ 각 멤버의 note가 있으면 팀장에게 보여주고, 필요하면 조정한 뒤 역할을 확정. "
                 "AI 단독 확정 X — 팀장이 메모 보고 최종 판단."
             ),
             "next": "배정안은 아직 저장되지 않았습니다. 팀장에게 멤버 메모와 배정안을 보여주고, 확인되면 역할을 확정하세요.",
             "suggested_next_actions": [
                 "팀장에게 배정안과 멤버 메모 확인받기",
+                "helper가 붙은 무거운 책임 카드가 적절한지 확인하기",
                 "조정이 필요하면 배정안 수정하기",
                 "확정되면 역할 저장 및 공지하기",
                 "저장 후 팀원별 할일 확인하거나 역할별 실행 todo로 연결하기",
@@ -624,6 +744,7 @@ def register(mcp: FastMCP) -> None:
     )
     async def set_roles(
         assignments: list[RoleAssignment],
+        helpers: list[RoleHelperAssignment] | None = None,
         room_id: int | None = None,
         message: str | None = None,
     ) -> dict[str, Any]:
@@ -634,6 +755,7 @@ def register(mcp: FastMCP) -> None:
 
         Args:
             assignments: [{"nickname": 멤버, "role": "역할(여러개면 ', '로 연결)"}]
+            helpers: [{"card": 책임 카드, "owner": 메인 담당, "helper": 함께 진행 멤버}]
             room_id: 대상 방 (생략 시 현재 작업 방)
             message: 공지 문구 (생략 시 기본 형식)
         """
@@ -656,7 +778,23 @@ def register(mcp: FastMCP) -> None:
             }
 
         lines = "\n".join(f"· {a['nickname']}: {a['role']}" for a in written)
-        msg = message or f"[팀플톡] 역할 분배 결과\n{lines}"
+        helper_payload = [
+            {
+                "card": h.card,
+                "owner": h.owner,
+                "helper": h.helper,
+                "reason": h.reason or "",
+            }
+            for h in (helpers or [])
+        ]
+        helper_lines = "\n".join(
+            f"· {h['helper']}: {h['card']} 함께 진행 (메인 {h['owner']})"
+            for h in helper_payload
+        )
+        msg = message or (
+            f"[팀플톡] 역할 분배 결과\n{lines}"
+            + (f"\n\n함께 진행\n{helper_lines}" if helper_lines else "")
+        )
         sent = []
         from ..config import settings
         from ..dashboard_web import create_dashboard_token
@@ -683,7 +821,7 @@ def register(mcp: FastMCP) -> None:
                 kind="roles",
                 title="역할 분배 확정",
                 summary="; ".join(f"{a['nickname']}: {a['role']}" for a in written),
-                payload={"assignments": written, "notified": sent},
+                payload={"assignments": written, "helpers": helper_payload, "notified": sent},
                 source="set_roles",
             )
         else:
@@ -692,6 +830,7 @@ def register(mcp: FastMCP) -> None:
         return {
             "ok": True,
             "assigned": written,
+            "helpers": helper_payload,
             "notified": sent,
             "count": len(written),
             "synced_todos": synced,
