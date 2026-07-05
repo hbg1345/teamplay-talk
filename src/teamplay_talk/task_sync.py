@@ -33,14 +33,26 @@ def _task_id(res: Any) -> str | None:
     return None
 
 
-def _date_due(day: Any, hour: int = 23, minute: int = 59) -> str:
-    """date/ISO 문자열 → 그날 KST hour:minute 의 UTC RFC3339."""
-    if isinstance(day, str):
-        day = date.fromisoformat(day[:10])
-    elif isinstance(day, datetime):
-        day = day.date()
-    dt = datetime(day.year, day.month, day.day, hour, minute, tzinfo=KST)
-    return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+def _yyyymmdd(value: Any) -> str | None:
+    """date/datetime/ISO → KST 날짜 'yyyyMMdd' (카카오 할 일 due_date 형식)."""
+    if value is None:
+        return None
+    try:
+        if isinstance(value, datetime):
+            d = (value.astimezone(KST) if value.tzinfo else value).date()
+        elif isinstance(value, date):
+            d = value
+        else:
+            dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            d = (dt.astimezone(KST) if dt.tzinfo else dt).date()
+    except Exception:  # noqa: BLE001
+        return None
+    return d.strftime("%Y%m%d")
+
+
+def _due_in(days: int = 0) -> str:
+    """오늘(KST) + days → 'yyyyMMdd'."""
+    return (datetime.now(KST).date() + timedelta(days=days)).strftime("%Y%m%d")
 
 
 async def _refresh(member: dict[str, Any]) -> str | None:
@@ -105,10 +117,7 @@ async def _delete(member: dict[str, Any], task_id: str) -> None:
 # ─────────────────────────── 체크인 ───────────────────────────
 async def sync_checkin(room_id: int, day: Any, *, alarm_time: str = "2100") -> None:
     """밤 체크인 발송 시: 멤버별 '오늘 체크인' 할 일 생성 + 링크 기록."""
-    try:
-        due = _date_due(day)
-    except Exception:  # noqa: BLE001
-        due = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    due = _yyyymmdd(day) or _due_in(0)
     for m in kakao_store.list_members_with_tokens(room_id):
         tid = await _create(m, content="✅ 오늘 체크인", due_date=due, alarm_time=alarm_time)
         if tid:
@@ -132,9 +141,7 @@ async def sync_form(room_id: int, form_id: int, title: str, *,
                     due_date: str | None = None, alarm_time: str = "1000") -> None:
     """폼/투표 발송 시: 멤버별 '응답하기' 할 일 생성 + 링크 기록."""
     if not due_date:
-        due_date = (datetime.now(KST) + timedelta(days=1)).astimezone(
-            timezone.utc
-        ).isoformat().replace("+00:00", "Z")
+        due_date = _due_in(1)
     content = f"🗳️ 응답하기 · {title}"[:100]
     for m in kakao_store.list_members_with_tokens(room_id):
         tid = await _create(m, content=content, due_date=due_date, alarm_time=alarm_time)
@@ -152,27 +159,6 @@ async def clear_form(room_id: int, form_id: int, *, user_id: int | None = None) 
         if m:
             await _delete(m, link["kakao_task_id"])
         storage.delete_kakao_task_link(link["id"])
-
-
-def _to_rfc3339(value: Any) -> str | None:
-    """datetime/ISO 문자열 → UTC RFC3339 (tz 없으면 KST 가정)."""
-    if value is None:
-        return None
-    try:
-        dt = value if isinstance(value, datetime) else datetime.fromisoformat(
-            str(value).replace("Z", "+00:00")
-        )
-    except Exception:  # noqa: BLE001
-        return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=KST)
-    return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
-
-
-def _fallback_due(days: int = 3) -> str:
-    return (datetime.now(KST) + timedelta(days=days)).astimezone(
-        timezone.utc
-    ).isoformat().replace("+00:00", "Z")
 
 
 # ─────────────────────────── 개인 todo ───────────────────────────
@@ -201,7 +187,7 @@ async def sync_todos(room_id: int, *, alarm_time: str = "0900") -> None:
             continue
         if (str(t["id"]), uid) in existing:
             continue
-        due = _to_rfc3339(t.get("end_at")) or _fallback_due()
+        due = _yyyymmdd(t.get("end_at")) or _due_in(3)
         tid = await _create(member, content=f"📌 {t['title']}"[:100], due_date=due, alarm_time=alarm_time)
         if tid:
             storage.record_kakao_task_link(room_id, "todo", str(t["id"]), uid, tid)
@@ -223,7 +209,7 @@ async def clear_todo(room_id: int, task_id: Any, *, user_id: int | None = None) 
 async def add_meeting(room_id: int, member: dict[str, Any], title: str, start_at: Any,
                       *, decision_id: Any = None, alarm_time: str = "0900") -> None:
     """회의 확정 시: 멤버별 '회의 참석' 할 일(due=회의시각) 생성."""
-    due = _to_rfc3339(start_at)
+    due = _yyyymmdd(start_at)
     if not due:
         return
     tid = await _create(member, content=f"🗓️ 회의: {title}"[:100], due_date=due, alarm_time=alarm_time)
