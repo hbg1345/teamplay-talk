@@ -132,8 +132,8 @@ async def send_feed_with_refresh(
                 items=items,
                 fallback_text=fallback_text,
             )
-    if status == 200:
-        try:  # 발송 성공 → 그 멤버에게 '할 일' 자동 팬딩(중앙 훅)
+    if status == 200 and reminder:  # opt-in: reminder 준 발송(폼/투표/체크인)만 할 일 생성.
+        try:  # 공지·다이제스트·역할통보는 reminder를 안 주므로 할 일 X (캘린더/todo 쪽에서 이미 생김)
             from . import task_sync
             await task_sync.pend_from_message(member, title=title, reminder=reminder)
         except Exception:

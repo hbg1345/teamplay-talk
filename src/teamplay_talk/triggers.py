@@ -157,6 +157,7 @@ async def _send_identified_form(form_id: int, message: str) -> dict[str, Any]:
             button_title="내 링크 열기",
             items=items,
             fallback_text=f"{message.rstrip()}\n{description}\n{url}",
+            reminder={"room_id": form["room_id"], "kind": "form", "ref_id": form_id},
         )
         (sent if status == 200 else failed).append(recipient["nickname"])
     return {"sent_to": sent, "failed": failed, "count": len(sent)}
