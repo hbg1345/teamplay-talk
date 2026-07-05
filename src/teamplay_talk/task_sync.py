@@ -251,3 +251,24 @@ async def sync_notice(room_id: int, title: str) -> None:
     content = f"📢 [{_room_name(room_id)}] {title}"[:100]
     for m in kakao_store.list_members_with_tokens(room_id):
         await _create(m, content=content, due_date=due, alarm_time=alarm)
+
+
+# ─────────────────────── 중앙 훅(메세지→할일) ───────────────────────
+async def pend_from_message(member: dict[str, Any], *, title: str,
+                            reminder: dict[str, Any] | None = None) -> None:
+    """카톡 메세지 발송 직후 그 멤버에게 '할 일' 자동 생성(중앙 훅).
+
+    send_feed_with_refresh 에서 호출 → 모든 폼·공지·미래 메세지가 자동으로 할 일이 됨.
+    reminder={room_id, kind, ref_id} 를 주면 삭제 추적용 링크도 기록(폼/체크인 등).
+    없으면(공지 등) 링크 없이 일회성.
+    """
+    reminder = reminder or {}
+    room_id = reminder.get("room_id")
+    prefix = f"[{_room_name(room_id)}] " if room_id else ""
+    due, alarm = _soon(2)
+    content = f"📌 {prefix}{title}"[:100]
+    tid = await _create(member, content=content, due_date=due, alarm_time=alarm)
+    if tid and room_id and reminder.get("kind") and reminder.get("ref_id") is not None:
+        storage.record_kakao_task_link(
+            room_id, reminder["kind"], str(reminder["ref_id"]), member["id"], tid
+        )

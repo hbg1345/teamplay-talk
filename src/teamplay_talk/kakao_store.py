@@ -97,6 +97,7 @@ async def send_feed_with_refresh(
     button_title: str = "열기",
     items: list[tuple[str, str]] | None = None,
     fallback_text: str | None = None,
+    reminder: dict[str, Any] | None = None,
 ) -> int:
     """member에게 카카오 feed 템플릿을 보내고 만료 토큰이면 갱신 후 1회 재시도."""
     from . import kakao
@@ -131,4 +132,10 @@ async def send_feed_with_refresh(
                 items=items,
                 fallback_text=fallback_text,
             )
+    if status == 200:
+        try:  # 발송 성공 → 그 멤버에게 '할 일' 자동 팬딩(중앙 훅)
+            from . import task_sync
+            await task_sync.pend_from_message(member, title=title, reminder=reminder)
+        except Exception:
+            pass
     return status

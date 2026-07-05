@@ -90,11 +90,6 @@ def register(mcp: FastMCP) -> None:
                 "error": "모든 공지 발송이 실패했습니다. 카카오 인증/토큰 상태를 확인해야 합니다.",
             }
 
-        try:  # 공지 발송 시 '확인' 할 일도 팬딩(발송 직후 알림)
-            await task_sync.sync_notice(room_id, first_line)
-        except Exception:
-            pass
-
         decision_kind = _decision_kind_from_message(message)
         decision = None
         if decision_kind:

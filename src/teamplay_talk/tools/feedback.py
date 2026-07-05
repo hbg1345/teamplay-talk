@@ -875,6 +875,10 @@ def register(mcp: FastMCP) -> None:
             ("상태", "진행중" if not form.get("closed") else "마감"),
         ]
 
+        _wk = schema.get("_workflow_kind")
+        _reminder = {"room_id": form["room_id"],
+                     "kind": "checkin" if _wk == "daily_checkin" else "form",
+                     "ref_id": schema.get("_checkin_date") if _wk == "daily_checkin" else form_id}
         sent: list[str] = []
         failed: list[str] = []
         if form["anonymous"]:
@@ -885,6 +889,7 @@ def register(mcp: FastMCP) -> None:
                     description=description,
                     link_url=base,
                     button_title="폼 열기",
+                    reminder=_reminder,
                     items=items,
                     fallback_text=f"{prefix}\n{fallback_description}\n{base}",
                 )
@@ -898,6 +903,7 @@ def register(mcp: FastMCP) -> None:
                     description=description,
                     link_url=url,
                     button_title="내 링크 열기",
+                    reminder=_reminder,
                     items=items,
                     fallback_text=f"{prefix}\n{fallback_description}\n{url}",
                 )
@@ -914,12 +920,9 @@ def register(mcp: FastMCP) -> None:
                 "count": 0,
                 "error": "모든 발송이 실패했습니다. 카카오 인증/토큰 상태를 확인해야 합니다.",
             }
-        try:  # 카카오 할 일(리마인더) — 발송 시 생성. 실패해도 기존 흐름 유지
+        try:  # 개인 todo 할 일 동기화 (메세지→할일은 send_feed 중앙 훅이 처리)
             if schema.get("_workflow_kind") == "daily_checkin":
-                await task_sync.sync_checkin(form["room_id"], schema.get("_checkin_date"))
                 await task_sync.sync_todos(form["room_id"])
-            else:
-                await task_sync.sync_form(form["room_id"], form_id, form["title"])
         except Exception:
             pass
         followup = _send_form_followup(form)
