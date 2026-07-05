@@ -579,8 +579,8 @@ async def _run_legacy(tools: LegacyTools, name: str, args: dict[str, Any]) -> An
 def _missing_next_hint(name: str, missing: list[str]) -> str:
     if name == "build_roadmap" and "tasks" in missing:
         return (
-            "로드맵을 만들려면 큰 단계 목록이 필요합니다. 프로젝트 주제를 바탕으로 "
-            "4~6개의 milestone을 직접 구성해 tasks에 넣어 다시 시도하세요."
+            "프로젝트 주제만 받은 상태입니다. 사용자에게 단계 목록을 요구하지 말고, "
+            "AI가 4~6개 큰 마일스톤 초안을 먼저 제안한 뒤 확인되면 그 초안으로 로드맵 생성을 이어가세요."
         )
     if name == "assign_roles" and "roles" in missing:
         return "현재 로드맵을 기준으로 워크스트림 역할 후보를 생성해 role_manage(action='start')로 다시 시도하세요."

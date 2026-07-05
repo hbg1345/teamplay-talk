@@ -520,7 +520,7 @@ def register(mcp: FastMCP) -> None:
             status = await kakao_store.send_feed_with_refresh(
                 m,
                 title="역할 분배가 확정됐습니다",
-                description="팀원별 역할을 저장했고, 역할명 todo가 있으면 실제 멤버에게 연결했습니다.",
+                description="팀원별 역할을 저장했습니다. 다음은 로드맵을 실행 todo로 쪼갤 차례입니다.",
                 link_url=link,
                 button_title="역할 보기",
                 items=items,
@@ -548,12 +548,17 @@ def register(mcp: FastMCP) -> None:
             "count": len(written),
             "synced_todos": synced,
             "next": (
-                "역할이 확정됐습니다. 역할명으로 만들어둔 todo가 있으면 실제 멤버에게 연결했습니다. "
-                "다음으로 팀원별 할일을 확인하세요."
+                "역할이 확정됐습니다. 기존 역할명 todo가 있으면 실제 멤버에게 연결했습니다. "
+                "다음은 로드맵 마일스톤을 실행 todo로 쪼개고, 팀원별 할 일을 확인하는 단계입니다."
             ),
             "suggested_next_actions": [
-                "팀원별 todo 확인하기",
-                "todo가 없으면 역할별 실행 todo 만들기",
-                "날짜가 있는 태스크는 캘린더 등록 후보로 검토하기",
+                "로드맵 기준 실행 todo 자동 생성하기",
+                "생성된 todo를 팀원별로 확인하기",
+                "todo 날짜를 배치하고 캘린더 등록하기",
+                "개인별 오늘 할 일 공지하기",
             ],
+            "chat_response_hint": (
+                "역할 확정만으로 개인 할 일이 생긴 것은 아니라고 설명하세요. "
+                "다음 단계는 로드맵 마일스톤 아래 실행 todo를 만들고 팀원별 목록을 확인하는 흐름으로 안내하세요."
+            ),
         }

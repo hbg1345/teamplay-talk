@@ -1015,7 +1015,50 @@ def register(mcp: FastMCP) -> None:
                 **formatted,
             }
 
-        created: list[dict[str, Any]] = []
+        milestone_rows = [
+            task for task in roadmap.get("tasks", [])
+            if (task.get("task_type") or "milestone") == "milestone"
+        ]
+        if todos and milestone_rows:
+            unlinked = [
+                {"title": todo.title, "assignee": todo.assignee}
+                for todo in todos
+                if not todo.parent_task_id and not todo.parent_title
+            ]
+            if unlinked and len(milestone_rows) == 1:
+                only_parent_id = int(milestone_rows[0]["id"])
+                for todo in todos:
+                    if not todo.parent_task_id and not todo.parent_title:
+                        todo.parent_task_id = only_parent_id
+            elif unlinked:
+                formatted = _format(roadmap)
+                return {
+                    "ok": False,
+                    "error": "실행 todo가 어느 로드맵 마일스톤 아래 작업인지 빠져 있습니다.",
+                    "unlinked_todos": unlinked,
+                    "available_milestones": [
+                        {"id": task["id"], "title": task["title"]}
+                        for task in milestone_rows
+                    ],
+                    "required_next_tool": "decompose_roadmap",
+                    "next": (
+                        "각 todo가 어느 로드맵 단계에 속하는지 표시해 다시 저장해야 합니다. "
+                        "사용자가 세부 todo를 직접 요구한 것이 아니라면 자동 분해 흐름으로 다시 진행하세요."
+                    ),
+                    "suggested_next_actions": [
+                        "현재 로드맵을 기준으로 todo를 자동 생성하기",
+                        "직접 만든 todo에 상위 마일스톤 제목을 붙여 다시 저장하기",
+                        "날짜 배치만 필요한 경우 로드맵 일정 배치를 먼저 하기",
+                    ],
+                    "chat_response_hint": (
+                        "사용자에게 세부 todo 목록을 다시 요구하지 마세요. "
+                        "현재 마일스톤을 기준으로 parent_title을 채워 다시 호출하거나, "
+                        "todos 없이 자동 분해를 호출해 로드맵과 연결된 todo를 만드세요."
+                    ),
+                    **formatted,
+                }
+
+        resolved_todos: list[tuple[TodoDraft, int | None]] = []
         unresolved_parent: list[dict[str, Any]] = []
         for todo in todos:
             parent_id = _resolve_parent_task_id(
@@ -1029,6 +1072,34 @@ def register(mcp: FastMCP) -> None:
                     "parent_task_id": todo.parent_task_id,
                     "parent_title": todo.parent_title,
                 })
+                continue
+            resolved_todos.append((todo, parent_id))
+        if unresolved_parent:
+            formatted = _format(roadmap)
+            return {
+                "ok": False,
+                "error": "일부 todo의 상위 마일스톤을 찾지 못했습니다.",
+                "unresolved_parent": unresolved_parent,
+                "available_milestones": [
+                    {"id": task["id"], "title": task["title"]}
+                    for task in milestone_rows
+                ],
+                "required_next_tool": "decompose_roadmap",
+                "next": "todo가 속한 로드맵 단계 이름을 현재 마일스톤 제목에 맞춰 다시 저장하세요.",
+                "suggested_next_actions": [
+                    "현재 로드맵 마일스톤 제목에 맞춰 상위 단계 이름 보정하기",
+                    "현재 로드맵 기준으로 실행 todo 자동 생성하기",
+                    "먼저 로드맵을 조회해 마일스톤 제목 확인하기",
+                ],
+                "chat_response_hint": (
+                    "상위 마일스톤 매칭이 실패했다고 짧게 말하고, 사용자에게 새 todo를 요구하지 말고 "
+                    "현재 available_milestones를 기준으로 parent_title을 보정해 다시 호출하세요."
+                ),
+                **formatted,
+            }
+
+        created: list[dict[str, Any]] = []
+        for todo, parent_id in resolved_todos:
             task = storage.add_task(
                 room_id,
                 title=todo.title,
@@ -1074,6 +1145,7 @@ def register(mcp: FastMCP) -> None:
             "chat_response_hint": (
                 "생성된 todo를 팀원/역할별로 요약해서 보여주세요. "
                 "auto_generated가 true면 사용자에게 세부 할일을 다시 요구하지 마세요. "
+                "각 todo가 어느 마일스톤 아래에 붙었는지도 필요하면 함께 보여주세요. "
                 "needs_role_assignment가 true면 실제 담당자 확정을 먼저 안내하고, false면 팀원별 할일 확인/공지로 이어가세요."
             ),
             **formatted,
