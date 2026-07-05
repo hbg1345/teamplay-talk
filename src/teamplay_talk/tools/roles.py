@@ -141,7 +141,7 @@ def _responsibility_card_bounds(member_count: int) -> dict[str, int]:
     """팀원 수의 1~2배 범위에서 책임 카드 목표치를 계산한다."""
     size = max(1, int(member_count or 1))
     min_count = max(2, size)
-    max_count = max(min_count, min(12, size * 2))
+    max_count = max(min_count, size * 2)  # 팀원 많으면 카드도 많아질 수 있음(12 고정캡 제거)
     preferred = round(size * 1.5)
     preferred = min(max(preferred, min_count), max_count)
     return {"min": min_count, "max": max_count, "preferred": preferred}
@@ -478,18 +478,19 @@ def register(mcp: FastMCP) -> None:
                 f"현재 기준 추천 책임 카드 수는 {card_bounds['min']}~{card_bounds['max']}개, 추천 {card_bounds['preferred']}개입니다. "
                 f"지금 초안은 {len(names)}개라 권장 범위와 다를 수 있습니다."
             )
-        if len(names) > 12:
+        hard_cap = max(12, len(members) * 2)  # 폼 사용성 한계. 팀원 많으면 카드도 늘 수 있으니 인원 연동
+        if len(names) > hard_cap:
             return {
                 "ok": False,
                 "created": False,
-                "error": "책임 카드가 너무 많아 모바일 폼으로 보내기 어렵습니다. 12개 이하로 줄여주세요.",
+                "error": f"책임 카드가 너무 많아 모바일 폼으로 보내기 어렵습니다. {hard_cap}개 이하로 줄여주세요. (팀원 수의 2배까지 권장)",
                 "room": room["name"],
                 "active_member_count": len(members),
                 "members": [m["nickname"] for m in members],
                 "received_cards": names,
                 "responsibility_card_count": card_bounds,
                 "chat_response_hint": (
-                    "카드가 너무 많다는 점만 말하고, 로드맵을 기준으로 8~12개 이하의 책임 카드로 다시 묶어주세요."
+                    f"카드가 너무 많다는 점만 말하고, 로드맵을 기준으로 {hard_cap}개 이하(팀원 수의 1~2배)의 책임 카드로 다시 묶어주세요."
                 ),
             }
         limits = _preference_limits(len(names))
@@ -680,6 +681,18 @@ def register(mcp: FastMCP) -> None:
                 "error": "응답이 없습니다. (anonymous=False로 만들고 멤버가 선호 카드를 제출해야 매칭 가능)",
             }
 
+        # 미응답자도 배정 대상에 포함(선호 없음 → 부하 균형만으로 배치). 응답 0명은 위에서 이미 막힘.
+        non_responders: list[str] = []
+        try:
+            for _m in storage.list_members(form["room_id"]):
+                _nick = _m.get("nickname") or f"user{_m.get('id')}"
+                if _nick not in prefs:
+                    prefs[_nick] = []
+                    avoids[_nick] = set()
+                    non_responders.append(_nick)
+        except Exception:
+            pass
+
         assignment_mode = schema.get("_role_assignment_mode") or ("ranking" if rank_el else "responsibility_cards")
         owner_slots = {role: 1 for role in roles} if assignment_mode == "responsibility_cards" else slots
         assigned, loads = _balanced_assign(roles, difficulties, prefs, avoids, owner_slots)
@@ -731,6 +744,11 @@ def register(mcp: FastMCP) -> None:
                 if covered_counts.get(role, 0) < required_slots[role]
             ],
             "member_notes": {m: notes[m] for m in notes},
+            "non_responders": non_responders,
+            "non_responder_note": (
+                f"{', '.join(non_responders)}님은 선호 응답이 없어 부하 균형만으로 배치했습니다. 팀장이 확인 후 조정하세요."
+                if non_responders else ""
+            ),
             "persisted": False,
             "not_persisted": True,
             "required_next_tool": "set_roles",
