@@ -53,7 +53,7 @@ def _is_task_like_role(name: str) -> bool:
 
 
 def _role_suggestions_from_roadmap(tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """로드맵 태스크에서 역할 후보(역량/워크스트림)를 거칠게 추천한다."""
+    """로드맵 태스크에서 최종 산출물 중심의 역할 후보를 추천한다."""
     text = " ".join(
         str(part or "")
         for task in tasks
@@ -65,33 +65,48 @@ def _role_suggestions_from_roadmap(tasks: list[dict[str, Any]]) -> list[dict[str
         if name not in {s["name"] for s in suggestions}:
             suggestions.append({"name": name, "difficulty": difficulty})
 
-    if any(k in text for k in ["주제", "아이디어", "기획", "브레인스토밍"]):
-        add("기획·PM", 7)
-    if any(k in text for k in ["빵", "소보로", "레시피", "재료", "식품", "조리", "시제품", "포장", "생산", "양산"]):
+    def has_any(words: list[str]) -> bool:
+        return any(word in text for word in words)
+
+    is_technical = has_any(["MCP", "서버", "API", "OAuth", "토큰", "캘린더", "지도", "연동", "프로토타입", "개발", "구현", "UI", "UX", "대시보드", "SurveyJS"])
+    is_production = has_any(["빵", "소보로", "레시피", "재료", "식품", "조리", "시제품", "포장", "생산", "양산", "제조"])
+    is_presentation = has_any(["책", "발표", "자료", "슬라이드", "대본", "리허설", "질의", "토론", "분석", "조사", "연구", "평가"])
+
+    if has_any(["주제", "아이디어", "기획", "계획", "일정", "팀원", "역할", "조율"]):
+        add("기획·일정 조율", 6)
+
+    if is_technical:
+        if has_any(["MCP", "서버", "프로토타입", "개발", "구현"]):
+            add("MCP 서버·도구 구현", 9)
+        if has_any(["카카오", "OAuth", "토큰", "캘린더", "지도", "연동", "MCP", "API"]):
+            add("카카오 API·OAuth 연동", 8)
+        if has_any(["폼", "대시보드", "UX", "UI", "SurveyJS"]):
+            add("폼·대시보드 UX", 6)
+        if has_any(["테스트", "피드백", "QA", "검증", "디버깅"]):
+            add("테스트·QA", 6)
+        if has_any(["문서", "발표", "제출", "데모"]):
+            add("문서·데모·발표", 5)
+    elif is_production:
         add("레시피·품질 설계", 7)
         add("재료·구매 관리", 5)
         add("제조·시제품 운영", 8)
-    if any(k in text for k in ["피드백", "개선", "검증", "테스트", "맛", "품질", "위생"]):
-        add("테스트·품질 개선", 6)
-    if any(k in text for k in ["시현", "발표", "포장", "마무리", "데모"]):
-        add("시현·발표 운영", 5)
-    if any(k in text for k in ["MCP", "서버", "API", "프로토타입", "개발", "구현"]):
-        add("MCP 서버·도구 구현", 9)
-    if any(k in text for k in ["카카오", "OAuth", "토큰", "캘린더", "지도", "연동", "MCP", "API"]):
-        add("카카오 API·OAuth 연동", 8)
-    if any(k in text for k in ["폼", "대시보드", "UX", "UI", "SurveyJS"]):
-        add("폼·대시보드 UX", 6)
-    if any(k in text for k in ["테스트", "피드백", "QA", "검증"]) and not any("테스트" in s["name"] for s in suggestions):
-        add("테스트·QA", 6)
-    if any(k in text for k in ["문서", "발표", "제출", "데모"]):
-        add("문서·데모·발표", 5)
+        if has_any(["피드백", "개선", "검증", "맛", "품질", "위생"]):
+            add("품질·피드백 개선", 6)
+        if has_any(["발표", "시현", "마무리"]):
+            add("시현·발표 운영", 5)
+    elif is_presentation:
+        add("자료 조사·내용 분석", 7)
+        add("발표 구조·대본 구성", 6)
+        add("슬라이드·시각자료 제작", 5)
+        add("발표·질의응답 준비", 5)
+
     if not suggestions:
         suggestions = [
-            {"name": "기획·PM", "difficulty": 7},
-            {"name": "핵심 구현", "difficulty": 9},
-            {"name": "연동·데이터", "difficulty": 7},
-            {"name": "테스트·QA", "difficulty": 5},
-            {"name": "문서·발표", "difficulty": 4},
+            {"name": "기획·일정 조율", "difficulty": 6},
+            {"name": "자료 조사·분석", "difficulty": 6},
+            {"name": "결과물 제작", "difficulty": 7},
+            {"name": "검토·개선", "difficulty": 5},
+            {"name": "최종 정리·공유", "difficulty": 4},
         ]
     return suggestions
 
@@ -111,7 +126,7 @@ def _validate_role_names(names: list[str], roadmap: dict[str, Any]) -> dict[str,
         "ok": False,
         "error": (
             "역할 후보가 로드맵 단계/할일명처럼 보입니다. 역할은 '대회 주제 선정' 같은 단계명이 아니라 "
-            "'기획·PM', 'MCP 서버·도구 구현', '문서·발표'처럼 여러 태스크를 책임지는 역량/워크스트림이어야 합니다."
+            "'자료 조사·내용 분석', '발표 구조·대본 구성', 'MCP 서버·도구 구현'처럼 여러 태스크를 책임지는 역량/워크스트림이어야 합니다."
         ),
         "invalid_roles": bad,
         "roadmap_task_titles": task_titles,
@@ -228,8 +243,10 @@ def register(mcp: FastMCP) -> None:
         ⚠️ **로드맵 단계명/태스크명을 역할로 쓰지 말 것.** "대회 주제 선정", "아이디어
         브레인스토밍", "프로토타입 개발", "최종 제출"은 역할이 아니라 할일/마일스톤이다.
         역할은 여러 태스크를 책임지는 역량/워크스트림이어야 한다.
-        예: '카카오 MCP 공모전'이면 기획·PM, MCP 서버·도구 구현, 카카오 API·OAuth 연동,
-        폼·대시보드 UX, 테스트·QA, 문서·데모·발표 등 *그 과제* 역할을 만들어야 함.
+        역할명은 최종 산출물에 맞춰 달라져야 한다. 발표 과제면 자료 조사·내용 분석,
+        발표 구조·대본 구성, 슬라이드·시각자료 제작, 발표·질의응답 준비처럼 만들고,
+        개발 과제일 때만 MCP 서버·도구 구현, 카카오 API·OAuth 연동, 폼·대시보드 UX,
+        테스트·QA처럼 기술 역할을 만든다.
 
         역할 생성 = **PM 분해 5단계**:
         ① 산출물 파악 — 그 과제가 최종적으로 내야 할 결과물이 무엇인지
