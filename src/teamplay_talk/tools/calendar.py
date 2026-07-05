@@ -16,7 +16,7 @@ from typing import Any
 
 from fastmcp import FastMCP
 
-from .. import kakao, kakao_calendar, kakao_store, storage
+from .. import kakao, kakao_calendar, kakao_store, storage, task_sync
 from ..config import settings
 from ..identity import bearer_token, resolve_caller
 
@@ -180,6 +180,10 @@ def register(mcp: FastMCP) -> None:
                     )
             if "event_id" in res:
                 created.append({"nickname": member["nickname"], "event_id": res["event_id"]})
+                try:  # 회의 참석 할 일(due=회의시각) — 실패해도 흐름 유지
+                    await task_sync.add_meeting(room_id, member, title, start_at)
+                except Exception:
+                    pass
             else:
                 failed.append({"nickname": member["nickname"], "error": res})
 

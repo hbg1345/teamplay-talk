@@ -13,7 +13,7 @@ from typing import Any
 
 from fastmcp import FastMCP
 
-from .. import kakao_store, storage
+from .. import kakao_store, storage, task_sync
 from .guards import require_form, require_room
 from .roadmap import _format as _format_roadmap
 from .roadmap import _task_date_bounds
@@ -718,7 +718,17 @@ def register(mcp: FastMCP) -> None:
         _caller, _form, error = await require_form(form_id)
         if error:
             return error
-        return apply_daily_checkin_to_tasks(form_id, dry_run=dry_run)
+        result = apply_daily_checkin_to_tasks(form_id, dry_run=dry_run)
+        if not dry_run and isinstance(result, dict) and result.get("ok"):
+            try:  # done 처리된 todo의 카카오 할 일 즉시 삭제
+                rid = result.get("room_id")
+                if rid:
+                    for row in result.get("applied_updates", []):
+                        if row.get("to") == "done":
+                            await task_sync.clear_todo(rid, row["task_id"])
+            except Exception:
+                pass
+        return result
 
     @mcp.tool(
         name="daily_report",

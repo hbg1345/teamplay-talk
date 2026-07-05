@@ -152,3 +152,82 @@ async def clear_form(room_id: int, form_id: int, *, user_id: int | None = None) 
         if m:
             await _delete(m, link["kakao_task_id"])
         storage.delete_kakao_task_link(link["id"])
+
+
+def _to_rfc3339(value: Any) -> str | None:
+    """datetime/ISO 문자열 → UTC RFC3339 (tz 없으면 KST 가정)."""
+    if value is None:
+        return None
+    try:
+        dt = value if isinstance(value, datetime) else datetime.fromisoformat(
+            str(value).replace("Z", "+00:00")
+        )
+    except Exception:  # noqa: BLE001
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=KST)
+    return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _fallback_due(days: int = 3) -> str:
+    return (datetime.now(KST) + timedelta(days=days)).astimezone(
+        timezone.utc
+    ).isoformat().replace("+00:00", "Z")
+
+
+# ─────────────────────────── 개인 todo ───────────────────────────
+async def sync_todos(room_id: int, *, alarm_time: str = "0900") -> None:
+    """활성 개인 todo(배정됨·todo/doing)마다 '할 일' 생성. 이미 있으면 skip.
+
+    체크인 발송 시 호출 → 팀원 톡캘린더에 '지금 할 것'만 뜬다. (전체 로드맵 아님)
+    """
+    try:
+        tasks = (storage.get_roadmap(room_id) or {}).get("tasks", [])
+    except Exception:  # noqa: BLE001
+        return
+    existing = {
+        (l["ref_id"], l["user_id"])
+        for l in storage.list_kakao_task_links(room_id=room_id, kind="todo")
+    }
+    members = {m["id"]: m for m in kakao_store.list_members_with_tokens(room_id)}
+    for t in tasks:
+        if (t.get("task_type") or "milestone") != "todo":
+            continue
+        if t.get("status") not in ("todo", "doing"):
+            continue
+        uid = t.get("assignee_user_id")
+        member = members.get(uid)
+        if member is None:
+            continue
+        if (str(t["id"]), uid) in existing:
+            continue
+        due = _to_rfc3339(t.get("end_at")) or _fallback_due()
+        tid = await _create(member, content=f"📌 {t['title']}"[:100], due_date=due, alarm_time=alarm_time)
+        if tid:
+            storage.record_kakao_task_link(room_id, "todo", str(t["id"]), uid, tid)
+
+
+async def clear_todo(room_id: int, task_id: Any, *, user_id: int | None = None) -> None:
+    """todo가 done 되면: 해당 개인 할 일 삭제."""
+    members = {m["id"]: m for m in kakao_store.list_members_with_tokens(room_id)}
+    for link in storage.list_kakao_task_links(room_id=room_id, kind="todo", ref_id=str(task_id)):
+        if user_id and link["user_id"] != user_id:
+            continue
+        member = members.get(link["user_id"])
+        if member is not None:
+            await _delete(member, link["kakao_task_id"])
+        storage.delete_kakao_task_link(link["id"])
+
+
+# ─────────────────────────── 회의 ───────────────────────────
+async def add_meeting(room_id: int, member: dict[str, Any], title: str, start_at: Any,
+                      *, decision_id: Any = None, alarm_time: str = "0900") -> None:
+    """회의 확정 시: 멤버별 '회의 참석' 할 일(due=회의시각) 생성."""
+    due = _to_rfc3339(start_at)
+    if not due:
+        return
+    tid = await _create(member, content=f"🗓️ 회의: {title}"[:100], due_date=due, alarm_time=alarm_time)
+    if tid:
+        storage.record_kakao_task_link(
+            room_id, "meeting", str(decision_id or start_at), member["id"], tid
+        )

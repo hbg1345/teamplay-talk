@@ -917,6 +917,7 @@ def register(mcp: FastMCP) -> None:
         try:  # 카카오 할 일(리마인더) — 발송 시 생성. 실패해도 기존 흐름 유지
             if schema.get("_workflow_kind") == "daily_checkin":
                 await task_sync.sync_checkin(form["room_id"], schema.get("_checkin_date"))
+                await task_sync.sync_todos(form["room_id"])
             else:
                 await task_sync.sync_form(form["room_id"], form_id, form["title"])
         except Exception:
