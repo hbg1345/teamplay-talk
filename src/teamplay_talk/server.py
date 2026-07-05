@@ -60,6 +60,7 @@ mcp = FastMCP(
         "room_manage(action=create) 뒤에는 참여 안내 문구(invite_share_text)를 먼저 그대로 보여주고, 다음 단계는 팀원 초대 후 주제 분석/로드맵 생성을 먼저 제안하라('먼저 프로젝트 주제로 로드맵을 잡아볼까요?'). "
         "기본 시작 흐름은 room_manage(create) → 팀원 초대 → roadmap_manage(build, 주제 기반 milestone) → [필요하면 roadmap 의견수렴/수정] → role_manage(start/finalize/set) → roadmap_manage(decompose, 역할별 개인 todo) 순서로 안내하라. "
         "역할분배를 먼저 하는 흐름은 사용자가 '역할이 이미 정해졌다', '팀원 전문성이 이미 확정됐다'고 명시한 경우에만 예외로 허용하라. "
+        "방장/팀장/관리자 같은 운영 역할은 프로젝트 실행 역할이 아니다. 이런 값만 있으면 역할이 아직 없는 상태로 보고, todo보다 로드맵 기반 역할분배를 먼저 제안하라. "
         "roadmap_manage(action=build/view) 응답 후에는 milestone_titles 또는 milestones/tasks의 제목을 먼저 bullet로 보여주고, 그 다음 '로드맵 의견수렴/수정'과 '마일스톤 기반 역할분배'를 제안하라. 역할이 없으면 '현재 역할 기준'이라고 말하지 마라. "
         "roadmap_manage(action=build)에서 tasks 누락 안내를 받으면 사용자에게 단계 목록을 다시 묻지 말고, 네가 마일스톤 초안을 만들어 '이 초안으로 만들까요?'라고 확인하라. "
         "폼/투표/역할/일정 도구를 만들기만 한 상태(sent=false)에서는 절대 '보냈다/요청했다'고 말하지 말고 "

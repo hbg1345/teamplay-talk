@@ -377,6 +377,13 @@ def _member_task_buckets(roadmap: dict[str, Any]) -> tuple[list[dict[str, Any]],
     return list(buckets.values()), unassigned
 
 
+def _is_project_role(role: Any) -> bool:
+    text = str(role or "").strip()
+    if not text:
+        return False
+    return text not in {"방장", "팀장", "관리자", "owner", "Owner", "admin", "Admin"}
+
+
 def _resolve_parent_task_id(
     roadmap: dict[str, Any],
     *,
@@ -507,27 +514,29 @@ def _format(roadmap: dict[str, Any]) -> dict[str, Any]:
     # 로드맵 이후 다음 행동 안내는 상태에 따라 갈린다.
     # 로드맵 직후에는 역할분배와 로드맵 의견수렴/수정을 먼저 드러내야
     # PlayMCP가 곧장 todo/캘린더로 건너뛰지 않는다.
-    has_roles = any(m.get("role") for m in roadmap.get("members", []))
+    has_roles = any(_is_project_role(m.get("role")) for m in roadmap.get("members", []))
     if not has_roles:
         workflow_state = "roadmap_created_roles_missing"
         roadmap_next = (
-            "로드맵 단계가 잡혔고 아직 확정된 역할은 없습니다. 다음은 이 로드맵에 대한 "
-            "팀 의견을 모아 수정하거나, 마일스톤을 바탕으로 워크스트림 역할분배를 진행하는 흐름이 자연스럽습니다."
+            "로드맵 단계가 잡혔고 아직 확정된 프로젝트 역할은 없습니다. 다음은 이 로드맵이 맞는지 "
+            "팀원 의견을 모으거나, 이 마일스톤을 기준으로 역할을 나누는 흐름이 자연스럽습니다."
         )
         roadmap_suggestions = [
             "로드맵이 맞는지 팀원 의견을 모아 수정·보완하기",
-            "마일스톤을 바탕으로 기획·생산·품질·마케팅·유통 같은 워크스트림 역할 나누기",
-            "역할이 정해진 뒤 각 단계 아래 실행 todo를 2~5개씩 만들기",
+            "이 로드맵 기준으로 워크스트림 역할 나누기",
+            "역할 선호도 조사를 팀원에게 보내기",
             "진행 흐름을 대시보드에서 확인하기",
         ]
         workflow_order_guidance = (
             "일반적으로는 로드맵을 먼저 만들고, 그 마일스톤을 보고 역할을 나눈 뒤, "
-            "역할별 실행 todo로 분해합니다. 아직 역할이 없으므로 '현재 역할 기준'이라고 말하지 마세요."
+            "역할별 실행 todo로 분해합니다. 아직 프로젝트 역할이 없으므로 '현재 역할 기준'이나 "
+            "'현재 역할 점검'이라고 말하지 마세요."
         )
         chat_hint = (
             "채팅 응답에서는 생성/조회된 마일스톤 제목을 먼저 bullet로 보여주세요. "
-            "역할이 아직 없으므로 '현재 역할 기준으로 todo를 쪼개자'고 말하지 마세요. "
-            "로드맵 의견수렴/수정 또는 마일스톤 기반 역할분배를 먼저 제안하세요."
+            "방장/팀장 같은 운영 역할만 있으면 프로젝트 역할은 아직 없는 상태입니다. "
+            "todo를 바로 제안하지 말고, '이 로드맵 기준으로 역할을 나눌까요?'를 우선 제안하세요. "
+            "보조 선택지로 로드맵 의견수렴/수정을 함께 보여주세요."
         )
     else:
         workflow_state = "roadmap_created_roles_present"
