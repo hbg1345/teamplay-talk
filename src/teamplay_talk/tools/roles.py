@@ -96,7 +96,7 @@ def _role_design_brief(
         "member_count_rule": (
             "If fewer than 2 active members are in the room, design only a draft card set for owner review. "
             "Do not shrink the project into 2 cards just because only the owner has joined. "
-            "Do not send a preference form until teammates join."
+            "A test preference form can be created for the owner, but explain that real assignment should be reviewed again after teammates join."
         ),
         "role_design_steps": [
             "1. 최종 산출물을 한 문장으로 정의한다.",
@@ -125,8 +125,8 @@ def _role_design_brief(
             "로드맵 단계명을 그대로 역할명으로 쓰지 않는다.",
             "방장·팀장·관리자 같은 운영 지위는 프로젝트 실행 역할로 보지 않는다.",
             "프로젝트 텍스트에 없는 기술명·직무명을 끼워 넣지 않는다.",
-            "팀원이 2명 이상일 때만 책임 카드 개수를 active_member_count의 1~2배로 강제한다.",
-            "팀원이 1명뿐이면 카드 수를 2개로 줄이지 말고, 방장 확인용 초안으로만 제시한다.",
+            "책임 카드 개수는 active_member_count의 1~2배를 권장하되, 프로젝트 맥락상 필요하면 초안 단계에서 조금 벗어날 수 있다.",
+            "팀원이 1명뿐이면 카드 수를 2개로 줄이지 말고, 방장 확인용 초안 또는 테스트 발송으로 진행할 수 있다.",
             "각 책임 카드는 난이도와 업무량이 너무 가볍거나 무겁지 않게 조정한다.",
             "'담당', '리드', '총괄' 같은 최종 역할명 표현을 카드명에 붙이지 않는다.",
             "책임 카드 목록을 만들면 곧바로 role_manage(action='start')에 roles로 다시 넣는다.",
@@ -463,50 +463,33 @@ def register(mcp: FastMCP) -> None:
         invalid = _validate_role_names(names, roadmap, len(members))
         if invalid is not None:
             return invalid
+        advisory_warnings: list[str] = []
         if len(members) < 2:
+            advisory_warnings.append(
+                "현재 방에 팀원이 1명뿐입니다. 선호/회피 조사는 테스트로 보낼 수 있지만, 실제 팀 배정은 팀원이 들어온 뒤 다시 보는 것이 좋습니다."
+            )
+        card_bounds = (
+            _responsibility_card_bounds(len(members))
+            if len(members) >= 2
+            else {"min": 4, "max": 6, "preferred": 5}
+        )
+        if len(names) < card_bounds["min"] or len(names) > card_bounds["max"]:
+            advisory_warnings.append(
+                f"현재 기준 추천 책임 카드 수는 {card_bounds['min']}~{card_bounds['max']}개, 추천 {card_bounds['preferred']}개입니다. "
+                f"지금 초안은 {len(names)}개라 권장 범위와 다를 수 있습니다."
+            )
+        if len(names) > 12:
             return {
                 "ok": False,
                 "created": False,
-                "needs_more_members": True,
-                "error": "역할 선호도 조사는 팀원이 2명 이상일 때 보내는 것이 자연스럽습니다.",
+                "error": "책임 카드가 너무 많아 모바일 폼으로 보내기 어렵습니다. 12개 이하로 줄여주세요.",
                 "room": room["name"],
                 "active_member_count": len(members),
                 "members": [m["nickname"] for m in members],
                 "received_cards": names,
-                "draft_cards_preserved": True,
-                "invite_code": room.get("invite_code"),
-                "invite_share_text": _invite_share_text(room),
-                "next": (
-                    "지금 만든 책임 카드 초안은 유지해서 팀장에게 보여주고, 팀원을 먼저 초대하세요. "
-                    "팀원이 들어온 뒤 같은 카드 구성으로 선호/회피 조사를 보내면 됩니다."
-                ),
-                "suggested_next_actions": [
-                    "초대 코드를 팀원에게 공유하기",
-                    "팀원이 들어온 뒤 같은 책임 카드로 선호/회피 조사 보내기",
-                    "팀원 수가 예상과 다르면 책임 카드 수만 다시 조정하기",
-                ],
-                "chat_response_hint": (
-                    "책임 카드를 2개로 다시 병합하지 마세요. 현재는 방장 1명뿐이라 발송만 보류된 상태입니다. "
-                    "이미 제안한 책임 카드 초안을 보여주고, 팀원 초대 후 이 구성으로 조사하자고 안내하세요."
-                ),
-            }
-        card_bounds = _responsibility_card_bounds(len(members))
-        if len(names) < card_bounds["min"] or len(names) > card_bounds["max"]:
-            return {
-                "ok": False,
-                "error": (
-                    f"책임 카드 수가 팀원 수 기준 범위를 벗어났습니다. 현재 팀원 {len(members)}명 기준 "
-                    f"{card_bounds['min']}~{card_bounds['max']}개가 적절하고, 추천은 {card_bounds['preferred']}개입니다."
-                ),
                 "responsibility_card_count": card_bounds,
-                "received_count": len(names),
-                "received_cards": names,
-                "role_design_brief": _role_design_brief(roadmap, len(members)),
-                "required_next_tool": "role_manage",
-                "required_next_action": "start",
                 "chat_response_hint": (
-                    "사용자에게 카드 수 오류를 길게 설명하지 말고, 로드맵을 기준으로 책임 카드를 "
-                    f"{card_bounds['preferred']}개 안팎으로 다시 묶어 role_manage(action='start')를 재호출하세요."
+                    "카드가 너무 많다는 점만 말하고, 로드맵을 기준으로 8~12개 이하의 책임 카드로 다시 묶어주세요."
                 ),
             }
         limits = _preference_limits(len(names))
@@ -587,6 +570,10 @@ def register(mcp: FastMCP) -> None:
                 "actual": len(names),
             },
             "preference_limits": limits,
+            "advisory_warnings": advisory_warnings,
+            "needs_more_members": len(members) < 2,
+            "invite_code": room.get("invite_code") if len(members) < 2 else None,
+            "invite_share_text": _invite_share_text(room) if len(members) < 2 else None,
             "generated_from_roadmap": generated_from_roadmap,
             "roadmap_task_titles": [t.get("title") for t in roadmap.get("tasks", [])],
             "members": [m["nickname"] for m in members],
@@ -598,7 +585,8 @@ def register(mcp: FastMCP) -> None:
             "action_required": (
                 "⚠️ 아직 보내지 마세요. 위 책임 카드 **이름**을 사용자(팀장)에게 보여주고 "
                 "'이대로 선호도 조사를 보낼까요? 바꿀 책임 카드가 있나요?'라고 물어 **명시적 확인**을 받으세요. "
-                "(난이도 점수는 보여주지 마세요 — 내부 균형용입니다.) 동의를 받은 뒤에만 역할 선호 폼을 발송하세요."
+                "(난이도 점수는 보여주지 마세요 — 내부 균형용입니다.) 동의를 받은 뒤에만 역할 선호 폼을 발송하세요. "
+                "팀원이 1명뿐이면 테스트 발송은 가능하지만, 실제 배정은 팀원 합류 후 다시 보는 편이 낫다고 안내하세요."
             ),
             "user_prompt_examples": [
                 "이 역할 목록으로 팀원들에게 선호도 조사 보내줘",
@@ -609,7 +597,8 @@ def register(mcp: FastMCP) -> None:
                 "내부 도구명은 말하지 말고, 현재 로드맵을 참고해 만든 책임 카드 목록을 "
                 f"팀장에게 보여준 뒤 '팀원은 맡고 싶은 것 최대 {limits['want_max']}개, "
                 f"피하고 싶은 것 최대 {limits['avoid_max']}개만 고르면 됩니다. 이대로 보낼까요?'처럼 확인을 받으세요. "
-                "로드맵 단계명을 그대로 쓰지 않고 책임 단위로 나눴다는 점을 짧게 설명하세요."
+                "로드맵 단계명을 그대로 쓰지 않고 책임 단위로 나눴다는 점을 짧게 설명하세요. "
+                "advisory_warnings가 있으면 막힌 것이 아니라 권장사항이라고 말하세요."
             ),
         }
 
