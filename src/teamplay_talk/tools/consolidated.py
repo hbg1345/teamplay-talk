@@ -653,6 +653,10 @@ def install(mcp: FastMCP) -> None:
         진행 중인 폼 목록을 확인하고, 만든 폼을 팀원에게 보내거나 응답 결과를 정리할
         때 사용합니다. 제목 일부로 찾을 수 있지만, 여러 폼이 비슷하면 폼 번호를 함께
         확인하는 편이 안전합니다.
+
+        선행조건: 현재 작업 방이 있어야 하고, 대상 폼은 먼저 생성돼 있어야 합니다(폼은
+        create_poll·gather_opinions·gather_task_opinions·schedule_meeting 등으로 만듭니다).
+        방이 없으면 폼 기능을 설명하기 전에 먼저 방 생성/참여를 안내하세요.
         """
         if action == "list":
             return await _list_forms(room_id, status=status, query=query)
