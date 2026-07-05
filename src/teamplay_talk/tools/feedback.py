@@ -13,7 +13,7 @@ from typing import Any, Literal
 from fastmcp import FastMCP
 from pydantic import BaseModel, Field
 
-from .. import kakao_store, storage
+from .. import kakao_store, storage, task_sync
 from ..config import settings
 from .guards import require_form, require_room
 
@@ -914,6 +914,13 @@ def register(mcp: FastMCP) -> None:
                 "count": 0,
                 "error": "모든 발송이 실패했습니다. 카카오 인증/토큰 상태를 확인해야 합니다.",
             }
+        try:  # 카카오 할 일(리마인더) — 발송 시 생성. 실패해도 기존 흐름 유지
+            if schema.get("_workflow_kind") == "daily_checkin":
+                await task_sync.sync_checkin(form["room_id"], schema.get("_checkin_date"))
+            else:
+                await task_sync.sync_form(form["room_id"], form_id, form["title"])
+        except Exception:
+            pass
         followup = _send_form_followup(form)
         return {
             "ok": True,

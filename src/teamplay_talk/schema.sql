@@ -255,3 +255,18 @@ CREATE TABLE IF NOT EXISTS room_decisions (
 );
 CREATE INDEX IF NOT EXISTS idx_room_decisions_room_created ON room_decisions (room_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_room_decisions_room_kind ON room_decisions (room_id, kind, created_at DESC);
+
+-- 카카오 톡캘린더 '할 일'(talk_calendar_task) 연동 링크
+-- 워크플로우 항목(체크인/폼/개인todo/회의) ↔ 카카오 할 일 ID 매핑. "완료 시 삭제" 추적용.
+CREATE TABLE IF NOT EXISTS kakao_task_links (
+    id             BIGSERIAL PRIMARY KEY,
+    room_id        BIGINT NOT NULL REFERENCES rooms (id) ON DELETE CASCADE,
+    kind           TEXT NOT NULL,                       -- checkin | form | todo | meeting
+    ref_id         TEXT NOT NULL,                       -- 대상 식별(날짜/form_id/task_id/decision_id)
+    user_id        BIGINT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    kakao_task_id  TEXT NOT NULL,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    cleared_at     TIMESTAMPTZ,
+    UNIQUE (kind, ref_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_kakao_task_links_lookup ON kakao_task_links (room_id, kind, ref_id);

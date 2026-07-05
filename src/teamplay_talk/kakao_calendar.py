@@ -196,3 +196,148 @@ async def delete_event(
     if not resp.content:
         return {"event_id": event_id}
     return resp.json()
+
+
+# ────────────────────────── 할 일 (Task) API ──────────────────────────
+# 톡캘린더 "할 일"(scope: talk_calendar_task). v1 엔드포인트.
+# 일정(event)과 달리 due_info(마감일 + 알림시각)로 네이티브 리마인더를 태운다.
+# create/task 는 검색으로 확인, update/delete/tasks 는 event 패턴 미러링 —
+# ⚠️ 정확한 엔드포인트·필드명(특히 completed/id 필드)은 라이브 1회 호출로 확정할 것.
+API_TASK = "https://kapi.kakao.com/v1/api/calendar"
+
+
+def _build_task(
+    *,
+    content: str | None = None,
+    due_date: str | None = None,
+    time_zone: str = "Asia/Seoul",
+    alarm_time: str | None = None,
+    rrule: str | None = None,
+    record_on: str | None = None,
+    color: str | None = None,
+) -> dict[str, Any]:
+    """할 일 ``task`` 객체 조립.
+
+    content:    할 일 내용(텍스트). 할 일엔 별도 링크 필드가 없으므로 URL은 여기 텍스트로.
+    due_date:   마감일 (UTC RFC3339, 예: ``2026-07-10T00:00:00Z``).
+    alarm_time: 마감일에 알림이 울릴 시각 ``"HHMM"`` (예: ``"0900"``, ``"2100"``).
+    rrule:      반복 규칙(있으면 recur 로 감싼다).
+    """
+    task: dict[str, Any] = {}
+    if content is not None:
+        task["content"] = content
+    due: dict[str, Any] = {}
+    if due_date is not None:
+        due["due_date"] = due_date
+    if time_zone:
+        due["time_zone"] = time_zone
+    if alarm_time is not None:
+        due["alarm_time"] = alarm_time
+    if due:
+        task["due_info"] = due
+    if rrule is not None:
+        recur: dict[str, Any] = {"rrule": rrule}
+        if record_on is not None:
+            recur["record_on"] = record_on
+        task["recur"] = recur
+    if color is not None:
+        task["color"] = color
+    return task
+
+
+async def create_task(
+    access_token: str,
+    *,
+    content: str,
+    due_date: str,
+    calendar_id: str = "primary",
+    time_zone: str = "Asia/Seoul",
+    alarm_time: str | None = None,
+    rrule: str | None = None,
+    record_on: str | None = None,
+    color: str | None = None,
+) -> dict[str, Any]:
+    """할 일을 생성한다. 성공 시 생성된 할 일 ID 포함 dict(``task_id`` 추정 — 라이브 확정)."""
+    task = _build_task(
+        content=content, due_date=due_date, time_zone=time_zone,
+        alarm_time=alarm_time, rrule=rrule, record_on=record_on, color=color,
+    )
+    data = {"calendar_id": calendar_id, "task": json.dumps(task, ensure_ascii=False)}
+    async with httpx.AsyncClient(timeout=10) as c:
+        resp = await c.post(f"{API_TASK}/create/task", headers=_auth(access_token), data=data)
+    return resp.json()
+
+
+async def list_tasks(
+    access_token: str,
+    *,
+    calendar_id: str | None = None,
+    from_at: str | None = None,
+    to_at: str | None = None,
+    preset: str | None = None,
+    time_zone: str | None = None,
+) -> dict[str, Any]:
+    """기간 내 할 일 목록. (엔드포인트/파라미터 event 미러링 — 라이브 검증)"""
+    params: dict[str, Any] = {}
+    if calendar_id is not None:
+        params["calendar_id"] = calendar_id
+    if preset is not None:
+        params["preset"] = preset
+    else:
+        if from_at is not None:
+            params["from"] = from_at
+        if to_at is not None:
+            params["to"] = to_at
+    if time_zone is not None:
+        params["time_zone"] = time_zone
+    async with httpx.AsyncClient(timeout=10) as c:
+        resp = await c.get(f"{API_TASK}/tasks", headers=_auth(access_token), params=params)
+    return resp.json()
+
+
+async def update_task(
+    access_token: str,
+    task_id: str,
+    *,
+    content: str | None = None,
+    due_date: str | None = None,
+    time_zone: str = "Asia/Seoul",
+    alarm_time: str | None = None,
+    completed: bool | None = None,
+    recur_update_type: str | None = None,
+) -> dict[str, Any]:
+    """할 일 수정(완료 토글·마감 변경 등). ``task_id`` + 변경 필드. (엔드포인트 라이브 검증)"""
+    task = _build_task(
+        content=content, due_date=due_date, time_zone=time_zone, alarm_time=alarm_time,
+    )
+    if completed is not None:
+        task["completed"] = completed
+    data: dict[str, Any] = {"task_id": task_id}
+    if recur_update_type is not None:
+        data["recur_update_type"] = recur_update_type
+    if task:
+        data["task"] = json.dumps(task, ensure_ascii=False)
+    async with httpx.AsyncClient(timeout=10) as c:
+        resp = await c.post(f"{API_TASK}/update/task", headers=_auth(access_token), data=data)
+    if not resp.content:
+        return {"task_id": task_id}
+    return resp.json()
+
+
+async def delete_task(
+    access_token: str,
+    task_id: str,
+    *,
+    recur_update_type: str | None = None,
+) -> dict[str, Any]:
+    """할 일을 삭제한다(완료 시 정리용). 성공 시 ``{"task_id": ...}``. (엔드포인트 라이브 검증)"""
+    params: dict[str, Any] = {"task_id": task_id}
+    if recur_update_type is not None:
+        params["recur_update_type"] = recur_update_type
+    async with httpx.AsyncClient(timeout=10) as c:
+        resp = await c.request(
+            "DELETE", f"{API_TASK}/delete/task", headers=_auth(access_token), params=params
+        )
+    if not resp.content:
+        return {"task_id": task_id}
+    return resp.json()

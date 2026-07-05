@@ -1529,3 +1529,52 @@ def delete_task(task_id: int, room_id: int) -> int | None:
             row = cur.fetchone()
         c.commit()
     return row["id"] if row else None
+
+
+# ─────────────── 카카오 할 일 링크 (kakao_task_links) ───────────────
+def record_kakao_task_link(
+    room_id: int, kind: str, ref_id: Any, user_id: int, kakao_task_id: str
+) -> None:
+    """워크플로우 항목 ↔ 카카오 할 일 ID 매핑을 저장(중복 시 갱신·재활성)."""
+    with conn() as c:
+        with c.cursor() as cur:
+            cur.execute(
+                "INSERT INTO kakao_task_links (room_id, kind, ref_id, user_id, kakao_task_id) "
+                "VALUES (%s, %s, %s, %s, %s) "
+                "ON CONFLICT (kind, ref_id, user_id) "
+                "DO UPDATE SET kakao_task_id = EXCLUDED.kakao_task_id, cleared_at = NULL",
+                (room_id, kind, str(ref_id), user_id, str(kakao_task_id)),
+            )
+        c.commit()
+
+
+def list_kakao_task_links(
+    *, room_id: int | None = None, kind: str | None = None,
+    ref_id: Any | None = None, user_id: int | None = None, active_only: bool = True,
+) -> list[dict[str, Any]]:
+    """조건에 맞는 할 일 링크 목록."""
+    clauses: list[str] = []
+    params: list[Any] = []
+    if room_id is not None:
+        clauses.append("room_id = %s"); params.append(room_id)
+    if kind is not None:
+        clauses.append("kind = %s"); params.append(kind)
+    if ref_id is not None:
+        clauses.append("ref_id = %s"); params.append(str(ref_id))
+    if user_id is not None:
+        clauses.append("user_id = %s"); params.append(user_id)
+    if active_only:
+        clauses.append("cleared_at IS NULL")
+    where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+    with conn() as c:
+        with c.cursor(row_factory=dict_row) as cur:
+            cur.execute("SELECT * FROM kakao_task_links" + where, tuple(params))
+            return cur.fetchall()
+
+
+def delete_kakao_task_link(link_id: int) -> None:
+    """할 일 링크 삭제(카카오 할 일 삭제 성공 후)."""
+    with conn() as c:
+        with c.cursor() as cur:
+            cur.execute("DELETE FROM kakao_task_links WHERE id = %s", (link_id,))
+        c.commit()

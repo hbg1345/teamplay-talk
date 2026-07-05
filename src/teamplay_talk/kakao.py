@@ -16,7 +16,7 @@ TOKEN_URL = "https://kauth.kakao.com/oauth/token"
 USER_ME_URL = "https://kapi.kakao.com/v2/user/me"
 MEMO_SEND_URL = "https://kapi.kakao.com/v2/api/talk/memo/default/send"
 
-DEFAULT_SCOPE = "talk_message,profile_nickname"
+DEFAULT_SCOPE = "talk_message,profile_nickname,talk_calendar,talk_calendar_task"
 
 
 def build_authorize_url(
