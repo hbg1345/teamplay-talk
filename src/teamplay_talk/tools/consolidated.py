@@ -184,9 +184,11 @@ def _workflow_label(schema: dict[str, Any]) -> str:
 
 def _form_summary(form: dict[str, Any]) -> dict[str, Any]:
     schema = form.get("schema_json") or {}
-    label = f"폼 #{form['id']} · {_workflow_label(schema)} · {form['title']} · {int(form.get('total_responses') or 0)}응답"
+    room_form_no = form.get("room_form_no") or form["id"]
+    label = f"방내 #{room_form_no} · ID {form['id']} · {_workflow_label(schema)} · {form['title']} · {int(form.get('total_responses') or 0)}응답"
     return {
         "form_id": form["id"],
+        "room_form_no": room_form_no,
         "label": label,
         "title": form["title"],
         "status": "closed" if form.get("closed") else "active",
@@ -237,7 +239,7 @@ async def _list_forms(
     summaries = [_form_summary(form) for form in forms[:limit]]
     active_count = sum(1 for form in storage.list_room_forms(room["id"]) if not form.get("closed"))
     forms_text = [
-        f"- 폼 #{form['form_id']} · {form['kind']} · {form['title']} · {form['responses']}응답 · {form['status']}"
+        f"- 방내 #{form['room_form_no']} · ID {form['form_id']} · {form['kind']} · {form['title']} · {form['responses']}응답 · {form['status']}"
         for form in summaries
     ]
     message = (
@@ -250,7 +252,7 @@ async def _list_forms(
         "room_id": room["id"],
         "room_name": room["name"],
         "message": message,
-        "important": "사용자에게 답할 때 반드시 폼 #ID를 포함하세요.",
+        "important": "사용자에게 답할 때 방내 번호와 내부 ID를 함께 포함하세요.",
         "status_filter": status,
         "query": query,
         "forms": summaries,
@@ -259,7 +261,7 @@ async def _list_forms(
         "total_matching": len(forms),
         "active_count": active_count,
         "next": (
-            "진행중인 폼을 확인했습니다. 닫거나 결과를 볼 폼은 제목 또는 form_id로 지정하세요."
+            "진행중인 폼을 확인했습니다. 닫거나 결과를 볼 폼은 제목 또는 ID로 지정하세요."
             if summaries
             else "조건에 맞는 폼이 없습니다."
         ),
@@ -269,8 +271,8 @@ async def _list_forms(
             "새 의견수렴 또는 역할분배 이어가기",
         ],
         "chat_response_hint": (
-            "대시보드 링크로만 안내하지 말고 message 또는 forms_text를 그대로 사용해 폼 #ID, 제목, 상태, 응답 수를 바로 요약하세요. "
-            "같은 문장을 반복하지 마세요. 마감/결과 확인이 필요하면 사용자가 제목이나 폼 #ID로 말해도 된다고 안내하세요."
+            "대시보드 링크로만 안내하지 말고 message 또는 forms_text를 그대로 사용해 방내 번호, 내부 ID, 제목, 상태, 응답 수를 바로 요약하세요. "
+            "같은 문장을 반복하지 마세요. 마감/결과 확인이 필요하면 사용자가 제목이나 ID로 말해도 된다고 안내하세요."
         ),
     }
 
@@ -518,6 +520,18 @@ async def _resolve_form_id(
     action: str,
 ) -> tuple[int | None, dict[str, Any] | None]:
     if form_id is not None:
+        _caller, room, error = await require_room(room_id)
+        if error is None:
+            forms = storage.list_room_forms(room["id"])
+            if any(int(form["id"]) == int(form_id) for form in forms):
+                return form_id, None
+            room_no_matches = [
+                form for form in forms
+                if int(form.get("room_form_no") or -1) == int(form_id)
+                and (status == "all" or (status == "closed") == bool(form.get("closed")))
+            ]
+            if len(room_no_matches) == 1:
+                return int(room_no_matches[0]["id"]), None
         return form_id, None
     _caller, room, error = await require_room(room_id)
     if error:

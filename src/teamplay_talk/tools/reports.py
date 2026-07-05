@@ -55,9 +55,11 @@ def _form_summary(form: dict[str, Any]) -> dict[str, Any]:
     schema = form.get("schema_json") or {}
     kind = _workflow_label(schema)
     responses = int(form.get("total_responses") or 0)
-    label = f"폼 #{form['id']} · {kind} · {form['title']} · {responses}응답"
+    room_form_no = form.get("room_form_no") or form["id"]
+    label = f"방내 #{room_form_no} · ID {form['id']} · {kind} · {form['title']} · {responses}응답"
     return {
         "form_id": form["id"],
+        "room_form_no": room_form_no,
         "label": label,
         "title": form["title"],
         "status": "closed" if form.get("closed") else "active",
@@ -110,7 +112,7 @@ def register(mcp: FastMCP) -> None:
         active_forms = [_form_summary(form) for form in forms if not form.get("closed")]
         recent_forms = [_form_summary(form) for form in forms[:8]]
         active_forms_text = [
-            f"- 폼 #{form['form_id']} · {form['kind']} · {form['title']} · {form['responses']}응답 · {form['status']}"
+            f"- 방내 #{form['room_form_no']} · ID {form['form_id']} · {form['kind']} · {form['title']} · {form['responses']}응답 · {form['status']}"
             for form in active_forms
         ]
         latest_decisions = {
@@ -138,7 +140,7 @@ def register(mcp: FastMCP) -> None:
                 "아직 응답 중인 폼이 있으면 마감 후 결과 확인하기",
             ],
             "chat_response_hint": (
-                "진행중 폼이 있으면 active_forms_text를 그대로 사용해 폼 #ID, 제목, 종류, 응답 수를 먼저 요약하세요. "
+                "진행중 폼이 있으면 active_forms_text를 그대로 사용해 방내 번호, 내부 ID, 제목, 종류, 응답 수를 먼저 요약하세요. "
                 "대시보드 링크는 전체 타임라인을 볼 보조 링크로 덧붙이세요."
             ),
         }

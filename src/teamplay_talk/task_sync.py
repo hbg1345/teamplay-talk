@@ -4,7 +4,8 @@
 설계:
 - 전부 **best-effort / non-blocking**. 카카오 호출·필드가 틀려도 예외를 삼키므로
   기존 talk_message 흐름은 절대 안 깨진다. (할 일은 "확실한 네이티브 알림" 보강용)
-- 링크 매핑(``kakao_task_links``)으로 "완료 시 삭제"를 추적한다.
+- 폼/체크인 발송 알림은 기본적으로 일회성 할 일만 만든다. 제출 저장 경로에서
+  카카오 할 일을 자동 삭제하지 않아 폼 제출 안정성을 우선한다.
 - 토큰 만료 시 refresh 후 1회 재시도(기존 calendar.py 패턴 동일).
 - 할 일엔 링크 필드가 없어 content(텍스트)만 — 실제 폼 링크는 기존 talk_message가 담당.
 """
@@ -226,9 +227,7 @@ async def pend_form_review(room_id: int, form_id: int, creator_user_id: int, tit
         return
     due, alarm = _soon(2)
     content = f"📋 [{_room_name(room_id)}] 결과 확인: {title}"[:100]
-    tid = await _create(member, content=content, due_date=due, alarm_time=alarm)
-    if tid:
-        storage.record_kakao_task_link(room_id, "form_review", str(form_id), creator_user_id, tid)
+    await _create(member, content=content, due_date=due, alarm_time=alarm)
 
 
 async def clear_form_review(room_id: int, form_id: int, *, user_id: int | None = None) -> None:
@@ -339,7 +338,8 @@ async def pend_from_message(member: dict[str, Any], *, title: str,
     else:
         content = f"📌 {prefix}{title}"[:100]
     tid = await _create(member, content=content, due_date=due, alarm_time=alarm)
-    if tid and room_id and reminder.get("kind") and reminder.get("ref_id") is not None:
+    should_track = bool(reminder.get("track", True))
+    if tid and should_track and room_id and reminder.get("kind") and reminder.get("ref_id") is not None:
         storage.record_kakao_task_link(
             room_id, reminder["kind"], str(reminder["ref_id"]), member["id"], tid
         )

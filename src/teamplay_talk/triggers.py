@@ -62,13 +62,6 @@ async def _send_kakao(user_id: int, message: str) -> int | None:
 async def process_closed_form(form_id: int) -> None:
     """폼을 마감 처리하고 생성자에게 nudge. (claim으로 1회만)"""
     claimed = storage.claim_form_for_nudge(form_id)
-    if claimed is not None:  # 마감 → 카카오 할 일(리마인더) 정리
-        try:
-            _f = storage.get_form(form_id) or {}
-            if _f:
-                await task_sync.clear_form_pending(_f, form_id=form_id)
-        except Exception:
-            pass
     if claimed is None or claimed.get("creator_user_id") is None:
         return
     msg = (
@@ -163,7 +156,7 @@ async def _send_identified_form(form_id: int, message: str) -> dict[str, Any]:
             button_title="내 링크 열기",
             items=items,
             fallback_text=f"{message.rstrip()}\n{description}\n{url}",
-            reminder={"room_id": form["room_id"], "kind": "form", "ref_id": form_id},
+            reminder={"room_id": form["room_id"], "kind": "form", "ref_id": form_id, "track": False},
         )
         (sent if status == 200 else failed).append(recipient["nickname"])
     return {"sent_to": sent, "failed": failed, "count": len(sent)}

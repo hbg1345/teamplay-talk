@@ -262,15 +262,15 @@ def register(mcp: FastMCP) -> None:
         questions: list[PollQuestion],
         room_id: int | None = None,
         description: str | None = None,
-        anonymous: bool = True,
+        anonymous: bool = False,
         close_minutes: int | None = None,
         close_on_all: bool = False,
     ) -> dict[str, Any]:
         """팀플톡 자체 폼이나 투표를 만들고 응답 링크를 반환합니다.
 
         단일선택, 복수선택, 선호 순위, 점수, 주관식 질문을 섞어 팀 의견을 받을 수
-        있습니다. 가벼운 의견수렴은 익명 폼이 좋고, 역할분배나 진척체크처럼 1인
-        1응답이 중요한 경우에는 멤버별 식별 폼이 좋습니다. 만든 뒤에는 폼 발송
+        있습니다. 기본은 멤버별 식별 폼이라 1인 1응답과 완료 처리가 됩니다.
+        가벼운 의견수렴처럼 익명이 중요한 경우에만 익명 폼을 선택합니다. 만든 뒤에는 폼 발송
         기능으로 팀원에게 보내야 합니다.
 
         Args:
@@ -278,7 +278,7 @@ def register(mcp: FastMCP) -> None:
             questions: 질문 목록
             room_id: 폼이 속한 방 ID (생략 시 현재 작업 방). ID 추측 금지 — 보통 생략하면 됨.
             description: 폼 설명 (선택)
-            anonymous: 공유링크(True·기본) vs 멤버별 식별 링크(False·매칭 필요시만)
+            anonymous: 익명 공유 링크 여부. 기본 False(멤버별 식별 링크)
             close_minutes: N분 뒤 자동 마감 (선택)
             close_on_all: 전원 응답 시 자동 마감 (식별 폼은 기본적으로 적용)
         """
@@ -341,11 +341,12 @@ def register(mcp: FastMCP) -> None:
                 "'이 폼을 팀원들에게 보내드릴까요?'처럼 자연어로 다음 행동을 물어보세요."
             ),
         }
+        members = storage.list_members(room_id)
+        storage.create_invites(fid, [m["id"] for m in members])
         if anonymous:
             out["share_url"] = base
+            out["mode"] = "익명 폼 — 결과에는 이름이 숨겨지고, 카카오 발송 시에는 멤버별 링크를 보냅니다."
         else:
-            members = storage.list_members(room_id)
-            storage.create_invites(fid, [m["id"] for m in members])
             out["mode"] = "식별 폼 — 팀원별 개인 링크로 발송됩니다."
         return out
 
@@ -780,10 +781,6 @@ def register(mcp: FastMCP) -> None:
         results = storage.get_results(form_id)
         if results is None:
             return {"ok": False, "error": "존재하지 않는 폼입니다."}
-        try:
-            await task_sync.clear_form_review(_form["room_id"], form_id, user_id=_caller["id"])
-        except Exception:
-            pass
         return {"ok": True, **results}
 
     @mcp.tool(
@@ -799,8 +796,8 @@ def register(mcp: FastMCP) -> None:
     async def close_poll(form_id: int) -> dict[str, Any]:
         """팀플톡 폼이나 투표를 마감하고 최종 결과를 보여줍니다.
 
-        마감 후에는 추가 응답을 받지 않습니다. 응답 요청으로 생긴 팀원 할 일도 함께
-        정리됩니다.
+        마감 후에는 추가 응답을 받지 않습니다. 카카오 할 일은 사용자의 일회성
+        알림으로 남기고, 서버가 자동 삭제하지 않습니다.
 
         Args:
             form_id: 마감할 폼 ID
@@ -812,10 +809,6 @@ def register(mcp: FastMCP) -> None:
         if results is None:
             return {"ok": False, "error": "존재하지 않는 폼입니다."}
         storage.close_form(form_id)
-        try:
-            await task_sync.clear_form_pending(_form, form_id=form_id)
-        except Exception:
-            pass
         return {"ok": True, "closed": True, **results}
 
     @mcp.tool(
@@ -854,26 +847,34 @@ def register(mcp: FastMCP) -> None:
         ]
 
         _wk = schema.get("_workflow_kind")
-        _reminder = {"room_id": form["room_id"],
-                     "kind": "checkin" if _wk == "daily_checkin" else "form",
-                     "ref_id": schema.get("_checkin_date") if _wk == "daily_checkin" else form_id}
+        _reminder = {
+            "room_id": form["room_id"],
+            "kind": "checkin" if _wk == "daily_checkin" else "form",
+            "ref_id": schema.get("_checkin_date") if _wk == "daily_checkin" else form_id,
+            "track": False,
+        }
         sent: list[str] = []
         failed: list[str] = []
+        recipients = storage.list_form_recipients(form_id)
+        if not recipients:
+            storage.create_invites(form_id, [m["id"] for m in storage.list_members(form["room_id"])])
+            recipients = storage.list_form_recipients(form_id)
         if form["anonymous"]:
-            for m in kakao_store.list_members_with_tokens(form["room_id"]):
+            for r in recipients:
+                url = f"{settings.public_base_url}{storage.form_public_path(form_id, r['invite_token'])}"
                 status = await kakao_store.send_feed_with_refresh(
-                    m,
+                    r,
                     title=title,
                     description=description,
-                    link_url=base,
+                    link_url=url,
                     button_title="폼 열기",
                     reminder=_reminder,
                     items=items,
-                    fallback_text=f"{prefix}\n{fallback_description}\n{base}",
+                    fallback_text=f"{prefix}\n{fallback_description}\n{url}",
                 )
-                (sent if status == 200 else failed).append(m["nickname"])
+                (sent if status == 200 else failed).append(r["nickname"])
         else:
-            for r in storage.list_form_recipients(form_id):
+            for r in recipients:
                 url = f"{settings.public_base_url}{storage.form_public_path(form_id, r['invite_token'])}"
                 status = await kakao_store.send_feed_with_refresh(
                     r,
