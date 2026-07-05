@@ -275,7 +275,7 @@ footer{padding:50px 0 58px;border-top:1px solid var(--line)}
 .foot-brand img{width:30px;height:30px;border-radius:9px}
 .foot small{color:var(--muted);font-size:13px}
 .foot-end{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-.foot-contact{color:var(--muted);font-size:13px;font-weight:700;transition:color .18s}
+.foot-contact{color:var(--muted);font-size:13px;transition:color .18s}
 .foot-contact:hover{color:var(--violet)}
 
 /* ── 스크롤 리빌 ── */
@@ -930,7 +930,7 @@ var EN={
   "wf_h2":"From kickoff to deadline,<br>one workflow.","wf_p":"Not a pile of one-off features — the whole team project runs end to end. Each step's output becomes the next step's input.",
   "feat_h2":"Right when you need it, here's how it helps.","feat_p":"One tool for every moment a decision is needed. Teammates just reply with a single link.",
   "mk_h2":"The makers","mk_p":"Built by two, serious about making team projects actually run.",
-  "cn_h2":"Connect right from PlayMCP","cn_p":"One Kakao login and you're in. Developers can also connect directly via the MCP endpoint.","cn_copy":"Copy",
+  "cn_h2":"Connect right from PlayMCP","cn_p":"One Kakao login and you're in. Developers can also connect directly via the MCP endpoint.","cn_copy":"Copy","foot_contact":"Contact teamplaytalk@gmail.com",
   "owner_tag":"Owner · PlayMCP AI","cmdhint":"👆 Tap the blue <b>'next'</b> chip in the owner's chat to step through it yourself",
   "feat0t":"Polls · gather opinions","feat0d":"From dinner spots to talk topics — when opinions split. Pools the team's answers in one place so you see what everyone wants.",
   "feat1t":"Match meeting times","feat1d":"When nobody knows who's free. Everyone checks a date×time grid, and AI pinpoints the slot that works for all.",
@@ -1158,7 +1158,7 @@ def _page() -> str:
 <footer>
   <div class="wrap foot">
     <div class="foot-brand"><img src="/icon-mark.png" alt="" width="30" height="30"> teamplay-talk</div>
-    <div class="foot-end"><small>Kakao PlayMCP · AGENTIC PLAYER · © 2026 teamplay-talk</small><a class="foot-contact" href="mailto:{_CONTACT_EMAIL}">문의 {_CONTACT_EMAIL}</a><button class="lang-toggle lg" type="button" aria-label="Language / 언어"><span>KO</span><span>EN</span></button></div>
+    <div class="foot-end"><small>Kakao PlayMCP · AGENTIC PLAYER · © 2026 teamplay-talk</small><a class="foot-contact" href="mailto:{_CONTACT_EMAIL}" data-i18n="foot_contact">문의 {_CONTACT_EMAIL}</a><button class="lang-toggle lg" type="button" aria-label="Language / 언어"><span>KO</span><span>EN</span></button></div>
   </div>
 </footer>
 
