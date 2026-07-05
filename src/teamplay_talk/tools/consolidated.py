@@ -14,6 +14,7 @@ from typing import Any, Literal
 from fastmcp import FastMCP
 
 from .. import storage
+from ..identity import resolve_caller
 from .guards import require_room
 
 
@@ -274,6 +275,240 @@ async def _list_forms(
     }
 
 
+def _general_guide_payload(
+    *,
+    rooms: list[dict[str, Any]] | None = None,
+    guide_topic: str | None = None,
+) -> dict[str, Any]:
+    rooms = rooms or []
+    has_rooms = bool(rooms)
+    active_room = next((room for room in rooms if room.get("is_active")), None)
+    if not has_rooms:
+        state = "no_room"
+        next_actions = [
+            "새 팀플방 만들기",
+            "초대 코드를 받았다면 방에 참여하기",
+            "방을 만든 뒤 프로젝트 주제로 로드맵 잡기",
+        ]
+        examples = [
+            "카카오 MCP 대회방 만들어줘",
+            "초대 코드 ABC123으로 참여할래",
+            "teamplay-talk 어떻게 써?",
+        ]
+    elif active_room is None:
+        state = "rooms_exist_no_active_room"
+        next_actions = [
+            "작업할 방을 현재 방으로 전환하기",
+            "방 목록에서 초대 코드와 역할 확인하기",
+            "현재 방을 정한 뒤 로드맵이나 진행상태 확인하기",
+        ]
+        examples = [
+            f"{rooms[0]['name']} 방으로 전환해줘",
+            "내가 속한 방 목록 보여줘",
+            "지금 방에서 다음에 뭐 하면 돼?",
+        ]
+    else:
+        state = "active_room_available"
+        next_actions = ["현재 방 상태를 기준으로 다음 단계 확인하기"]
+        examples = ["지금 우리 방에서 다음에 뭐 하면 돼?"]
+
+    flow = [
+        "방 만들기",
+        "팀원 초대",
+        "주제로 로드맵 만들기",
+        "로드맵 검토와 수정",
+        "역할 분배",
+        "개인별 할 일 만들기",
+        "투표·회의시간·장소 조율",
+        "데일리 체크인과 아침 리포트",
+    ]
+    topic_notes = {
+        "roadmap": "로드맵은 프로젝트 주제를 큰 단계로 나누고, 팀 의견을 받아 수정한 뒤 역할과 할 일의 기준으로 씁니다.",
+        "roles": "역할분배는 로드맵을 기준으로 워크스트림 역할을 만들고, 팀원 선호도와 난이도를 함께 봐서 배정합니다.",
+        "todo": "개인별 할 일은 확정된 로드맵과 역할을 1~2일 안에 끝낼 수 있는 실행 단위로 쪼개 관리합니다.",
+        "forms": "투표와 의견수렴은 카카오톡으로 폼을 보내고, 응답이 모이면 AI가 결과와 다음 결정을 정리합니다.",
+        "daily": "데일리는 밤 체크인으로 완료·막힘을 받고, 아침 리포트로 오늘 할 일과 지연 이슈를 정리합니다.",
+        "calendar": "회의나 마감이 정해지면 팀원별 카카오톡 캘린더에 등록해 놓치지 않게 돕습니다.",
+    }
+    topic = (guide_topic or "").strip().lower()
+    topic_note = topic_notes.get(topic)
+    return {
+        "ok": True,
+        "guide_mode": "general",
+        "guide_topic": guide_topic,
+        "state": state,
+        "active_room": active_room["name"] if active_room else None,
+        "rooms": [
+            {"name": room["name"], "invite_code": room["invite_code"], "active": room.get("is_active")}
+            for room in rooms
+        ],
+        "workflow": flow,
+        "topic_note": topic_note,
+        "next": (
+            topic_note
+            if topic_note
+            else "처음이라면 방을 만들고 팀원을 초대한 뒤, 프로젝트 주제로 로드맵을 먼저 잡으면 됩니다."
+        ),
+        "suggested_next_actions": next_actions,
+        "user_prompt_examples": examples,
+        "chat_response_hint": (
+            "홈페이지 링크를 주지 말고 채팅 안에서 사용법을 설명하세요. "
+            "처음 사용자는 방 만들기부터 안내하고, 이미 방이 있으면 현재 방 기준 다음 단계를 물어보게 하세요. "
+            "도구명이나 action명은 말하지 말고 사용자가 그대로 말할 수 있는 자연어 예시를 보여주세요."
+        ),
+    }
+
+
+async def _guide_room(room_id: int | None, guide_topic: str | None = None) -> dict[str, Any]:
+    caller = await resolve_caller()
+    if caller is None:
+        return {"ok": False, "error": "카카오 인증 정보가 없습니다. PlayMCP에서 카카오 계정 연결을 먼저 진행해 주세요."}
+
+    if room_id is None:
+        room = storage.get_active_room(caller["id"])
+        if room is None:
+            return _general_guide_payload(
+                rooms=storage.list_user_rooms(caller["id"]),
+                guide_topic=guide_topic,
+            )
+    else:
+        room = storage.get_room(room_id)
+        if room is None:
+            return {"ok": False, "error": f"방 {room_id}를 찾을 수 없습니다."}
+        if not storage.is_room_member(room_id, caller["id"]):
+            return {"ok": False, "error": "이 방의 멤버만 이 작업을 할 수 있습니다."}
+
+    members = storage.list_members(room["id"])
+    forms = storage.list_room_forms(room["id"])
+    active_forms = [form for form in forms if not form.get("closed")]
+    roadmap = storage.get_roadmap(room["id"])
+    tasks = roadmap.get("tasks", [])
+    milestones = [task for task in tasks if (task.get("task_type") or "milestone") == "milestone"]
+    todos = [task for task in tasks if (task.get("task_type") or "milestone") == "todo"]
+    roles_assigned = [member for member in members if member.get("role")]
+    assigned_todos = [task for task in todos if task.get("assignee_user_id") or task.get("assignee_role")]
+    done_todos = [task for task in todos if task.get("status") == "done"]
+    latest_decisions = {
+        kind: {
+            "id": decision["id"],
+            "title": decision["title"],
+            "summary": decision["summary"],
+            "created_at": _iso(decision.get("created_at")),
+        }
+        for kind, decision in storage.latest_room_decisions(room["id"]).items()
+    }
+
+    if not milestones:
+        stage = "roadmap_missing"
+        next_actions = [
+            "프로젝트 주제로 로드맵 만들기",
+            "팀원에게 로드맵에 들어갈 단계 의견 받기",
+            "팀원 초대 문구 다시 확인하기",
+        ]
+        examples = [
+            "이 주제로 로드맵 짜줘",
+            "로드맵이 괜찮은지 팀원 의견 받아줘",
+            "초대 문구 다시 보여줘",
+        ]
+    elif not roles_assigned:
+        stage = "roles_missing"
+        next_actions = [
+            "로드맵 기준으로 역할 후보 만들기",
+            "역할 선호도 폼 보내기",
+            "로드맵이 맞는지 먼저 팀원 의견 받기",
+        ]
+        examples = [
+            "로드맵 기준으로 역할 나눠줘",
+            "역할 선호도 조사 보내줘",
+            "로드맵 수정 의견 받아줘",
+        ]
+    elif not todos:
+        stage = "todos_missing"
+        next_actions = [
+            "로드맵과 역할을 개인별 실행 할 일로 쪼개기",
+            "팀원별 할 일 목록 확인하기",
+            "날짜가 있는 할 일을 캘린더에 등록하기",
+        ]
+        examples = [
+            "역할별로 개인 할 일 만들어줘",
+            "팀원별 할 일 보여줘",
+            "날짜 있는 할 일 캘린더에 넣어줘",
+        ]
+    elif active_forms:
+        stage = "waiting_for_responses"
+        next_actions = [
+            "진행 중인 폼 응답 수 확인하기",
+            "응답이 충분하면 결과 정리하기",
+            "응답이 끝난 폼 마감하기",
+        ]
+        examples = [
+            "진행 중인 폼 뭐가 있어?",
+            "응답 결과 정리해줘",
+            "이 투표 마감해줘",
+        ]
+    else:
+        stage = "running"
+        next_actions = [
+            "오늘 할 일과 밀린 일 확인하기",
+            "회의 시간이나 장소 조율하기",
+            "데일리 체크인 또는 아침 리포트 만들기",
+        ]
+        examples = [
+            "팀원별 오늘 할 일 보여줘",
+            "이번 주 회의 시간 잡아줘",
+            "오늘 팀 리포트 만들어줘",
+        ]
+
+    topic = (guide_topic or "").strip().lower()
+    topic_guides = {
+        "roadmap": ["로드맵은 큰 milestone부터 만들고, 필요하면 팀 의견을 받아 수정합니다.", "그 다음 역할분배와 개인별 할 일로 이어갑니다."],
+        "roles": ["역할은 로드맵 태스크명이 아니라 여러 일을 책임지는 워크스트림으로 나눕니다.", "예: 기획·PM, 구현, 연동, QA, 문서·발표."],
+        "todo": ["할 일은 milestone 아래에 1~2일 단위 실행 항목으로 쪼갭니다.", "역할이 확정돼 있으면 실제 팀원에게 자동으로 연결합니다."],
+        "forms": ["폼은 만들기와 발송이 분리됩니다.", "만든 뒤 팀원에게 보낼지 확인하고, 응답이 모이면 결과를 정리합니다."],
+        "daily": ["밤에는 체크인으로 완료·막힘을 받고, 아침에는 리포트로 오늘 할 일을 정리합니다."],
+        "calendar": ["확정된 회의나 날짜가 있는 할 일은 팀원별 카카오톡 캘린더에 등록할 수 있습니다."],
+    }
+    topic_notes = topic_guides.get(topic)
+    status_lines = [
+        f"팀원 {len(members)}명",
+        f"로드맵 {len(milestones)}개 단계",
+        f"역할 확정 {len(roles_assigned)}명",
+        f"개인 할 일 {len(todos)}개",
+        f"완료 {len(done_todos)}개",
+        f"진행 중인 폼 {len(active_forms)}개",
+    ]
+    return {
+        "ok": True,
+        "guide_mode": "room",
+        "guide_topic": guide_topic,
+        "room_id": room["id"],
+        "room_name": room["name"],
+        "workflow_stage": stage,
+        "status_summary": status_lines,
+        "metrics": {
+            "members": len(members),
+            "milestones": len(milestones),
+            "roles_assigned": len(roles_assigned),
+            "todos": len(todos),
+            "assigned_todos": len(assigned_todos),
+            "done_todos": len(done_todos),
+            "active_forms": len(active_forms),
+        },
+        "members": [{"nickname": member["nickname"], "role": member.get("role")} for member in members],
+        "active_forms": [_form_summary(form) for form in active_forms[:8]],
+        "latest_decisions": latest_decisions,
+        "topic_notes": topic_notes,
+        "next": "현재 방 상태를 기준으로 다음 단계를 골랐습니다.",
+        "suggested_next_actions": next_actions,
+        "user_prompt_examples": examples,
+        "chat_response_hint": (
+            "현재 상태를 1~2문장으로 요약하고, suggested_next_actions를 질문 형태로 제안하세요. "
+            "도구명/action명은 노출하지 말고 user_prompt_examples처럼 사용자가 그대로 말할 수 있는 예시를 보여주세요. "
+            "guide_topic이 있으면 topic_notes를 먼저 반영하세요."
+        ),
+    }
+
+
 async def _resolve_form_id(
     room_id: int | None,
     *,
@@ -349,7 +584,7 @@ def install(mcp: FastMCP) -> None:
     @mcp.tool(
         name="room_manage",
         annotations={
-            "title": "Room Management",
+            "title": "방 관리",
             "readOnlyHint": False,
             "destructiveHint": False,
             "idempotentHint": False,
@@ -357,12 +592,15 @@ def install(mcp: FastMCP) -> None:
         },
     )
     async def room_manage(
-        action: Literal["create", "join", "switch", "list", "delete", "restore", "leave"],
+        action: Literal["create", "join", "switch", "list", "delete", "restore", "leave", "guide"],
         name: str | None = None,
         description: str | None = None,
         invite_code: str | None = None,
+        guide_topic: str | None = None,
     ) -> dict[str, Any]:
-        """Manage teamplay-talk(팀플톡) rooms: create, join, switch, list, delete, restore, or leave."""
+        """팀플톡 방을 만들고, 참여하고, 현재 작업 방과 다음 단계를 안내합니다."""
+        if action == "guide":
+            return await _guide_room(None, guide_topic=guide_topic)
         target = {
             "create": "create_room",
             "join": "join_room",
@@ -381,7 +619,7 @@ def install(mcp: FastMCP) -> None:
     @mcp.tool(
         name="form_manage",
         annotations={
-            "title": "Form Follow-up",
+            "title": "폼 관리",
             "readOnlyHint": False,
             "destructiveHint": False,
             "idempotentHint": False,
@@ -396,11 +634,11 @@ def install(mcp: FastMCP) -> None:
         room_id: int | None = None,
         message: str | None = None,
     ) -> dict[str, Any]:
-        """List, send, read results, or close an existing teamplay-talk(팀플톡) form/poll.
+        """팀플톡 폼과 투표를 찾고, 보내고, 결과를 확인하거나 마감합니다.
 
-        Use action='list' when the user asks what polls/forms are currently running.
-        For send/results/close, form_id is best. If unknown, pass query/title and this
-        hub will resolve the matching form in the current room.
+        진행 중인 폼이나 투표를 물으면 action='list'를 사용한다. 발송, 결과 확인,
+        마감은 form_id가 가장 정확하다. form_id를 모르면 query에 제목 일부를
+        넣어 현재 작업 방에서 찾는다.
         """
         if action == "list":
             return await _list_forms(room_id, status=status, query=query)
@@ -425,7 +663,7 @@ def install(mcp: FastMCP) -> None:
     @mcp.tool(
         name="role_manage",
         annotations={
-            "title": "Role Assignment Flow",
+            "title": "역할 분배",
             "readOnlyHint": False,
             "destructiveHint": False,
             "idempotentHint": False,
@@ -441,7 +679,7 @@ def install(mcp: FastMCP) -> None:
         close_minutes: int | None = None,
         message: str | None = None,
     ) -> dict[str, Any]:
-        """Run teamplay-talk(팀플톡) role assignment: start preference form, compute assignment, or save roles."""
+        """팀플톡 역할 분배를 시작하고, 응답 기반 배정안을 계산하거나 확정합니다."""
         target = {
             "start": "assign_roles",
             "finalize": "finalize_roles",
@@ -459,7 +697,7 @@ def install(mcp: FastMCP) -> None:
     @mcp.tool(
         name="roadmap_manage",
         annotations={
-            "title": "Roadmap and Member Tasks",
+            "title": "로드맵과 팀원 할 일",
             "readOnlyHint": False,
             "destructiveHint": False,
             "idempotentHint": False,
@@ -482,7 +720,7 @@ def install(mcp: FastMCP) -> None:
         dry_run: bool = False,
         room_id: int | None = None,
     ) -> dict[str, Any]:
-        """Build/view/schedule/decompose a teamplay-talk(팀플톡) roadmap or inspect/notify member tasks."""
+        """팀플톡 로드맵을 만들고, 일정을 배치하고, 팀원별 할 일을 관리합니다."""
         target = {
             "build": "build_roadmap",
             "view": "view_roadmap",
@@ -510,7 +748,7 @@ def install(mcp: FastMCP) -> None:
     @mcp.tool(
         name="task_manage",
         annotations={
-            "title": "Roadmap Task Editing",
+            "title": "로드맵 태스크 편집",
             "readOnlyHint": False,
             "destructiveHint": False,
             "idempotentHint": False,
@@ -531,7 +769,7 @@ def install(mcp: FastMCP) -> None:
         after_task_ids: list[int] | None = None,
         before_task_ids: list[int] | None = None,
     ) -> dict[str, Any]:
-        """Add, update, or delete one teamplay-talk(팀플톡) roadmap task."""
+        """팀플톡 로드맵의 태스크를 하나씩 추가, 수정, 삭제합니다."""
         target = {"add": "add_task", "update": "update_task", "delete": "delete_task"}[action]
         return await _run_legacy(legacy, target, {
             "task_id": task_id,
@@ -550,7 +788,7 @@ def install(mcp: FastMCP) -> None:
     @mcp.tool(
         name="daily_manage",
         annotations={
-            "title": "Daily Check-in and Report",
+            "title": "데일리 체크인과 리포트",
             "readOnlyHint": False,
             "destructiveHint": False,
             "idempotentHint": False,
@@ -570,7 +808,7 @@ def install(mcp: FastMCP) -> None:
         apply_checkin: bool = True,
         publish: bool = False,
     ) -> dict[str, Any]:
-        """Create/apply daily check-ins or build a teamplay-talk(팀플톡) daily report."""
+        """팀플톡 데일리 체크인 폼을 만들고, 응답 반영과 팀 리포트를 처리합니다."""
         target = {
             "create_checkin": "create_daily_checkin",
             "apply_checkin": "apply_daily_checkin",
@@ -592,7 +830,7 @@ def install(mcp: FastMCP) -> None:
     @mcp.tool(
         name="calendar_team",
         annotations={
-            "title": "Team Calendar Registration",
+            "title": "팀 캘린더 등록",
             "readOnlyHint": False,
             "destructiveHint": False,
             "idempotentHint": False,
@@ -616,7 +854,7 @@ def install(mcp: FastMCP) -> None:
         include_done: bool = False,
         default_minutes: int = 30,
     ) -> dict[str, Any]:
-        """Register meeting or assigned roadmap task events to team members' KakaoTalk calendars."""
+        """회의나 배정된 로드맵 할 일을 팀원들의 카카오톡 캘린더에 등록합니다."""
         target = {
             "room_event": "calendar_create_room_event",
             "task_events": "calendar_create_task_events",
@@ -641,7 +879,7 @@ def install(mcp: FastMCP) -> None:
     @mcp.tool(
         name="calendar_personal",
         annotations={
-            "title": "Personal Calendar CRUD",
+            "title": "개인 캘린더 관리",
             "readOnlyHint": False,
             "destructiveHint": False,
             "idempotentHint": False,
@@ -667,7 +905,7 @@ def install(mcp: FastMCP) -> None:
         preset: str | None = None,
         limit: int | None = None,
     ) -> dict[str, Any]:
-        """Create, list, get, update, or delete the caller's KakaoTalk calendar events."""
+        """호출자의 카카오톡 캘린더 일정을 생성, 조회, 수정, 삭제합니다."""
         target = {
             "create": "calendar_create_event",
             "list": "calendar_list_events",

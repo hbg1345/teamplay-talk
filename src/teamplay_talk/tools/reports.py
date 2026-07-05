@@ -82,11 +82,11 @@ def register(mcp: FastMCP) -> None:
         },
     )
     async def room_dashboard(room_id: int | None = None) -> dict[str, Any]:
-        """Returns a signed result timeline URL for a teamplay-talk(팀플톡) room.
+        """현재 작업 방의 결과 타임라인 대시보드 링크를 반환합니다.
 
         방에서 지금까지 만든 SurveyJS 폼/투표/일정조율 결과를 한 화면에서 보는
         타임라인 링크를 반환한다. 각 결과는 생성된 순서대로 요약되며,
-        회의 일정은 teamplay-talk의 best_slots를 함께 보여준다.
+        회의 일정은 best_slots를 함께 보여준다.
 
         Args:
             room_id: 대상 방 ID. 생략하면 현재 작업 방을 사용한다.

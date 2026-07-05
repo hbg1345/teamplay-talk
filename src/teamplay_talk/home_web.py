@@ -381,7 +381,7 @@ var CD_KO=[
  [{r:'user',t:'카카오 MCP 대회 로드맵 짜줘'},
   {r:'ai',t:'마감(7/14)까지 <b>6단계</b>로 잡았어요.<br>1 주제·기획 <span>~6/20</span><br>2 서버+카카오 인증 <span>~6/26</span><br>3 핵심 기능 <span>~7/4</span><br>4 홈페이지·데모 <span>~7/9</span><br>5 QC·리허설 <span>~7/12</span><br>6 제출 <span>~7/14</span>'},
   {r:'user',t:'좋아'},
-  {r:'ai',t:'확정 — 각 단계를 <b>개인 todo</b>로 쪼개 배정했어요 (함봉구 백엔드 · 이민지 UI · 김주호 프론트). 각자 카톡으로 보냈어요.'}],
+  {r:'ai',t:'확정 — 각 단계를 <b>개인 todo</b>로 쪼개 배정했어요 (함봉구 백엔드 · 이민지 UI · 김주호 프론트). 각자 카톡과 할 일 알림으로 보냈어요.'}],
  [{r:'user',t:'역할 좀 나눠줘'},
   {r:'ai',t:'<b>4개 역할</b>(기획·백엔드·프론트·디자인)로 나눴어요. 선호 순위 받을까요?'},
   {r:'user',t:'ㅇㅇ'},
@@ -477,7 +477,7 @@ function cdPlay(i){
     cmd:'로드맵 단계별로 팀원 <b>todo</b> 만들어줘',
     draft:'로드맵 7단계를 <b>역할별 todo</b>로 쪼개 마감까지 붙였어요.<br>기획·PM → 박세원 · 백엔드 → 함봉구 · 프론트 → 김주호 · 디자인·UX → 이민지',
     kko:'<b>[팀플톡] 내 할 일 · 이민지</b><br><b>이번 주</b><br>· 폼 화면 UX 다듬기 <span>~7/8</span><br>· 대시보드 정보구조 정리 <span>~7/9</span><br><b>다음 주</b><br>· 데모 화면 최종 점검 <span>~7/10</span><br><span>끝내면 밤 체크인에서 체크하면 돼요</span>',
-    result:'전원에게 <b>마감 붙은 todo</b> 배정 완료.<br><span>이제 회의 일정을 잡을까요?</span>'},
+    result:'전원에게 <b>마감 붙은 todo</b>와 할 일 알림 배정 완료.<br><span>이제 회의 일정을 잡을까요?</span>'},
 
    {cap:'팀에게 물어봐요', sub:'열린 질문 → 투표 폼 → 결과 집계', member:'form', who:'이민지', channel:'카카오톡', think:'투표 만드는 중', send:'투표 폼 전송',
     cmd:'어떤 클라우드 플랫폼 쓸지 팀원들한테 물어봐줘',
@@ -780,7 +780,7 @@ _FEATURES = [
     ("roles", "역할 나누기", "누가 뭘 맡을지 애매할 때. 선호와 난이도를 함께 보고 공평하게 나눠, 뒷말 없는 분배를 도와줘요."),
     ("map", "로드맵 · 할 일 쪼개기", "무엇부터 할지 막막할 때. 큰 그림을 세우고 각자 할 일까지 나눠, 다음에 뭘 할지 분명해져요."),
     ("sun", "매일 진행 챙기기", "진행이 흐지부지될 때. 밤엔 오늘 한 일을 체크받고, 아침엔 누가 어디까지 왔는지 정리해줘요."),
-    ("bell", "공지 · 일정 전하기", "정한 걸 놓치지 않게. 결정과 일정을 팀 카톡과 톡캘린더로 바로 전해줘요."),
+    ("bell", "공지 · 일정 전하기", "정한 걸 놓치지 않게. 결정과 일정을 팀 카톡, 톡캘린더, 할 일 알림으로 바로 전해줘요."),
     ("dash", "팀 상태 한눈에 보기", "전체가 궁금할 때. 투표·체크인·결정을 한 화면에 모아 팀이 어디쯤인지 보여줘요."),
 ]
 
@@ -788,7 +788,7 @@ _PIPELINE = [
     ("01", "방 개설 · 초대", "초대 코드 하나로 팀원 합류 — 이후 모든 조율이 이 방을 중심으로 돌아갑니다.", "room"),
     ("02", "로드맵 · 의견 수렴", "주제를 말하면 AI가 마일스톤을 설계하고, 팀 검토를 받아 확정합니다.", "roadmap"),
     ("03", "역할 분배", "선호 순위 → 난이도 균형 배정 → 방장 확인 후 확정.", "roles"),
-    ("04", "개인 todo · 일정", "로드맵 단계 × 역할로 개인 todo를 쪼개고 마감까지 배정합니다.", "todo"),
+    ("04", "개인 todo · 일정", "로드맵 단계 × 역할로 개인 todo를 쪼개고 마감과 할 일 알림까지 배정합니다.", "todo"),
     ("05", "회의 · 장소 · 캘린더", "날짜×시간 그리드로 시간 확정, 장소 집계, 톡캘린더 등록까지.", "meet"),
     ("06", "데일리 · 공지", "밤 체크인 → 아침 리포트가 자동으로 돌고, 결정사항은 팀 카톡으로 공지.", "daily"),
 ]
@@ -858,7 +858,7 @@ var EN={
   "hero_h1":"Your team's PM,<br>handed to <span class=\"mlg\">AI<svg class=\"wave-underline\" viewBox=\"0 0 120 14\" preserveAspectRatio=\"none\" aria-hidden=\"true\"><defs><linearGradient id=\"ulg2\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"0\"><stop stop-color=\"#7c3aed\"/><stop offset=\"1\" stop-color=\"#22b8ff\"/></linearGradient></defs><path pathLength=\"100\" d=\"M2 8 C10 4.5 22 4.5 32 8 S54 11.5 64 8 S86 4.5 96 8 C106 11.5 112 8 118 8\" fill=\"none\" stroke=\"url(#ulg2)\" stroke-width=\"4.5\" stroke-linecap=\"round\"/></svg></span>",
   "hero_sub":"Polls, meeting times, role splits, roadmaps, daily reports — all of it. AI handles the busywork of team coordination like a PM, and teammates just reply in the KakaoTalk they already use.",
   "cta_primary":"Connect on PlayMCP","cta_ghost":"See how it works","chat_head":"teamplay-talk · AI conversation demo",
-  "how_h2":"One word from the owner,<br>and it reaches the whole team.","how_p":"No installs, no new app. Teammates get forms and alerts in the KakaoTalk they already use, and reply with a single link.",
+  "how_h2":"One word from the owner,<br>and it reaches the whole team.","how_p":"No installs, no new app. Teammates get forms and to-do reminders in the KakaoTalk they already use, and reply with a single link.",
   "s1t":"Connect on PlayMCP","s1d":"One Kakao login connects teamplay-talk to your AI agent.",
   "s2t":"Talk to the AI","s2d":"\"Split the roles,\" \"find a meeting time.\" Just say it — one line is enough.",
   "s3t":"Auto-broadcast to the team","s3d":"Forms, polls, and notices spread to your teammates' KakaoTalk.",
@@ -876,18 +876,18 @@ var EN={
   "feat3t":"Split the roles","feat3d":"When who-does-what is fuzzy. Weighs preference and difficulty for a fair split.",
   "feat4t":"Roadmap · break down tasks","feat4d":"When you don't know where to start. Sets the big picture and splits each person's tasks.",
   "feat5t":"Keep daily progress","feat5d":"When momentum fizzles. At night it checks what got done; in the morning it lays out who is where.",
-  "feat6t":"Notices · schedules, delivered","feat6d":"So nothing decided slips. Sends decisions and schedules straight to team KakaoTalk and Talk Calendar.",
+  "feat6t":"Notices · schedules, delivered","feat6d":"So nothing decided slips. Sends decisions and schedules straight to team KakaoTalk, Talk Calendar, and to-do reminders.",
   "feat7t":"See team status at a glance","feat7d":"Gathers votes, check-ins, and decisions on one screen to show where the team stands.",
   "pipe0t":"Room setup · invite","pipe0d":"One invite code brings the team in — from here, all coordination revolves around this room.",
   "pipe1t":"Roadmap · gather input","pipe1d":"Say the topic; AI designs milestones and locks them in after team review.",
   "pipe2t":"Role assignment","pipe2d":"Preference ranking → difficulty-balanced assignment → owner confirms.",
-  "pipe3t":"Personal todos · schedule","pipe3d":"Splits personal todos by roadmap stage × role and assigns deadlines.",
+  "pipe3t":"Personal todos · schedule","pipe3d":"Splits personal todos by roadmap stage × role, then assigns deadlines and to-do reminders.",
   "pipe4t":"Meeting · place · calendar","pipe4d":"Locks the time via a date×time grid, tallies the place, adds it to Talk Calendar.",
   "pipe5t":"Daily · notices","pipe5d":"Night check-in → morning report runs automatically; decisions go to team KakaoTalk.",
   "chip0":"Roadmap","chip1":"Roles","chip2":"Meeting time","chip3":"Place","chip4":"Poll","chip5":"Daily"
 };
 var CD_EN=[
- [{r:"user",t:"Plan a roadmap for the Kakao MCP contest"},{r:"ai",t:"Mapped it in <b>6 stages</b> to the deadline (7/14).<br>1 Topic·plan <span>~6/20</span><br>2 Server + Kakao auth <span>~6/26</span><br>3 Core features <span>~7/4</span><br>4 Homepage·demo <span>~7/9</span><br>5 QC·rehearsal <span>~7/12</span><br>6 Submit <span>~7/14</span>"},{r:"user",t:"Nice"},{r:"ai",t:"Locked in — split each stage into <b>personal todos</b> (Bonggu backend · Minji UI · Juho frontend). Sent to each via KakaoTalk."}],
+ [{r:"user",t:"Plan a roadmap for the Kakao MCP contest"},{r:"ai",t:"Mapped it in <b>6 stages</b> to the deadline (7/14).<br>1 Topic·plan <span>~6/20</span><br>2 Server + Kakao auth <span>~6/26</span><br>3 Core features <span>~7/4</span><br>4 Homepage·demo <span>~7/9</span><br>5 QC·rehearsal <span>~7/12</span><br>6 Submit <span>~7/14</span>"},{r:"user",t:"Nice"},{r:"ai",t:"Locked in — split each stage into <b>personal todos</b> (Bonggu backend · Minji UI · Juho frontend). Sent to each via KakaoTalk and to-do reminders."}],
  [{r:"user",t:"Split the roles"},{r:"ai",t:"Split into <b>4 roles</b> (planning·backend·frontend·design). Collect preference rankings?"},{r:"user",t:"yep"},{r:"ai",t:"Got everyone's <b>preference rankings</b>. Assigning now."},{r:"ai",t:"Balanced by preference·difficulty.<br>Sewon <b>Planning·PM</b> · Bonggu <b>Backend</b><br>Minji <b>Design·UX</b> · Juho <b>Frontend</b><br>Confirmed and announced."}],
  [{r:"user",t:"Find a meeting time this week"},{r:"ai",t:"Built a 2-week <b>availability grid</b> from today. Send to all 4?"},{r:"user",t:"yes, send it"},{r:"ai",t:"All replied — <b>Tue 8:00 PM</b> works for all 4.<br>Announced and added to Talk Calendar."}],
  [{r:"user",t:"Let's pick a place"},{r:"ai",t:"I'll collect each person's <b>preferred area</b> via a form. Send it?"},{r:"user",t:"yep"},{r:"ai",t:"Result: <b>Gangnam Station</b> 3 votes (Hongdae 1). Set to Gangnam and announced."}],
@@ -898,7 +898,7 @@ var STEPS_EN=[
  {cap:"Create the room",sub:"Owner creates the room · teammates join via PlayMCP",member:"join",who:"Minji",channel:"PlayMCP",think:"Creating",cmd:"Create a room for the Kakao MCP contest",draft:"<b>'Kakao MCP contest room'</b> created.<br>Invite code <b>AbC123xY</b> <span>share it with your team</span>",code:"AbC123xY",result:"4 teammates <b>joined via PlayMCP</b>.<br><span>Shall we set the roadmap now?</span>"},
  {cap:"Set the roadmap, gather input",sub:"AI drafts milestones → team review → lock in",member:"form",who:"Minji",channel:"KakaoTalk",think:"Planning",send:"Sending",cmd:"Make a roadmap for our contest entry. Submission <b>7/10</b>. Gather the team's input too",draft:"<b>6-stage roadmap</b> draft.<br>Topic · Core design · Dev·integration · Demo·UX · Test·QA · Submit <span>~7/10</span><br><span>Sending a review form to the team</span>",kko:"<b>[TeamplayTalk]</b> Roadmap review request<br><span>Respond &#9656;</span>",form:{type:"text",title:"Roadmap review · comments",answer:"Add a security-check · user-feedback stage before testing too"},result:"Feedback applied — added a <b>security-check · user-feedback</b> stage.<br>Locked in as a 7-stage roadmap."},
  {cap:"Split the roles",sub:"Preference-ranking form → balanced assignment",member:"form",who:"Minji",channel:"KakaoTalk",think:"Roles",send:"Sending",cmd:"Start <b>role assignment</b> based on the roadmap",draft:"<b>5 role</b> candidates.<br>Planning·PM / Backend / Frontend / Design·UX / QA·Demo<br><span>Send the preference survey?</span>",kko:"<b>[TeamplayTalk]</b> Role preference survey<br><span>Respond &#9656;</span>",form:{type:"rank",title:"Rank role preferences (all 5)",items:["Design·UX","QA·Demo","Planning·PM","Backend","Frontend"]},result:"Sewon <b>Planning·PM · QA·Demo</b> · Bonggu <b>Backend</b><br>Minji <b>Design·UX</b> · Juho <b>Frontend</b> <span>Confirm?</span>"},
- {cap:"Break into to-dos",sub:"Roadmap stage × role → personal todos → schedule",member:"notice",who:"Minji",channel:"KakaoTalk",big:true,think:"Splitting",send:"Sending",cmd:"Create <b>todos</b> for the team by roadmap stage",draft:"Split the 7 stages into <b>role-based todos</b> with deadlines.<br>Planning·PM → Sewon · Backend → Bonggu · Frontend → Juho · Design·UX → Minji",kko:"<b>[TeamplayTalk] My to-dos · Minji</b><br><b>This week</b><br>· Polish form-screen UX <span>~7/8</span><br>· Organize dashboard IA <span>~7/9</span><br><b>Next week</b><br>· Final demo-screen check <span>~7/10</span><br><span>Check them off at the night check-in when done</span>",result:"Assigned <b>todos with deadlines</b> to everyone.<br><span>Shall we set a meeting time now?</span>"},
+ {cap:"Break into to-dos",sub:"Roadmap stage × role → personal todos → schedule",member:"notice",who:"Minji",channel:"KakaoTalk",big:true,think:"Splitting",send:"Sending",cmd:"Create <b>todos</b> for the team by roadmap stage",draft:"Split the 7 stages into <b>role-based todos</b> with deadlines.<br>Planning·PM → Sewon · Backend → Bonggu · Frontend → Juho · Design·UX → Minji",kko:"<b>[TeamplayTalk] My to-dos · Minji</b><br><b>This week</b><br>· Polish form-screen UX <span>~7/8</span><br>· Organize dashboard IA <span>~7/9</span><br><b>Next week</b><br>· Final demo-screen check <span>~7/10</span><br><span>Check them off at the night check-in when done</span>",result:"Assigned <b>todos with deadlines</b> and reminders to everyone.<br><span>Shall we set a meeting time now?</span>"},
  {cap:"Ask the team",sub:"Open question → poll form → tally",member:"form",who:"Minji",channel:"KakaoTalk",think:"Building",send:"Sending",cmd:"Ask the team which cloud platform to use",draft:"Built a <b>cloud poll</b>.<br>AWS · GCP · Azure <span>Send to the team?</span>",kko:"<b>[TeamplayTalk]</b> Cloud platform poll<br><span>Respond &#9656;</span>",form:{type:"poll",title:"Which cloud should we go with?",opts:["AWS","GCP","Azure"],sel:"GCP"},result:"Tallied — <b>GCP</b> wins with 3 votes.<br>Announced to the team."},
  {cap:"Set a meeting time",sub:"Grid check → suggest overlap → add to Talk Calendar",member:"form",who:"Minji",channel:"KakaoTalk",think:"Building",send:"Sending",cmd:"Find a time for this week's <b>full-team meeting</b>",draft:"Built a date×time <b>availability grid</b>.<br><span>Send it to the team?</span>",kko:"<b>[TeamplayTalk]</b> Meeting availability<br><span>Check all slots that work &#9656;</span>",form:{type:"grid",title:"Meeting availability",cols:["Mon","Tue","Wed","Thu"],rows:["7 PM","8 PM","9 PM"],on:["2,0","0,1","1,3","2,3"],x:["0,0","2,1"]},result:"<b>Mon 9:00 PM</b> — all 4 free.<br><span>Lock this time?</span>",extra:{cmd:"Yes, add it to Talk Calendar too",status:"Calendar",kko:"<b>[Talk Calendar]</b> Event added<br><b>Team meeting</b> · Mon 7/6, 9:00 PM<br><span>Reminder set 30 min before</span>",result:"<b>Added to Talk Calendar</b> — reminders set for all.<br><span>Collect the meeting place next?</span>"}},
  {cap:"Pick the place",sub:"Short-answer preferences → dedupe → tally candidates",member:"form",who:"Minji",channel:"KakaoTalk",think:"Building",send:"Sending",cmd:"Collect meeting-place candidates",draft:"Built a <b>short-answer</b> form for preferred places.<br><span>I'll tidy addresses via KakaoMap</span>",kko:"<b>[TeamplayTalk]</b> Meeting place<br><span>Write where you'd like to meet &#9656;</span>",form:{type:"text",title:"Meeting place",answer:"A study cafe near Gangnam Station"},result:"Tallied — <b>Gangnam Station</b> leads with 3.<br><span>Set to Gangnam Station and announced.</span>"},
@@ -988,7 +988,7 @@ def _page() -> str:
     <div class="sec-head rv">
       <span class="eyebrow">How it works</span>
       <h2 data-i18n="how_h2">방장이 한마디면,<br>팀 전체에 후두둑.</h2>
-      <p data-i18n="how_p">설치도, 새 앱도 없어요. 팀원들은 늘 쓰던 카카오톡으로 폼과 알림을 받고, 링크 하나로 응답해요.</p>
+      <p data-i18n="how_p">설치도, 새 앱도 없어요. 팀원들은 늘 쓰던 카카오톡으로 폼과 할 일 알림을 받고, 링크 하나로 응답해요.</p>
     </div>
     <div class="steps">
       <div class="step card rv d1"><div class="no">STEP 1</div><h3 data-i18n="s1t">PlayMCP에서 연결</h3><p data-i18n="s1d">카카오 로그인 한 번으로 teamplay-talk가 AI 에이전트에 연결돼요.</p></div>

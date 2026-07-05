@@ -41,11 +41,11 @@ def register(mcp: FastMCP) -> None:
         },
     )
     async def notify_room(message: str, room_id: int | None = None) -> dict[str, Any]:
-        """Sends a KakaoTalk notification to every member of a teamplay-talk(팀플톡) room.
+        """팀플톡 방 멤버 전원에게 카카오톡 알림을 보냅니다.
 
-        팀플톡(teamplay-talk) 방의 모든 멤버에게 카카오톡 '나와의 채팅방'으로
-        알림을 보낸다. 카카오 로그인을 마친 멤버에게만 전달된다. room_id를 안
-        주면 **현재 작업 방**으로 보낸다.
+        카카오 로그인을 마친 멤버의 '나와의 채팅방'으로 메시지를 발송한다.
+        room_id를 생략하면 현재 작업 방을 대상으로 한다. 폼 링크 배포에는 이
+        도구가 아니라 form_manage(action='send')를 사용한다.
 
         Args:
             message: 보낼 메시지 내용

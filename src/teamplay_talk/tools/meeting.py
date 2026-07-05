@@ -67,18 +67,18 @@ def register(mcp: FastMCP) -> None:
         room_id: int | None = None,
         close_minutes: int | None = 1440,
     ) -> dict[str, Any]:
-        """Creates a When2meet-style availability grid (dates x time, O/X) for meetings.
+        """회의 가능 시간을 모으는 날짜×시간 그리드 폼을 만듭니다.
 
-        회의 일정 조율용 **가용성 그리드**를 만든다: **열=날짜**(기본 생성일부터 14일,
-        가로 스크롤) × **행=시간**(시간 단위). 각 셀은 **O(가능)/X(절대 불가)** 드롭다운,
-        그리드 아래 **기타 건의사항** 자유기입 칸.
+        열은 날짜, 행은 시간이다. 각 칸에서 O(가능), X(절대 불가)를 고르고,
+        그리드 아래에는 기타 건의사항을 자유롭게 적을 수 있다. 기본은 생성일부터
+        14일, 9시부터 22시까지 1시간 단위다.
 
-        보통은 인자 없이 schedule_meeting() 만 호출하면 된다(오늘부터 14일 × 9~22시 1시간).
+        보통은 인자 없이 schedule_meeting()만 호출하면 된다.
         특정 날짜만 보려면 dates에 직접 라벨을 넘긴다(예: ["6/30(월)", "7/1(화)"]).
 
-        멤버가 셀에 O/X 표시 → get_poll_results가 **X 0명 중 O 최다** 칸을 best_slots로
-        모두 반환(AI 분석 불필요; best_slot은 대표값). 생성 후 **팀장 확인받고** send_form.
-        전원 응답 시 자동 마감.
+        응답 결과는 form_manage(action='results')로 확인한다. X가 0명인 칸 중
+        O가 가장 많은 시간을 best_slots로 모두 반환한다. 생성 후에는 팀장 확인을
+        받고 form_manage(action='send')로 발송한다. 전원 응답 시 자동 마감된다.
 
         Args:
             days: 생성일부터 며칠치 (기본 14; dates 주면 무시)

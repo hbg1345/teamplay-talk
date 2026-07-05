@@ -182,6 +182,40 @@ async def clear_form(room_id: int, form_id: int, *, user_id: int | None = None) 
         storage.delete_kakao_task_link(link["id"])
 
 
+async def clear_form_pending(
+    form: dict[str, Any] | None = None,
+    *,
+    form_id: int | None = None,
+    user_id: int | None = None,
+) -> None:
+    """폼/체크인 응답 요청으로 만든 카카오 할 일을 삭제한다.
+
+    일반 폼은 kind=form/ref_id=form_id, 데일리 체크인은
+    kind=checkin/ref_id=_checkin_date 로 저장되므로 닫기/응답 경로에서 이
+    함수를 쓰면 두 종류를 같은 방식으로 정리할 수 있다.
+    """
+    if form is None and form_id is not None:
+        form = storage.get_form(form_id)
+    if form is None:
+        return
+    room_id = form.get("room_id")
+    if not room_id:
+        return
+    schema = form.get("schema_json") or {}
+    if schema.get("_workflow_kind") == "daily_checkin":
+        checkin_date = schema.get("_checkin_date")
+        if checkin_date is not None:
+            await clear_checkin(
+                int(room_id),
+                checkin_date,
+                user_ids=[user_id] if user_id is not None else None,
+            )
+        return
+    target_form_id = form.get("id") or form_id
+    if target_form_id is not None:
+        await clear_form(int(room_id), int(target_form_id), user_id=user_id)
+
+
 # ─────────────────────────── 개인 todo ───────────────────────────
 async def sync_todos(room_id: int, *, alarm_time: str = "0900") -> None:
     """활성 개인 todo(배정됨·todo/doing)마다 '할 일' 생성. 이미 있으면 skip.

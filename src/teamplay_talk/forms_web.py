@@ -16,7 +16,7 @@ import json as jsonlib
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse
 
-from . import storage
+from . import storage, task_sync
 from .ui_theme import (
     APP_FONT_LINKS,
     APP_REACT_LIQUID_BOOTSTRAP,
@@ -540,6 +540,11 @@ async def submit_form(request: Request) -> JSONResponse:
         answers = {}
 
     storage.save_response(form_id, answers, member_id=member_id)
+    if member_id is not None:
+        try:
+            await task_sync.clear_form_pending(form, form_id=form_id, user_id=member_id)
+        except Exception:
+            pass
     # 전원 응답 시 즉시 마감 + 드라이버 nudge (시간 마감은 스케줄러가 담당)
     if form.get("close_on_all") and not form["closed"] and storage.all_members_responded(form_id):
         from . import triggers

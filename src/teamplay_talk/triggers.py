@@ -64,13 +64,8 @@ async def process_closed_form(form_id: int) -> None:
     if claimed is not None:  # 마감 → 카카오 할 일(리마인더) 정리
         try:
             _f = storage.get_form(form_id) or {}
-            _rid = _f.get("room_id") or claimed.get("room_id")
-            _sch = _f.get("schema_json") or {}
-            if _rid:
-                if _sch.get("_workflow_kind") == "daily_checkin":
-                    await task_sync.clear_checkin(_rid, _sch.get("_checkin_date"))
-                else:
-                    await task_sync.clear_form(_rid, form_id)
+            if _f:
+                await task_sync.clear_form_pending(_f, form_id=form_id)
         except Exception:
             pass
     if claimed is None or claimed.get("creator_user_id") is None:
