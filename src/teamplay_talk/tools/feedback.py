@@ -268,19 +268,10 @@ def register(mcp: FastMCP) -> None:
     ) -> dict[str, Any]:
         """팀플톡 자체 폼이나 투표를 만들고 응답 링크를 반환합니다.
 
-        팀원은 이 링크를 카톡으로
-        받아 브라우저에서 응답한다(AI·앱·로그인 불필요).
-
-        질문 타입(type): single=단일선택, multi=복수선택, rank=선호 순위(드래그),
-        rating=점수, text=주관식.
-
-        anonymous=True는 공유 링크 1개를 쓰는 익명 폼이다. 의견수렴이나 여론조사처럼
-        전체 목소리를 모을 때 사용한다. 익명이라 중복 제출은 막을 수 없다.
-        anonymous=False는 멤버별 개인 링크를 쓰는 식별 폼이다. 역할분배, 진척체크,
-        구속력 있는 투표처럼 1인 1응답이 필요할 때 사용한다. 재제출하면 기존 응답을 교체한다.
-
-        생성 후 배포는 form_manage(action='send')로 한다. notify_room으로 폼 링크를
-        보내지 않는다. 익명 폼은 공유 링크를, 식별 폼은 각자 개인 링크를 보낸다.
+        단일선택, 복수선택, 선호 순위, 점수, 주관식 질문을 섞어 팀 의견을 받을 수
+        있습니다. 가벼운 의견수렴은 익명 폼이 좋고, 역할분배나 진척체크처럼 1인
+        1응답이 중요한 경우에는 멤버별 식별 폼이 좋습니다. 만든 뒤에는 폼 발송
+        기능으로 팀원에게 보내야 합니다.
 
         Args:
             title: 폼 제목 (예: "회식 날짜 투표")
@@ -374,19 +365,10 @@ def register(mcp: FastMCP) -> None:
     ) -> dict[str, Any]:
         """팀원에게 자유의견을 받아 의사결정을 시작합니다.
 
-        주제, 아이디어, 방향처럼 무엇으로 할지 정해야 할 때 사용한다.
-        약속 장소 후보 수집은 긴 자유서술 대신 gather_locations를 우선 사용한다.
-        사용자에게 후보를 떠넘기지 말고, 이 도구로 팀원에게 자유의견을 먼저 모은다.
-
-        기본 2단계 흐름:
-        (1) gather_opinions로 자유의견 폼 생성 → form_manage(action='send')로 발송
-        (2) form_manage(action='results')로 의견 확인 → AI가 항목화 → create_poll로
-            복수선택 본투표 생성 → form_manage(action='send')로 발송 → 결과 공지
-
-        약속 장소 정하기는 gather_locations → form_manage(action='send') → form_manage(action='results') →
-        정규화/카카오맵 MCP 장소명 확인 보조 → create_poll 본투표 흐름을 사용한다.
-
-        예: "회의 일정 잡자" → gather_opinions("회의 가능한 날짜·시간을 자유롭게 적어주세요").
+        주제, 아이디어, 진행 방향처럼 아직 후보가 정리되지 않았을 때 먼저 사용합니다.
+        팀원이 자유롭게 남긴 답변을 모은 뒤, AI가 후보로 정리하고 필요하면 본투표로
+        이어갈 수 있습니다. 약속 장소 후보처럼 입력 형식이 중요한 경우에는 장소 후보
+        수집 기능을 쓰는 편이 더 안정적입니다.
 
         Args:
             question: 팀원에게 물을 질문 (네가 맥락 보고 직접 작성)
@@ -475,15 +457,10 @@ def register(mcp: FastMCP) -> None:
     ) -> dict[str, Any]:
         """약속 장소 결정을 위한 위치 후보 수집 폼을 만듭니다.
 
-        약속 장소를 정하기 위한 전용 수집 폼을 만든다. 긴 자유서술 1칸 대신
-        짧은 위치 입력칸 5개와 기타 의견을 분리해 받아서 AI가 정규화하기 쉽게 한다.
-
-        기본 흐름:
-        gather_locations → form_manage(action='send') → form_manage(action='results') →
-        AI가 위치 후보 정규화 →
-        카카오맵 MCP가 있으면 장소명/역명/주소 확인 보조 →
-        없으면 카카오맵 MCP 연결 시 장소 확인이 더 정확해진다고 안내하고 제출 후보만 사용 →
-        create_poll(복수선택 본투표) → form_manage(action='send') → form_manage(action='results') → notify_room.
+        긴 자유서술 한 칸 대신 짧은 장소 입력칸 여러 개와 기타 의견을 나누어 받습니다.
+        응답이 모이면 비슷한 역, 상권, 장소명을 묶어 본투표 후보로 정리하기 쉽습니다.
+        카카오맵 MCP가 있으면 장소명 확인에 보조적으로 활용할 수 있고, 없으면 제출된
+        후보만 기준으로 정리합니다.
 
         Args:
             title: 폼 제목
@@ -610,15 +587,9 @@ def register(mcp: FastMCP) -> None:
     ) -> dict[str, Any]:
         """로드맵과 할 일에 대한 팀원 의견을 구조적으로 모읍니다.
 
-        로드맵 단계, 개인별 to-do, 병목/리스크, 스코프 조정을 정하기 전에 팀원 의견을
-        구조적으로 모은다. 결과 조회 뒤 AI가 답변을 정규화해 task_manage 또는
-        create_poll 우선순위 투표로 이어가야 한다.
-
-        기본 흐름:
-        gather_task_opinions → form_manage(action='send') → form_manage(action='results') →
-        AI가 태스크 후보/수정사항/리스크로 정규화 →
-        roadmap_manage(action='decompose') 또는 task_manage(action='add'/'update') 또는
-        create_poll → roadmap_manage(action='member_tasks'/'digest').
+        로드맵 단계, 개인 할 일, 병목, 프로젝트 범위 조정처럼 팀 운영에 반영해야 할
+        의견을 받을 때 사용합니다. 현재 로드맵 요약을 함께 보여주고, 응답을 바탕으로
+        할 일 수정, 우선순위 투표, 팀 공지로 이어갈 수 있습니다.
 
         Args:
             scope: roadmap=로드맵 단계, todo=구체 할일, blockers=막힌 점, scope=범위 조정
@@ -792,15 +763,11 @@ def register(mcp: FastMCP) -> None:
         },
     )
     async def get_poll_results(form_id: int) -> dict[str, Any]:
-        """Reads aggregated responses of a teamplay-talk(팀플톡) poll/form.
+        """팀플톡 폼과 투표의 응답 결과를 정리해서 보여줍니다.
 
-        폼 응답을 질문별로 집계해 반환한다. 객관식=선택지별 카운트와 승자/동점,
-        rank=순위점수와 상위 후보, rating=평균, 주관식=답변 목록. 식별 폼이면
-        멤버별 raw 응답도 포함한다.
-
-        결과에는 workflow_kind와 suggested_next_actions가 포함된다. 역할분배는 일반
-        create_poll이 아니라 assign_roles가 만든 ranking 폼이며, 결과 조회 후
-        finalize_roles → set_roles로 이어진다.
+        객관식은 선택지별 응답 수와 동점 후보를, 선호 순위는 점수와 상위 후보를,
+        점수형은 평균을, 주관식은 답변 목록을 보여줍니다. 식별 폼이면 멤버별 응답도
+        함께 확인할 수 있습니다.
 
         Args:
             form_id: 결과를 조회할 폼 ID
@@ -828,9 +795,10 @@ def register(mcp: FastMCP) -> None:
         },
     )
     async def close_poll(form_id: int) -> dict[str, Any]:
-        """Closes a teamplay-talk(팀플톡) poll and returns final results.
+        """팀플톡 폼이나 투표를 마감하고 최종 결과를 보여줍니다.
 
-        폼을 마감(추가 응답 차단)하고 최종 결과를 반환한다.
+        마감 후에는 추가 응답을 받지 않습니다. 응답 요청으로 생긴 팀원 할 일도 함께
+        정리됩니다.
 
         Args:
             form_id: 마감할 폼 ID
@@ -859,11 +827,11 @@ def register(mcp: FastMCP) -> None:
         },
     )
     async def send_form(form_id: int, message: str | None = None) -> dict[str, Any]:
-        """Sends a teamplay-talk(팀플톡) form link to the team via KakaoTalk.
+        """팀플톡 폼 링크를 카카오톡으로 팀원에게 보냅니다.
 
-        폼을 팀에 발송한다. **익명 폼이면 공유 링크 1개를 전원에게**, **식별 폼이면
-        각 멤버에게 자기 개인 링크를** 보낸다. create_poll 뒤 배포는 이걸로 한다.
-        (notify_room으로 폼 링크를 보내지 말 것 — 개인 링크가 섞인다.)
+        익명 폼은 같은 공유 링크를 보내고, 식별 폼은 각 멤버에게 개인 링크를 보냅니다.
+        역할분배, 진척체크처럼 1인 1응답이 필요한 폼은 반드시 이 발송 기능을 사용해야
+        합니다.
 
         Args:
             form_id: 발송할 폼 ID

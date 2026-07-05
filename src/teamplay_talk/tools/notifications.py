@@ -43,9 +43,10 @@ def register(mcp: FastMCP) -> None:
     async def notify_room(message: str, room_id: int | None = None) -> dict[str, Any]:
         """팀플톡 방 멤버 전원에게 카카오톡 알림을 보냅니다.
 
-        카카오 로그인을 마친 멤버의 '나와의 채팅방'으로 메시지를 발송한다.
-        room_id를 생략하면 현재 작업 방을 대상으로 한다. 폼 링크 배포에는 이
-        도구가 아니라 form_manage(action='send')를 사용한다.
+        카카오 로그인을 마친 멤버의 '나와의 채팅방'으로 공지와 결정 사항을
+        보냅니다. 투표 결과 공유, 회의 확정, 다음 행동 안내처럼 팀 전체가 알아야
+        하는 내용을 전할 때 사용합니다. 폼 응답 링크는 폼 발송 기능을 사용해야
+        개인별 링크가 섞이지 않습니다.
 
         Args:
             message: 보낼 메시지 내용

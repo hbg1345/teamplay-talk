@@ -636,9 +636,9 @@ def install(mcp: FastMCP) -> None:
     ) -> dict[str, Any]:
         """팀플톡 폼과 투표를 찾고, 보내고, 결과를 확인하거나 마감합니다.
 
-        진행 중인 폼이나 투표를 물으면 action='list'를 사용한다. 발송, 결과 확인,
-        마감은 form_id가 가장 정확하다. form_id를 모르면 query에 제목 일부를
-        넣어 현재 작업 방에서 찾는다.
+        진행 중인 폼 목록을 확인하고, 만든 폼을 팀원에게 보내거나 응답 결과를 정리할
+        때 사용합니다. 제목 일부로 찾을 수 있지만, 여러 폼이 비슷하면 폼 번호를 함께
+        확인하는 편이 안전합니다.
         """
         if action == "list":
             return await _list_forms(room_id, status=status, query=query)
@@ -679,7 +679,7 @@ def install(mcp: FastMCP) -> None:
         close_minutes: int | None = None,
         message: str | None = None,
     ) -> dict[str, Any]:
-        """팀플톡 역할 분배를 시작하고, 응답 기반 배정안을 계산하거나 확정합니다."""
+        """팀플톡 역할 선호도를 받고, 균형 잡힌 배정안을 계산하거나 확정합니다."""
         target = {
             "start": "assign_roles",
             "finalize": "finalize_roles",
@@ -720,7 +720,7 @@ def install(mcp: FastMCP) -> None:
         dry_run: bool = False,
         room_id: int | None = None,
     ) -> dict[str, Any]:
-        """팀플톡 로드맵을 만들고, 일정을 배치하고, 팀원별 할 일을 관리합니다."""
+        """프로젝트 로드맵을 만들고, 일정과 팀원별 할 일로 이어갑니다."""
         target = {
             "build": "build_roadmap",
             "view": "view_roadmap",
@@ -769,7 +769,7 @@ def install(mcp: FastMCP) -> None:
         after_task_ids: list[int] | None = None,
         before_task_ids: list[int] | None = None,
     ) -> dict[str, Any]:
-        """팀플톡 로드맵의 태스크를 하나씩 추가, 수정, 삭제합니다."""
+        """로드맵의 개별 할 일을 추가하거나 수정하고 삭제합니다."""
         target = {"add": "add_task", "update": "update_task", "delete": "delete_task"}[action]
         return await _run_legacy(legacy, target, {
             "task_id": task_id,
@@ -808,7 +808,7 @@ def install(mcp: FastMCP) -> None:
         apply_checkin: bool = True,
         publish: bool = False,
     ) -> dict[str, Any]:
-        """팀플톡 데일리 체크인 폼을 만들고, 응답 반영과 팀 리포트를 처리합니다."""
+        """데일리 체크인을 만들고, 응답을 할 일 상태와 팀 리포트에 반영합니다."""
         target = {
             "create_checkin": "create_daily_checkin",
             "apply_checkin": "apply_daily_checkin",
@@ -905,7 +905,7 @@ def install(mcp: FastMCP) -> None:
         preset: str | None = None,
         limit: int | None = None,
     ) -> dict[str, Any]:
-        """호출자의 카카오톡 캘린더 일정을 생성, 조회, 수정, 삭제합니다."""
+        """내 카카오톡 캘린더 일정을 만들고 확인하거나 수정, 삭제합니다."""
         target = {
             "create": "calendar_create_event",
             "list": "calendar_list_events",
