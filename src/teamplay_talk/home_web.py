@@ -364,17 +364,14 @@ footer{padding:50px 0 58px;border-top:1px solid var(--line)}
 .sr-rankchip{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;color:var(--ink-soft);background:rgba(124,58,237,.07);border:1px solid var(--line);border-radius:999px;padding:4px 10px}
 .sr-rankchip b{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:999px;background:var(--violet);color:#fff;font-size:10px}
 .sr-rankchip.on{animation:srPick .28s cubic-bezier(.16,1,.3,1)}
-.sr-pick{display:flex;flex-wrap:wrap;gap:6px}
-.sr-pickchip{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:700;color:var(--muted);background:rgba(124,58,237,.05);border:1px solid var(--line);border-radius:999px;padding:4px 11px;transition:background .28s,color .28s,border-color .28s}
-.sr-pickchip.on{animation:srPick .28s cubic-bezier(.16,1,.3,1)}
-.sr-pickchip.want{color:#fff;background:var(--violet);border-color:var(--violet)}
-.sr-pickchip.want::before{content:"\2713";font-size:10.5px;font-weight:900}
-.sr-pickchip.avoid{color:#c53d5a;background:rgba(214,64,94,.1);border-color:rgba(214,64,94,.38)}
-.sr-pickchip.avoid::before{content:"\00d7";font-size:12px;font-weight:900;line-height:1}
 .sr-poll{display:flex;flex-direction:column;gap:5px}
-.sr-opt{font-size:12.5px;font-weight:700;color:var(--muted);background:rgba(124,58,237,.05);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+.sr-opt{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--muted);background:rgba(124,58,237,.05);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
 .sr-opt.sel{color:var(--violet);background:rgba(124,58,237,.12);border-color:rgba(124,58,237,.4);font-weight:800;animation:srPick .28s cubic-bezier(.16,1,.3,1)}
 .sr-opt.sel::before{content:"● ";font-size:10px}
+.sr-opt.want{color:var(--violet);background:rgba(124,58,237,.12);border-color:rgba(124,58,237,.42);font-weight:800;animation:srPick .28s cubic-bezier(.16,1,.3,1)}
+.sr-opt.want::before{content:"O";font-weight:900}
+.sr-opt.avoid{color:#c53d5a;background:rgba(214,64,94,.1);border-color:rgba(214,64,94,.4);font-weight:800;animation:srPick .28s cubic-bezier(.16,1,.3,1)}
+.sr-opt.avoid::before{content:"×";font-weight:900;font-size:14px;line-height:1}
 .sr-form-submit{align-self:flex-end;padding:6px 15px;border-radius:999px;border:0;font-family:inherit;font-size:12px;font-weight:800;color:#fff;background:var(--violet);cursor:default;transition:background .25s}
 .sr-form.done .sr-form-submit{background:#22c55e}
 .sr-form.done .sr-form-submit{animation:srSubmit .36s cubic-bezier(.16,1,.3,1)}
@@ -539,7 +536,7 @@ function cdPlay(i){
     cmd:'로드맵 기준 <b>역할분배</b> 시작해줘',
     draft:'로드맵에서 <b>책임 카드 6개</b>로 나눴어요.<br>기획 · 백엔드 API · 폼 UX · 대시보드 · QA · 데모 스토리<br><span>선호도 조사 보낼까요?</span>',
     kko:'<b>[팀플톡]</b> 역할 선호도 조사<br><span>응답하기 &#9656;</span>',
-    form:{type:'pick', title:'맡고 싶은 것 · 피하고 싶은 것', items:[{t:'기획'},{t:'백엔드 API',m:'avoid'},{t:'폼 UX',m:'want'},{t:'대시보드'},{t:'QA'},{t:'데모 스토리',m:'want'}]},
+    form:{type:'poll', title:'맡고 싶은 것 · 피하고 싶은 것', opts:['폼 UX','대시보드','데모 스토리'], want:'폼 UX', avoid:'대시보드'},
     result:'박세원 <b>기획 · QA</b> · 함봉구 <b>백엔드 API</b><br>이민지 <b>폼 UX · 데모 스토리</b> · 김주호 <b>대시보드</b> <span>확정?</span>'},
 
    {cap:'할 일로 쪼개요', sub:'로드맵 단계 × 역할 → 개인별 todo → 일정', member:'notice', who:'이민지', channel:'카카오톡', big:true, think:'할 일 분해 중', send:'카톡 전달',
@@ -644,9 +641,6 @@ function cdPlay(i){
     if(f.type==='rank'){
       return '<div class="sr-rank">'+f.items.map(function(it,i){ return '<span class="sr-rankchip"><b>'+(i+1)+'</b>'+it+'</span>'; }).join('')+'</div>';
     }
-    if(f.type==='pick'){
-      return '<div class="sr-pick">'+f.items.map(function(it,i){ return '<span class="sr-pickchip" data-i="'+i+'">'+it.t+'</span>'; }).join('')+'</div>';
-    }
     return '<div class="sr-form-field"></div>';
   }
   function typeInto(el,text,my){
@@ -680,7 +674,11 @@ function cdPlay(i){
         if(reduce){ go(); } else { after((on.length+k)*160,function(){ if(my!==SR.tok)return; go(); }); }
       });
     } else if(f.type==='poll'){
-      var o=b.querySelector('.sr-opt[data-opt="'+f.sel+'"]'); if(o)o.classList.add('sel');
+      var pollMark=function(sel,cls,delay){ if(!sel)return; var e=b.querySelector('.sr-opt[data-opt="'+sel+'"]'); if(!e)return;
+        if(reduce){ e.classList.add(cls); } else { after(delay,function(){ if(my!==SR.tok)return; e.classList.add(cls); sd(memberBox); }); } };
+      if(f.sel){ pollMark(f.sel,'sel',0); }
+      pollMark(f.want,'want',reduce?0:200);
+      pollMark(f.avoid,'avoid',reduce?0:560);
     } else if(f.type==='check'){
       f.items.forEach(function(it,i){ if(it.on){
         var go=function(){ var e=b.querySelector('.sr-checkitem[data-i="'+i+'"]'); if(e)e.classList.add('on'); };
@@ -689,13 +687,6 @@ function cdPlay(i){
       var note=b.querySelector('.sr-checknote'); if(note){ if(reduce){ note.style.display='block'; note.textContent=f.note; } else { after(f.items.length*180+150,function(){ if(my!==SR.tok)return; note.style.display='block'; typeInto(note,f.note,my); sd(memberBox); }); } }
     } else if(f.type==='rank'){
       var chips=b.querySelectorAll('.sr-rankchip'); Array.prototype.forEach.call(chips,function(c,i){ c.classList.add('on'); var bb=c.querySelector('b'); if(bb)bb.textContent=(i+1); });
-    } else if(f.type==='pick'){
-      var pk=0;
-      f.items.forEach(function(it,i){ if(!it.m)return;
-        var idx=i, ord=pk++;
-        if(reduce){ var e0=b.querySelector('.sr-pickchip[data-i="'+idx+'"]'); if(e0)e0.classList.add('on',it.m); }
-        else { after(ord*260+150,function(){ if(my!==SR.tok)return; var e=b.querySelector('.sr-pickchip[data-i="'+idx+'"]'); if(e)e.classList.add('on',it.m); sd(memberBox); }); }
-      });
     } else {
       var fld=b.querySelector('.sr-form-field'); if(fld)typeInto(fld,f.answer,my);
     }
@@ -750,7 +741,7 @@ function cdPlay(i){
       beats.push([t,function(){ flash(memberSlot); kkOn(lbl); setStatus(S.send||'카톡 전송'); bubble(memberBox,'kko-in',S.kko); }]); t+=(S.big?1900:1100);
       if(m==='form'||m==='autoform'){
         beats.push([t,function(){ showForm(S.form); setStatus('폼 작성'); }]); t+=920;
-        beats.push([t,function(){ fillForm(S.form); }]); t+=(S.form&&S.form.type==='grid'?1500:(S.form&&(S.form.type==='rank'||S.form.type==='pick')?1450:1100));
+        beats.push([t,function(){ fillForm(S.form); }]); t+=(S.form&&S.form.type==='grid'?1500:(S.form&&S.form.type==='rank'?1450:1100));
         beats.push([t,function(){ submitForm(); setStatus('제출'); }]); t+=720;
         beats.push([t,function(){ pulse(); setStatus('응답 수집'); }]); t+=540;
       }
@@ -976,7 +967,7 @@ var CD_EN=[
 var STEPS_EN=[
  {cap:"Create the room",sub:"Owner creates the room · teammates join via PlayMCP",member:"join",who:"Minji",channel:"PlayMCP",think:"Creating",cmd:"Create a room for the Kakao MCP contest",draft:"<b>'Kakao MCP contest room'</b> created.<br>Invite code <b>AbC123xY</b> <span>share it with your team</span>",code:"AbC123xY",result:"4 teammates <b>joined via PlayMCP</b>.<br><span>Shall we set the roadmap now?</span>"},
  {cap:"Set the roadmap, gather input",sub:"AI drafts milestones → team review → lock in",member:"form",who:"Minji",channel:"KakaoTalk",think:"Planning",send:"Sending",cmd:"Make a roadmap for our contest entry. Submission <b>7/10</b>. Gather the team's input too",draft:"<b>6-stage roadmap</b> draft.<br>Topic · Core design · Dev·integration · Demo·UX · Test·QA · Submit <span>~7/10</span><br><span>Sending a review form to the team</span>",kko:"<b>[TeamplayTalk]</b> Roadmap review request<br><span>Respond &#9656;</span>",form:{type:"text",title:"Roadmap review · comments",answer:"Add a security-check · user-feedback stage before testing too"},result:"Feedback applied — added a <b>security-check · user-feedback</b> stage.<br>Locked in as a 7-stage roadmap."},
- {cap:"Split the roles",sub:"Responsibility cards → preference form → balanced assignment",member:"form",who:"Minji",channel:"KakaoTalk",think:"Roles",send:"Sending",cmd:"Start <b>role assignment</b> based on the roadmap",draft:"<b>6 responsibility cards</b> from the roadmap.<br>Planning · Backend API · Form UX · Dashboard · QA · Demo story<br><span>Send the preference survey?</span>",kko:"<b>[TeamplayTalk]</b> Role preference survey<br><span>Respond &#9656;</span>",form:{type:"pick",title:"Want · avoid",items:[{t:"Planning"},{t:"Backend API",m:"avoid"},{t:"Form UX",m:"want"},{t:"Dashboard"},{t:"QA"},{t:"Demo story",m:"want"}]},result:"Sewon <b>Planning · QA</b> · Bonggu <b>Backend API</b><br>Minji <b>Form UX · Demo story</b> · Juho <b>Dashboard</b> <span>Confirm?</span>"},
+ {cap:"Split the roles",sub:"Responsibility cards → preference form → balanced assignment",member:"form",who:"Minji",channel:"KakaoTalk",think:"Roles",send:"Sending",cmd:"Start <b>role assignment</b> based on the roadmap",draft:"<b>6 responsibility cards</b> from the roadmap.<br>Planning · Backend API · Form UX · Dashboard · QA · Demo story<br><span>Send the preference survey?</span>",kko:"<b>[TeamplayTalk]</b> Role preference survey<br><span>Respond &#9656;</span>",form:{type:"poll",title:"Want · avoid",opts:["Form UX","Dashboard","Demo story"],want:"Form UX",avoid:"Dashboard"},result:"Sewon <b>Planning · QA</b> · Bonggu <b>Backend API</b><br>Minji <b>Form UX · Demo story</b> · Juho <b>Dashboard</b> <span>Confirm?</span>"},
  {cap:"Break into to-dos",sub:"Roadmap stage × role → personal todos → schedule",member:"notice",who:"Minji",channel:"KakaoTalk",big:true,think:"Splitting",send:"Sending",cmd:"Create <b>todos</b> for the team by roadmap stage",draft:"Split the 7 stages into <b>role-based todos</b> with deadlines.<br>Planning·PM → Sewon · Backend → Bonggu · Frontend → Juho · Design·UX → Minji",kko:"<b>[TeamplayTalk] My to-dos · Minji</b><br><b>This week</b><br>· Polish form-screen UX <span>~7/8</span><br>· Organize dashboard IA <span>~7/9</span><br><b>Next week</b><br>· Final demo-screen check <span>~7/10</span><br><span>Check them off at the night check-in when done</span>",result:"Assigned <b>todos with deadlines</b> and reminders to everyone.<br><span>Shall we set a meeting time now?</span>"},
  {cap:"Ask the team",sub:"Open question → poll form → tally",member:"form",who:"Minji",channel:"KakaoTalk",think:"Building",send:"Sending",cmd:"Ask the team which cloud platform to use",draft:"Built a <b>cloud poll</b>.<br>AWS · GCP · Azure <span>Send to the team?</span>",kko:"<b>[TeamplayTalk]</b> Cloud platform poll<br><span>Respond &#9656;</span>",form:{type:"poll",title:"Which cloud should we go with?",opts:["AWS","GCP","Azure"],sel:"GCP"},result:"Tallied — <b>GCP</b> wins with 3 votes.<br>Announced to the team."},
  {cap:"Set a meeting time",sub:"Grid check → suggest overlap → add to Talk Calendar",member:"form",who:"Minji",channel:"KakaoTalk",think:"Building",send:"Sending",cmd:"Find a time for this week's <b>full-team meeting</b>",draft:"Built a date×time <b>availability grid</b>.<br><span>Send it to the team?</span>",kko:"<b>[TeamplayTalk]</b> Meeting availability<br><span>Check all slots that work &#9656;</span>",form:{type:"grid",title:"Meeting availability",cols:["Mon","Tue","Wed","Thu"],rows:["7 PM","8 PM","9 PM"],on:["2,0","0,1","1,3","2,3"],x:["0,0","2,1"]},result:"<b>Mon 9:00 PM</b> — all 4 free.<br><span>Lock this time?</span>",extra:{cmd:"Yes, add it to Talk Calendar too",status:"Calendar",kko:"<b>[Talk Calendar]</b> Event added<br><b>Team meeting</b> · Mon 7/6, 9:00 PM<br><span>Reminder set 30 min before</span>",result:"<b>Added to Talk Calendar</b> — reminders set for all.<br><span>Collect the meeting place next?</span>"}},
