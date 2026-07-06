@@ -102,11 +102,12 @@ def join_room(
             # 이미 참여한 경우 중복 추가하지 않음
             cur.execute(
                 "INSERT INTO room_members (room_id, user_id) VALUES (%s, %s) "
-                "ON CONFLICT (room_id, user_id) DO NOTHING",
+                "ON CONFLICT (room_id, user_id) DO NOTHING RETURNING room_id",
                 (room["id"], user["id"]),
             )
+            joined = cur.fetchone() is not None
         c.commit()
-    return {"room": room, "user": user}
+    return {"room": room, "user": user, "joined": joined}
 
 
 def get_room(room_id: int, *, include_deleted: bool = False) -> dict[str, Any] | None:

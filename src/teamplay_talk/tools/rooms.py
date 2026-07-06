@@ -18,6 +18,7 @@ from fastmcp import FastMCP
 from .. import storage
 from ..auth_web import build_invite_oauth_url
 from ..identity import resolve_caller
+from ..room_events import notify_owner_member_joined
 
 _NEED_AUTH = {
     "ok": False,
@@ -246,6 +247,11 @@ def register(mcp: FastMCP) -> None:
             return {"ok": False, "error": "유효하지 않은 초대 코드입니다."}
         room = result["room"]
         storage.set_active_room(caller["id"], room["id"])
+        owner_notification = await notify_owner_member_joined(
+            room,
+            result["user"],
+            joined=bool(result.get("joined")),
+        )
         owner_name = _room_owner_name(room)
         members = _member_summary(room["id"])
         return {
@@ -255,6 +261,7 @@ def register(mcp: FastMCP) -> None:
             "owner_name": owner_name,
             "member_count": len(members),
             "members": members,
+            "owner_notification": owner_notification,
             "active": True,
             "message": (
                 f"'{room['name']}' 참여 완료 — 현재 작업 방으로 설정됨. "

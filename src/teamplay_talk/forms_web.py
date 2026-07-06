@@ -59,14 +59,19 @@ __APP_REACT_LIQUID_IMPORTS__
  .sd-question__header{padding-bottom:8px}
  .sd-question__title{font-weight:800;color:var(--ink);line-height:1.35}
  .sd-input,.sd-comment,.sd-dropdown,.sd-tagbox{border:0!important;border-radius:var(--radius)!important;background:radial-gradient(260px 86px at 12% 0%,rgba(255,255,255,.82),transparent 68%),linear-gradient(180deg,rgba(255,255,255,.72),rgba(255,250,240,.54))!important;color:var(--ink)!important;box-shadow:0 0 0 1px rgba(33,24,8,.13),inset 0 1px 0 rgba(255,255,255,.88),inset 0 -1px 0 rgba(33,24,8,.035),0 12px 28px rgba(45,36,18,.055)!important;backdrop-filter:blur(14px) saturate(1.22);-webkit-backdrop-filter:blur(14px) saturate(1.22)}
+ .sd-comment{box-sizing:border-box!important;display:block!important;inline-size:100%!important;width:100%!important;max-width:100%!important;min-width:0!important;resize:vertical!important;overflow:auto!important}
+ .sd-question__content,.sd-comment__content{min-width:0!important;max-width:100%!important;overflow:hidden!important}
  .sd-input:focus,.sd-comment:focus,.sd-dropdown:focus{outline:0!important;box-shadow:0 0 0 1px rgba(37,33,29,.28),0 0 0 4px rgba(254,229,0,.26),inset 0 1px 0 rgba(255,255,255,.88),0 14px 32px rgba(45,36,18,.08)!important}
  .sd-selectbase{display:grid!important;gap:10px!important}
  .sd-selectbase__item,.sd-ranking-item{border:0!important;border-radius:var(--radius)!important;background:radial-gradient(220px 72px at 12% 0%,rgba(255,255,255,.76),transparent 68%),linear-gradient(180deg,rgba(255,255,255,.68),rgba(255,250,240,.52))!important;box-shadow:0 0 0 1px rgba(33,24,8,.11),inset 0 1px 0 rgba(255,255,255,.82),0 10px 24px rgba(45,36,18,.05)!important}
- .sd-selectbase__item{display:flex!important;align-items:stretch!important;min-height:52px!important;padding:0!important;overflow:hidden!important}
- .sd-selectbase__label{display:flex!important;align-items:center!important;gap:12px!important;width:100%!important;min-height:52px!important;padding:0 16px!important;cursor:pointer!important}
+ .sd-selectbase__item{display:flex!important;align-items:stretch!important;min-height:52px!important;padding:0!important;position:relative!important;isolation:isolate!important;overflow:visible!important}
+ .sd-selectbase__label{display:flex!important;align-items:center!important;gap:12px!important;width:100%!important;min-height:52px!important;padding:0 16px!important;cursor:pointer!important;position:relative!important;z-index:1!important}
  .sd-item__decorator{flex:0 0 24px!important;margin:0!important}
  .sd-item__control-label{flex:1 1 auto!important;min-width:0!important;line-height:1.35!important;padding-top:1px!important;color:var(--ink)!important;word-break:keep-all;overflow-wrap:anywhere}
  .sd-selectbase__item.sd-item--checked{box-shadow:0 0 0 1px rgba(216,188,0,.34),inset 0 1px 0 rgba(255,255,255,.82),0 12px 26px rgba(254,229,0,.10)!important}
+ .tp-role-avoids-question .sd-selectbase__item.sd-item--checked,.tp-role-avoids-question .sd-selectbase__item.tp-avoid-selected{background:radial-gradient(220px 72px at 12% 0%,rgba(255,255,255,.72),transparent 68%),linear-gradient(180deg,rgba(255,235,239,.90),rgba(255,244,246,.62))!important;box-shadow:0 0 0 1px rgba(191,64,88,.34),inset 0 1px 0 rgba(255,255,255,.82),0 12px 26px rgba(191,64,88,.11)!important}
+ .tp-role-avoids-question .sd-selectbase__item.sd-item--checked .sd-item__control-label,.tp-role-avoids-question .sd-selectbase__item.tp-avoid-selected .sd-item__control-label{color:#8b2639!important}
+ .tp-role-avoids-question .sd-selectbase__item.sd-item--checked .sd-item__decorator,.tp-role-avoids-question .sd-selectbase__item.tp-avoid-selected .sd-item__decorator{box-shadow:0 0 0 2px rgba(191,64,88,.22)!important}
  .sd-selectbase__item:focus-within,.sd-ranking-item:focus-within{box-shadow:0 0 0 3px rgba(254,229,0,.26)!important}
  .sd-btn,.sd-navigation__complete-btn{position:relative!important;overflow:hidden!important;border:0!important;border-radius:var(--radius)!important;background:radial-gradient(120px 52px at 18% 0%,rgba(255,255,255,.70),transparent 70%),linear-gradient(135deg,#fff178,var(--kakao-yellow))!important;color:var(--kakao-black)!important;font-weight:850!important;box-shadow:0 0 0 1px rgba(118,98,0,.18),inset 0 1px 0 rgba(255,255,255,.84),inset 0 -1px 0 rgba(118,98,0,.20),0 16px 34px rgba(254,229,0,.23)!important}
  .sd-btn:hover,.sd-navigation__complete-btn:hover{transform:translateY(-1px);box-shadow:0 0 0 1px rgba(118,98,0,.22),inset 0 1px 0 rgba(255,255,255,.88),inset 0 -1px 0 rgba(118,98,0,.22),0 18px 40px rgba(254,229,0,.28)!important}
@@ -141,6 +146,9 @@ __APP_REACT_LIQUID_IMPORTS__
  .sd-input,.sd-comment,.sd-dropdown,.sd-tagbox,.schedule__note textarea{background:rgba(255,253,247,.82)!important;box-shadow:0 0 0 1px rgba(33,24,8,.12),inset 0 1px 0 rgba(255,255,255,.54)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
  .sd-selectbase__item,.sd-ranking-item{background:rgba(255,253,247,.76)!important;box-shadow:0 0 0 1px rgba(33,24,8,.10)!important}
  .sd-selectbase__item{padding:0!important}
+ .sd-question__content{overflow:visible!important}
+ .tp-role-avoids-question .sd-selectbase__item.sd-item--checked,.tp-role-avoids-question .sd-selectbase__item.tp-avoid-selected{background:linear-gradient(180deg,rgba(255,205,214,.97),rgba(255,222,229,.92))!important;box-shadow:0 0 0 1.5px rgba(198,52,78,.62),inset 0 1px 0 rgba(255,255,255,.55),0 8px 20px rgba(198,52,78,.16)!important}
+ .tp-role-avoids-question .sd-selectbase__item.sd-item--checked .sd-item__control-label,.tp-role-avoids-question .sd-selectbase__item.tp-avoid-selected .sd-item__control-label{color:#a11d38!important}
  .schedule{background:rgba(255,252,244,.70)!important;box-shadow:0 0 0 1px rgba(33,24,8,.10),0 16px 42px rgba(45,36,18,.08)!important;backdrop-filter:blur(10px) saturate(1.04)!important;-webkit-backdrop-filter:blur(10px) saturate(1.04)!important}
  .schedule__head,.day-panel__head{background:rgba(255,252,244,.62)!important}
  .schedule__pill,.choice,.date-tab,.day-action{background:linear-gradient(180deg,rgba(255,255,255,.62),rgba(255,250,240,.38))!important;box-shadow:0 0 0 1px rgba(33,24,8,.10),0 8px 18px rgba(45,36,18,.045)!important}
@@ -229,6 +237,36 @@ __APP_REACT_LIQUID_IMPORTS__
     window.requestAnimationFrame(function(){
       if (window.enhanceLiquidGlass) window.enhanceLiquidGlass();
     });
+  }
+  function choiceValueFromItem(item) {
+    var input = item && item.querySelector ? item.querySelector("input") : null;
+    if (input && input.value) return String(input.value);
+    var label = item && item.querySelector ? item.querySelector(".sd-item__control-label") : null;
+    return String((label ? label.textContent : item ? item.textContent : "") || "").trim();
+  }
+  function selectedValueMap(raw) {
+    var values = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+    var map = {};
+    values.forEach(function(value){
+      map[String(value)] = true;
+    });
+    return map;
+  }
+  function syncRoleAvoidChoices(survey) {
+    var selected = selectedValueMap(survey && survey.getValue ? survey.getValue("role_avoids") : []);
+    document.querySelectorAll(".tp-role-avoids-question .sd-selectbase__item").forEach(function(item){
+      var input = item.querySelector("input");
+      var isChecked = Boolean(input && input.checked) || item.classList.contains("sd-item--checked");
+      var value = choiceValueFromItem(item);
+      item.classList.toggle("tp-avoid-selected", isChecked || Boolean(selected[value]));
+    });
+  }
+  function markSurveyQuestion(question, element, survey) {
+    if (!question || !element) return;
+    if (question.name === "role_avoids") {
+      element.classList.add("tp-role-avoids-question");
+      window.setTimeout(function(){ syncRoleAvoidChoices(survey); }, 0);
+    }
   }
   function renderAvailabilityForm(schema, grid) {
     var container = document.getElementById("surveyContainer");
@@ -446,6 +484,14 @@ __APP_REACT_LIQUID_IMPORTS__
       survey.completeText = "제출";
       survey.showCompletedPage = false;
       survey.completedHtml = "";
+      survey.onAfterRenderQuestion.add(function(sender, options){
+        markSurveyQuestion(options.question, options.htmlElement, sender);
+      });
+      survey.onValueChanged.add(function(sender, options){
+        if (options.name === "role_avoids") {
+          window.setTimeout(function(){ syncRoleAvoidChoices(sender); }, 0);
+        }
+      });
       survey.onComplete.add(function(sender){
         postAnswers(sender.data).catch(function(e){ showErr("제출 실패: " + e); });
       });

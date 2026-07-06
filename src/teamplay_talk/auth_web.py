@@ -24,6 +24,7 @@ from starlette.responses import HTMLResponse
 
 from . import kakao, kakao_store, storage
 from .config import settings
+from .room_events import notify_owner_member_joined
 
 # 초대 링크(state) 유효시간. 친구가 링크를 받고 로그인하는 데 충분한 시간.
 _STATE_TTL_SECONDS = 60 * 60 * 24  # 24시간
@@ -154,6 +155,11 @@ async def kakao_callback(request: Request) -> HTMLResponse:
     )
 
     room = result["room"]
+    await notify_owner_member_joined(
+        room,
+        result["user"],
+        joined=bool(result.get("joined")),
+    )
     return _page(
         "참여 완료 🎉",
         f"'{room['name']}' 방에 참여했어요! 이제 카카오로 팀 알림을 받고, 폼에 응답할 수 있습니다. "

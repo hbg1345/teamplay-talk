@@ -95,6 +95,14 @@ function propsFor(element) {
 
 function shouldSkipLiquid(element) {
   if (!element || element.matches(repeatedDashboardSelector)) return true;
+  if (
+    element.closest(".sd-root-modern") &&
+    element.matches(
+      ".sd-selectbase__item,.sd-ranking-item,.sd-input,.sd-comment,.sd-dropdown,.sd-tagbox,.sd-btn,.sd-navigation__complete-btn"
+    )
+  ) {
+    return true;
+  }
   return Boolean(element.closest(".timeline") && element.matches(".glass-panel,.roadmap-panel"));
 }
 

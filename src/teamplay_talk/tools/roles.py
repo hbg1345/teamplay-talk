@@ -5,6 +5,7 @@
 
 핵심:
 - **전체집합 커버**: 모든 책임 카드가 누군가에게 배정된다(멤버<카드면 한 명이 여러 책임).
+- **공동 owner**: 멤버가 카드보다 많거나 책임이 큰 경우 한 책임 카드에 여러 멤버가 배정될 수 있다.
 - **난이도 균형**: 각 멤버의 난이도 합이 비슷하게 (LPT 그리디).
 - **선호/회피 반영**: 동률일 때 그 책임을 선호한 멤버에게, 회피한 멤버는 뒤로.
 - 난이도 점수는 **멤버 폼엔 안 보이고**(균형 배분용), 매칭은 서버에서 결정적으로.
@@ -19,45 +20,6 @@ from pydantic import BaseModel, Field
 
 from .. import kakao_store, storage
 from .guards import require_form, require_room
-
-_BAD_GENERIC_ROLES = {
-    "팀원",
-    "담당자",
-    "작업자",
-    "참여자",
-    "대회 주제 선정",
-    "아이디어 브레인스토밍",
-    "최종 제출",
-}
-
-_FINAL_ROLE_MARKERS = ("담당", "리드", "총괄", "매니저", "관리자")
-
-
-def _norm_label(value: str) -> str:
-    return "".join(ch for ch in value.strip().lower() if ch.isalnum())
-
-
-def _is_task_like_role(name: str) -> bool:
-    """역할이 아니라 로드맵 단계/할일처럼 보이는 이름을 잡는다."""
-    stripped = name.strip()
-    if stripped in _BAD_GENERIC_ROLES:
-        return True
-    task_like_phrases = {
-        "주제 선정",
-        "아이디어 브레인스토밍",
-        "테스트 및 피드백",
-        "최종 제출",
-        "결과 제출",
-        "중간 점검",
-        "최종 점검",
-    }
-    return stripped in task_like_phrases
-
-
-def _looks_like_final_role_bundle(name: str) -> bool:
-    """책임 카드가 아니라 사람에게 붙일 최종 역할명처럼 보이는 이름을 잡는다."""
-    stripped = name.strip()
-    return any(stripped.endswith(marker) for marker in _FINAL_ROLE_MARKERS)
 
 
 def _role_design_brief(
@@ -77,25 +39,24 @@ def _role_design_brief(
         for task in tasks
         if (task.get("task_type") or "milestone") == "milestone"
     ]
-    card_bounds = _responsibility_card_bounds(member_count)
     return {
         "principle": (
-            "처음부터 큰 역할명을 정하지 않는다. 로드맵을 읽고, 최종 산출물을 만들기 위해 필요한 "
-            "책임 카드를 MECE하게 분해한 뒤 난이도와 연관도를 붙인다. 최종 역할 묶음은 팀원 응답 후 배정 단계에서 만든다."
+            "로드맵과 프로젝트 맥락을 읽고, 팀원이 선호도를 고를 수 있는 역할/책임 카드를 자유롭게 만든다. "
+            "카드명은 프로젝트에 맞게 자연스럽게 정하고, 서버는 이름을 강하게 검열하지 않는다. "
+            "difficulty와 slots는 이후 균형 배정에만 사용한다."
         ),
         "roadmap_milestones": task_lines,
         "team_size": member_count,
-        "responsibility_card_count": card_bounds,
-        "preference_limits_if_preferred_count": _preference_limits(card_bounds["preferred"]),
+        "responsibility_card_count": {
+            "basis": "ai_discretion",
+            "hard_limit": False,
+        },
         "role_design_steps": [
-            "1. 최종 산출물을 한 문장으로 정의한다.",
-            "2. 각 마일스톤에서 빠지면 안 되는 책임 단위를 뽑는다.",
-            "3. 책임 카드는 팀원 수의 1~2배 범위로 만든다. preferred 개수에 최대한 맞춘다.",
-            "4. 너무 작은 할일은 합치고, 너무 큰 책임은 둘로 나눈다.",
-            "5. 카드명은 2~14자 안팎의 명사구로 만들고, 로드맵 단계명과 똑같이 쓰지 않는다.",
-            "6. 각 카드는 서로 겹치지 않게 만들고, 전체 로드맵 책임이 빠지지 않게 한다.",
-            "7. slots는 호환 필드다. 특별히 공동 책임이 필요한 경우가 아니면 1로 둔다. 큰 일은 slots를 늘리기보다 책임 카드를 나눈다.",
-            "8. 난이도 8 이상이거나 혼자 수행하기 어렵다고 판단한 책임 카드는 finalize 단계에서 helper가 붙을 수 있다.",
+            "1. 로드맵과 최종 산출물을 보고 팀원이 고를 역할/책임 카드를 만든다.",
+            "2. 카드 개수와 이름은 프로젝트 성격에 맞게 자유롭게 정한다.",
+            "3. 각 카드에 difficulty(1~10)를 붙인다. 멤버에게는 보이지 않고 균형 배분에만 쓴다.",
+            "4. 같은 카드를 여러 명이 함께 맡는 것이 자연스러우면 slots(1~10)를 2 이상으로 둔다.",
+            "5. 만든 카드 목록을 role_manage(action='start')에 roles로 다시 넣는다.",
         ],
         "difficulty_rubric": {
             "base": 3,
@@ -107,32 +68,17 @@ def _role_design_brief(
             "range": "최종 difficulty는 1~10 정수. 멤버에게 보여주지 않고 균형 배분에만 쓴다.",
         },
         "slot_rubric": (
-            "slots는 과거 호환용이다. 책임 카드 방식에서는 기본 1. 병목이면 slots를 올리기보다 "
-            "작업을 더 작은 책임 카드로 분리한다."
+            "slots는 공동 owner 자리 수다. 기본 1이며, 같은 역할/책임을 여러 명이 함께 맡는 것이 자연스러우면 2 이상으로 둔다."
         ),
         "hard_rules": [
-            "로드맵 단계명을 그대로 역할명으로 쓰지 않는다.",
-            "방장·팀장·관리자 같은 운영 지위는 프로젝트 실행 역할로 보지 않는다.",
-            "프로젝트 텍스트에 없는 기술명·직무명을 끼워 넣지 않는다.",
-            "책임 카드 개수는 team_size의 1~2배 범위를 벗어나지 않는다.",
-            "각 책임 카드는 난이도와 업무량이 너무 가볍거나 무겁지 않게 조정한다.",
-            "'담당', '리드', '총괄' 같은 최종 역할명 표현을 카드명에 붙이지 않는다.",
+            "difficulty는 1~10 정수다.",
+            "slots는 1~10 정수다.",
             "책임 카드 목록을 만들면 곧바로 role_manage(action='start')에 roles로 다시 넣는다.",
         ],
         "output_schema": [
             {"name": "프로젝트 어휘로 만든 책임 카드명", "difficulty": "1~10", "slots": "대부분 1"}
         ],
     }
-
-
-def _responsibility_card_bounds(member_count: int) -> dict[str, int]:
-    """팀원 수의 1~2배 범위에서 책임 카드 목표치를 계산한다."""
-    size = max(1, int(member_count or 1))
-    min_count = max(2, size)
-    max_count = max(min_count, min(12, size * 2))
-    preferred = round(size * 1.5)
-    preferred = min(max(preferred, min_count), max_count)
-    return {"min": min_count, "max": max_count, "preferred": preferred}
 
 
 def _preference_limits(card_count: int) -> dict[str, int]:
@@ -158,37 +104,14 @@ def _validate_role_names(
     roadmap: dict[str, Any],
     member_count: int,
 ) -> dict[str, Any] | None:
-    task_titles = [str(t.get("title") or "") for t in roadmap.get("tasks", [])]
-    normalized_task_titles = {_norm_label(title) for title in task_titles}
-    exact_task_matches = [
-        name for name in names
-        if _norm_label(name) in normalized_task_titles and _norm_label(name)
-    ]
-    task_like = [name for name in names if _is_task_like_role(name)]
-    final_role_like = [name for name in names if _looks_like_final_role_bundle(name)]
-    bad = sorted(set(exact_task_matches + task_like + final_role_like), key=names.index)
-    if not bad:
-        return None
-    return {
-        "ok": False,
-        "error": (
-            "역할 후보가 로드맵 단계/할일명 또는 최종 역할명처럼 보입니다. 이 단계에서는 사람에게 붙일 "
-            "역할 묶음이 아니라, 선호도 조사용 책임 카드를 만들어야 합니다."
-        ),
-        "invalid_roles": bad,
-        "roadmap_task_titles": task_titles,
-        "role_design_brief": _role_design_brief(roadmap, member_count),
-        "role_design_rule": (
-            "로드맵 단계명=할일, 책임 카드=선호도 조사용 작업 책임 단위, 최종 역할명=배정 후 사람별 묶음 이름. "
-            "'담당/리드/총괄' 표현은 finalize 이후 배정 결과에 붙이고, 지금은 책임 카드명만 넣으세요."
-        ),
-    }
+    """역할명은 AI 자율에 맡긴다. 난이도/slots 범위는 Pydantic이 검증한다."""
+    return None
 
 
 class Role(BaseModel):
     """책임 카드 1개 (이름 + 난이도)."""
 
-    name: str = Field(description="프로젝트 산출물에서 직접 도출한 책임 카드 이름. 담당/리드/총괄 같은 최종 역할명은 쓰지 않는다.")
+    name: str = Field(description="팀원이 선호도를 고를 역할/책임 카드 이름")
     difficulty: int = Field(
         default=5,
         ge=1,
@@ -203,8 +126,8 @@ class Role(BaseModel):
         ge=1,
         le=10,
         description=(
-            "호환 필드. 책임 카드 방식에서는 기본 1. 병목이거나 함께 진행이 필요하면 2로 둘 수 있지만, "
-            "서버는 owner 1명을 두고 helper를 별도로 제안한다."
+            "공동 owner 자리 수. 기본 1. 같은 책임을 반드시 여러 명이 함께 맡아야 하면 2 이상으로 둔다. "
+            "쪼갤 수 있는 큰 일은 slots를 늘리기보다 더 작은 책임 카드로 나누는 편이 좋다."
         ),
     )
 
@@ -280,6 +203,34 @@ def _balanced_assign(
     return assigned, loads
 
 
+def _owner_slot_counts(
+    roles: list[str],
+    difficulties: dict[str, int],
+    requested_slots: dict[str, int] | None,
+    member_count: int,
+) -> dict[str, int]:
+    """카드별 owner 자리 수를 정한다.
+
+    기본은 AI가 넣은 slots를 존중한다. 팀원이 카드보다 많으면 남는 멤버가 놀지 않도록
+    난이도 높은 카드부터 공동 owner 자리를 늘린다.
+    """
+    counts = {
+        role: max(1, int((requested_slots or {}).get(role, 1)))
+        for role in roles
+    }
+    if not roles:
+        return counts
+    extra = max(0, int(member_count or 0) - sum(counts.values()))
+    ordered = sorted(roles, key=lambda role: (-difficulties.get(role, 5), role))
+    index = 0
+    while extra > 0:
+        role = ordered[index % len(ordered)]
+        counts[role] += 1
+        extra -= 1
+        index += 1
+    return counts
+
+
 def _helper_candidates(
     roles: list[str],
     difficulties: dict[str, int],
@@ -300,9 +251,11 @@ def _helper_candidates(
         return [], helper_loads
 
     owner_by_role: dict[str, str] = {}
+    owner_count_by_role: dict[str, int] = {}
     for member, member_roles in assigned.items():
         for role in member_roles:
             owner_by_role.setdefault(role, member)
+            owner_count_by_role[role] = owner_count_by_role.get(role, 0) + 1
 
     def pref_rank(member: str, role: str) -> int:
         try:
@@ -314,7 +267,7 @@ def _helper_candidates(
     seen: set[str] = set()
     heavy_roles = [
         role for role in roles
-        if difficulties.get(role, 5) >= 8 or max(1, int((slots or {}).get(role, 1))) > 1
+        if difficulties.get(role, 5) >= 8 and owner_count_by_role.get(role, 0) < 2
     ]
     for role in sorted(heavy_roles, key=lambda r: -difficulties.get(r, 5)):
         if role in seen:
@@ -337,9 +290,7 @@ def _helper_candidates(
         )
         helper_weight = max(1, round(difficulties.get(role, 5) * 0.4))
         helper_loads[helper] += helper_weight
-        reason = "난이도 높은 책임이라 함께 진행을 권장합니다."
-        if max(1, int((slots or {}).get(role, 1))) > 1:
-            reason = "공동 진행이 필요한 책임으로 표시되어 helper를 붙였습니다."
+        reason = "난이도 높은 책임인데 owner가 1명이라 함께 진행을 권장합니다."
         helpers.append({
             "card": role,
             "owner": owner,
@@ -371,27 +322,21 @@ def register(mcp: FastMCP) -> None:
     ) -> dict[str, Any]:
         """Starts role assignment by creating a responsibility-card preference form for the team.
 
-        역할 분배 **시작**. **너(AI)가 PM처럼 로드맵을 책임 카드+난이도로 직접 분해**해서
-        넘겨라 (사용자에게 책임 카드·팀원 이름 묻지 마 — 팀원은 room_info로 확인).
+        역할 분배 **시작**. 너(AI)가 로드맵과 프로젝트 맥락을 보고 팀원이 선호도를 고를
+        역할/책임 카드와 난이도를 직접 만들어 넘겨라. 사용자에게 역할 목록 작성을 떠넘기지 마라.
 
-        ⚠️ **고정 역할명 사전을 쓰지 말 것.** 개발 과제라고 항상 같은 기술 역할을 쓰거나,
-        발표 과제라고 항상 같은 발표 역할을 쓰면 안 된다. 역할명은 로드맵의 실제 산출물,
-        반복 작업, 의존관계에서 매번 새로 만든다.
-
-        역할 생성 = **책임 카드 설계 7단계**:
-        ① 최종 산출물 파악 — 이 팀이 마지막에 무엇을 제출/시연/완료해야 하는지 한 문장으로 정의
-        ② 책임 분해 — 각 마일스톤에서 빠지면 안 되는 책임 단위를 추출
-        ③ 개수 조절 — 책임 카드는 팀원 수의 1~2배, 되도록 1.5배 근처로 만들기
-        ④ MECE 점검 — 책임끼리 겹치지 않고 전체 로드맵이 빠지지 않게 하기
-        ⑤ 카드명 작성 — 프로젝트 어휘로 짧게 만들고 로드맵 단계명을 그대로 쓰지 않기
-        ⑥ slots — 기본 1. 큰 책임은 slots를 늘리기보다 카드 자체를 나누기
-        ⑦ 난이도(difficulty) — 작업량, 불확실성, 의존도, 마감 리스크, 커뮤니케이션 부담을 합쳐 1~10
+        역할 생성:
+        ① 로드맵과 최종 산출물을 확인
+        ② 팀원이 고를 역할/책임 카드 생성
+        ③ 각 카드에 difficulty(1~10)와 slots(1~10)를 지정
+        ④ role_manage(action='start')에 roles로 다시 호출
 
         형식: roles=[{"name":"<프로젝트에서 도출한 책임 카드명>","difficulty":<1~10 정수>,"slots":1}, ...]
 
         난이도(difficulty)는 **멤버에겐 안 보이고**, 일을 공평하게 나누는 균형 배분에만 쓰인다.
-        책임 카드 수는 팀원 수와 달라도 됨 — finalize_roles가 **모든 책임 카드를 멤버에 골고루 채운다**
-        (멤버가 적으면 한 명이 여러 책임). close_minutes 기본 1일, 전원 응답 시 자동 마감.
+        역할/책임 카드 수는 팀원 수와 달라도 됨 — finalize_roles가 **모든 owner 자리를 멤버에 골고루 채운다**.
+        멤버가 적으면 한 명이 여러 책임을 맡고, 멤버가 카드보다 많으면 난이도 높은 책임에 공동 owner가 붙을 수 있다.
+        close_minutes 기본 1일, 전원 응답 시 자동 마감.
 
         생성 후 흐름: **(1) 책임 카드 목록을 팀장에게 보여주고 '이대로?' 확인받기** →
         send_form(form_id) → 멤버 선호/회피 → finalize_roles 매칭 → **(2) 결과 팀장 확인** →
@@ -428,38 +373,12 @@ def register(mcp: FastMCP) -> None:
                     "고정 예시 역할명은 쓰지 말고 로드맵의 실제 산출물 언어를 사용하세요."
                 ),
             }
-        if len(roles) < 2:
-            return {
-                "ok": False,
-                "error": "책임 카드를 2개 이상 구성할 수 없습니다. 먼저 로드맵을 만들거나 프로젝트 주제를 더 구체화하세요.",
-                "roadmap_task_titles": [t.get("title") for t in roadmap.get("tasks", [])],
-            }
-
         names = [r.name for r in roles]
         difficulties = {r.name: r.difficulty for r in roles}
         slots = {r.name: r.slots for r in roles}
         invalid = _validate_role_names(names, roadmap, len(members))
         if invalid is not None:
             return invalid
-        card_bounds = _responsibility_card_bounds(len(members))
-        if len(names) < card_bounds["min"] or len(names) > card_bounds["max"]:
-            return {
-                "ok": False,
-                "error": (
-                    f"책임 카드 수가 팀원 수 기준 범위를 벗어났습니다. 현재 팀원 {len(members)}명 기준 "
-                    f"{card_bounds['min']}~{card_bounds['max']}개가 적절하고, 추천은 {card_bounds['preferred']}개입니다."
-                ),
-                "responsibility_card_count": card_bounds,
-                "received_count": len(names),
-                "received_cards": names,
-                "role_design_brief": _role_design_brief(roadmap, len(members)),
-                "required_next_tool": "role_manage",
-                "required_next_action": "start",
-                "chat_response_hint": (
-                    "사용자에게 카드 수 오류를 길게 설명하지 말고, 로드맵을 기준으로 책임 카드를 "
-                    f"{card_bounds['preferred']}개 안팎으로 다시 묶어 role_manage(action='start')를 재호출하세요."
-                ),
-            }
         limits = _preference_limits(len(names))
 
         closes_at = None
@@ -534,8 +453,9 @@ def register(mcp: FastMCP) -> None:
             "role_slots": slots,
             "total_role_slots": sum(slots.values()),
             "responsibility_card_count": {
-                **card_bounds,
                 "actual": len(names),
+                "basis": "ai_discretion",
+                "hard_limit": False,
             },
             "preference_limits": limits,
             "generated_from_roadmap": generated_from_roadmap,
@@ -560,7 +480,7 @@ def register(mcp: FastMCP) -> None:
                 "내부 도구명은 말하지 말고, 현재 로드맵을 참고해 만든 책임 카드 목록을 "
                 f"팀장에게 보여준 뒤 '팀원은 맡고 싶은 것 최대 {limits['want_max']}개, "
                 f"피하고 싶은 것 최대 {limits['avoid_max']}개만 고르면 됩니다. 이대로 보낼까요?'처럼 확인을 받으세요. "
-                "로드맵 단계명을 그대로 쓰지 않고 책임 단위로 나눴다는 점을 짧게 설명하세요."
+                "로드맵을 책임 단위로 나눴다는 점을 짧게 설명하세요."
             ),
         }
 
@@ -643,7 +563,11 @@ def register(mcp: FastMCP) -> None:
             }
 
         assignment_mode = schema.get("_role_assignment_mode") or ("ranking" if rank_el else "responsibility_cards")
-        owner_slots = {role: 1 for role in roles} if assignment_mode == "responsibility_cards" else slots
+        owner_slots = (
+            _owner_slot_counts(roles, difficulties, slots, len(prefs))
+            if assignment_mode == "responsibility_cards"
+            else slots
+        )
         assigned, loads = _balanced_assign(roles, difficulties, prefs, avoids, owner_slots)
         helper_assignments, helper_loads = _helper_candidates(
             roles,
@@ -711,7 +635,8 @@ def register(mcp: FastMCP) -> None:
                 ],
             },
             "note": (
-                "모든 책임 카드는 owner 1명에게 배정하고, 난이도 높은 카드는 helper를 별도로 제안합니다. "
+                "모든 책임 카드 owner 자리를 배정합니다. 멤버가 카드보다 많거나 slots가 2 이상이면 "
+                "한 책임 카드에 여러 owner가 붙을 수 있고, 무거운 단독 owner 카드만 helper를 별도로 제안합니다. "
                 "workload는 owner 난이도 합, helper_workload는 함께 진행 부담입니다. "
                 "⚠️ 각 멤버의 note가 있으면 팀장에게 보여주고, 필요하면 조정한 뒤 역할을 확정. "
                 "AI 단독 확정 X — 팀장이 메모 보고 최종 판단."
