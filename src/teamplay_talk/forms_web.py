@@ -175,14 +175,29 @@ __APP_REACT_LIQUID_IMPORTS__
     document.getElementById("done").style.display = "block";
     requestLiquidEnhance();
   }
+  var submitInFlight = false;
   function postAnswers(data) {
+    if (submitInFlight) return Promise.resolve();
+    submitInFlight = true;
     return fetch(window.location.pathname + window.location.search, {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify(data)
     }).then(function(response){
-      if (!response.ok) throw new Error("HTTP " + response.status);
-      showDone();
+      return response.text().then(function(text){
+        if (!response.ok) {
+          var detail = text;
+          try {
+            var parsed = JSON.parse(text);
+            detail = parsed.message || parsed.error || text;
+          } catch (_) {}
+          throw new Error("HTTP " + response.status + (detail ? " - " + detail : ""));
+        }
+        showDone();
+      });
+    }).catch(function(error){
+      submitInFlight = false;
+      throw error;
     });
   }
   function findAvailabilityElement(schema) {
@@ -529,11 +544,20 @@ async def submit_form(request: Request) -> JSONResponse:
     if form is None:
         return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
     if form["closed"]:
-        return JSONResponse({"ok": False, "error": "closed"}, status_code=403)
+        return JSONResponse(
+            {"ok": False, "error": "closed", "message": "이미 마감된 폼입니다."},
+            status_code=403,
+        )
     if not form["anonymous"] and member_id is None:
-        return JSONResponse({"ok": False, "error": "personal link required"}, status_code=403)
+        return JSONResponse(
+            {"ok": False, "error": "personal link required", "message": "개인 링크로만 응답할 수 있는 폼입니다."},
+            status_code=403,
+        )
     if member_id is not None and not storage.is_form_member(form_id, member_id):
-        return JSONResponse({"ok": False, "error": "not a current room member"}, status_code=403)
+        return JSONResponse(
+            {"ok": False, "error": "not a current room member", "message": "이 방의 현재 멤버만 응답할 수 있습니다."},
+            status_code=403,
+        )
 
     try:
         answers = await request.json()
