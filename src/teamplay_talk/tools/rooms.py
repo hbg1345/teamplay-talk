@@ -51,16 +51,34 @@ def _decision_payload(decision: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _room_owner_name(room: dict[str, Any]) -> str | None:
+    owner_id = room.get("owner_id")
+    if owner_id is None:
+        return None
+    owner = storage.get_user(owner_id)
+    return owner.get("nickname") if owner else None
+
+
+def _member_summary(room_id: int) -> list[dict[str, Any]]:
+    return [
+        {"nickname": member["nickname"], "role": member.get("role")}
+        for member in storage.list_members(room_id)
+    ]
+
+
 def _invite_payload(room: dict[str, Any]) -> dict[str, str]:
     invite_code = room["invite_code"]
     join_command = f'join_room(invite_code="{invite_code}")'
+    owner_name = _room_owner_name(room)
     # 프로토타입 기본값은 PlayMCP 초대 코드 참여다. OAuth 초대 링크는
     # INVITE_OAUTH_ENABLED=true일 때만 생성된다.
     oauth_join_url = build_invite_oauth_url(invite_code)
     lines = [
         f"팀플톡 '{room['name']}' 방에 참여해 주세요.",
+        f"방장: {owner_name}" if owner_name else None,
         f"초대 코드: {invite_code}",
     ]
+    lines = [line for line in lines if line]
     if oauth_join_url:
         lines.append(f"카카오로 바로 참여하기: {oauth_join_url}")
     else:
@@ -73,6 +91,8 @@ def _invite_payload(room: dict[str, Any]) -> dict[str, str]:
         "join_command": join_command,
         "invite_share_text": invite_share_text,
     }
+    if owner_name:
+        payload["owner_name"] = owner_name
     if oauth_join_url:
         payload["oauth_join_url"] = oauth_join_url
     return payload
@@ -226,19 +246,30 @@ def register(mcp: FastMCP) -> None:
             return {"ok": False, "error": "유효하지 않은 초대 코드입니다."}
         room = result["room"]
         storage.set_active_room(caller["id"], room["id"])
+        owner_name = _room_owner_name(room)
+        members = _member_summary(room["id"])
         return {
             "ok": True,
             "room_id": room["id"],
             "name": room["name"],
+            "owner_name": owner_name,
+            "member_count": len(members),
+            "members": members,
             "active": True,
-            "message": f"'{room['name']}' 참여 완료 — 현재 작업 방으로 설정됨.",
+            "message": (
+                f"'{room['name']}' 참여 완료 — 현재 작업 방으로 설정됨. "
+                f"방장: {owner_name or '확인 필요'}, 현재 멤버 {len(members)}명."
+            ),
             "next": "이제 방 멤버를 확인하거나, 팀장이 역할분배/로드맵을 시작하면 됩니다.",
             "suggested_next_actions": [
                 "현재 방 멤버 확인하기",
                 "역할분배 폼이 오면 응답하기",
                 "로드맵·todo가 생기면 내 할일 확인하기",
             ],
-            "chat_response_hint": "참여 성공을 말하고, 이제 이 방에서 오는 역할분배/체크인/투표에 응답하면 된다고 짧게 안내하세요.",
+            "chat_response_hint": (
+                "참여 성공을 말할 때 방 이름, 방장 이름, 현재 멤버 명단을 함께 보여주세요. "
+                "사용자가 다른 방에 들어간 것 같다고 느끼지 않도록 '현재 작업 방'이 이 방으로 설정됐다고 확인해 주세요."
+            ),
         }
 
     @mcp.tool(
@@ -328,6 +359,7 @@ def register(mcp: FastMCP) -> None:
                 "ok": True,
                 "room_id": room["id"],
                 "name": room["name"],
+                "owner_name": _room_owner_name(room),
                 "invite_code": room["invite_code"],
                 **_invite_payload(room),
                 "member_count": len(members),
