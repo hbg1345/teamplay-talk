@@ -155,8 +155,13 @@ register_home_routes(mcp)
 
 def _public_transport_security() -> dict[str, list[str]]:
     parsed = urlsplit(settings.public_base_url)
-    allowed_hosts: list[str] = []
-    allowed_origins: list[str] = []
+    allowed_hosts: list[str] = [
+        "*.playmcp-endpoint.kakaocloud.io",
+    ]
+    allowed_origins: list[str] = [
+        "https://*.playmcp-endpoint.kakaocloud.io",
+        "https://playmcp.kakao.com",
+    ]
 
     if parsed.netloc:
         allowed_hosts.append(parsed.netloc)
@@ -173,9 +178,7 @@ def _public_transport_security() -> dict[str, list[str]]:
 
 def main() -> None:
     start_scheduler()  # 폼 마감 감지 + 드라이버 nudge (백그라운드)
-    # NOTE: FastMCP 3.x의 run()은 allowed_hosts/allowed_origins 인자를 받지 않는다.
-    # 또한 public 호스트로 화이트리스트를 걸면 KC 헬스체크(내부 IP/localhost)가
-    # 거부되어 503이 난다. 호스트 라우팅은 KC/PlayMCP 앞단이 담당하므로 제한하지 않는다.
+    transport_security = _public_transport_security()
     # PlayMCP는 stateless(no session) MCP 서버를 권장한다. stateless_http=True면
     # 매 요청이 세션 없이 독립 처리되어, 세션 미유지 클라이언트(PlayMCP)에서도
     # initialize 없이 바로 tools/list·tool call이 동작한다.
@@ -184,6 +187,9 @@ def main() -> None:
         host=settings.host,
         port=settings.port,
         stateless_http=True,
+        host_origin_protection=True,
+        allowed_hosts=transport_security["allowed_hosts"],
+        allowed_origins=transport_security["allowed_origins"],
         uvicorn_config={"access_log": False},
     )
 
