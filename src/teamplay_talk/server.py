@@ -25,6 +25,7 @@ from .dashboard_web import register_dashboard_routes
 from .forms_web import register_form_routes
 from .home_web import register_home_routes
 from .kakao_token_proxy import register_kakao_token_proxy
+from .response_guard import ResponseSizeGuard
 from .tools import register_all
 from .triggers import start_scheduler
 
@@ -134,6 +135,10 @@ async def health_check(_request: Request) -> PlainTextResponse:
 
 # 도메인별 도구 등록
 register_all(mcp)
+
+# 응답 크기 가드 — PlayMCP 네이티브 채팅의 content part 한도 초과 방지.
+# 큰 툴 응답을 요약+대시보드 안내로 축소한다(데이터엔 영향 없음).
+mcp.add_middleware(ResponseSizeGuard())
 
 # 네이티브 폼 웹 페이지(/form/<id>) 등록
 register_form_routes(mcp)
