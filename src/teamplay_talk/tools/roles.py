@@ -473,13 +473,6 @@ def register(mcp: FastMCP) -> None:
                     "고정 예시 역할명은 쓰지 말고 로드맵의 실제 산출물 언어를 사용하세요."
                 ),
             }
-        if len(roles) < 2:
-            return {
-                "ok": False,
-                "error": "책임 카드를 2개 이상 구성할 수 없습니다. 먼저 로드맵을 만들거나 프로젝트 주제를 더 구체화하세요.",
-                "roadmap_task_titles": [t.get("title") for t in roadmap.get("tasks", [])],
-            }
-
         names = [r.name for r in roles]
         difficulties = {r.name: r.difficulty for r in roles}
         slots = {r.name: r.slots for r in roles}
@@ -487,6 +480,10 @@ def register(mcp: FastMCP) -> None:
         if invalid is not None:
             return invalid
         advisory_warnings: list[str] = []
+        if len(names) == 1:
+            advisory_warnings.append(
+                "책임 카드가 1개뿐입니다. 테스트나 아주 작은 팀플이면 진행할 수 있지만, 팀장이 원하면 더 세분화해도 됩니다."
+            )
         if len(members) < 2:
             advisory_warnings.append(
                 "현재 방에 팀원이 1명뿐입니다. 선호/회피 조사는 테스트로 보낼 수 있지만, 실제 팀 배정은 팀원이 들어온 뒤 다시 보는 것이 좋습니다."
@@ -501,21 +498,11 @@ def register(mcp: FastMCP) -> None:
                 f"현재 기준 추천 책임 카드 수는 {card_bounds['min']}~{card_bounds['max']}개, 추천 {card_bounds['preferred']}개입니다. "
                 f"지금 초안은 {len(names)}개라 권장 범위와 다를 수 있습니다."
             )
-        hard_cap = max(12, len(members) * 2)  # 폼 사용성 한계. 팀원 많으면 카드도 늘 수 있으니 인원 연동
-        if len(names) > hard_cap:
-            return {
-                "ok": False,
-                "created": False,
-                "error": f"책임 카드가 너무 많아 모바일 폼으로 보내기 어렵습니다. {hard_cap}개 이하로 줄여주세요. (팀원 수의 2배까지 권장)",
-                "room": room["name"],
-                "active_member_count": len(members),
-                "members": [m["nickname"] for m in members],
-                "received_cards": names,
-                "responsibility_card_count": card_bounds,
-                "chat_response_hint": (
-                    f"카드가 너무 많다는 점만 말하고, 로드맵을 기준으로 {hard_cap}개 이하(팀원 수의 1~2배)의 책임 카드로 다시 묶어주세요."
-                ),
-            }
+        soft_cap = max(12, len(members) * 2)
+        if len(names) > soft_cap:
+            advisory_warnings.append(
+                f"책임 카드가 {len(names)}개라 모바일 폼이 길어질 수 있습니다. 권장 상한은 {soft_cap}개 정도지만, 서비스 흐름을 막지 않고 그대로 생성합니다."
+            )
         limits = _preference_limits(len(names))
 
         closes_at = None
