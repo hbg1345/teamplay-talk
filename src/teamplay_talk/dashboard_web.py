@@ -355,7 +355,7 @@ __APP_LUCIDE_SCRIPT__
   .decision-title{margin:0;color:var(--ink);font-weight:820;line-height:1.45}
   .decision-note{margin:0;color:var(--muted);font-size:.88rem;line-height:1.5}
   .empty{border:1px dashed rgba(33,24,8,.24);border-radius:var(--radius);background:rgba(255,252,244,.62);padding:36px 22px;text-align:center;color:var(--muted)}
-  body.dashboard-page{background:#fff;--muted:#17140f;--quiet:#17140f;--ink-soft:#17140f}
+  body.dashboard-page{--muted:#17140f;--quiet:#17140f;--ink-soft:#17140f}
   body.dashboard-page:before{display:none}
   body.dashboard-page:after{display:none}
   body.dashboard-page .glass-panel,
