@@ -612,7 +612,7 @@ def install(mcp: FastMCP) -> None:
         invite_code: str | None = None,
         guide_topic: str | None = None,
     ) -> dict[str, Any]:
-        """팀 프로젝트 방을 만들고, 참여하고, 현재 작업 방과 다음 단계를 안내합니다."""
+        """teamplay-talk(팀플톡)에서 팀 프로젝트 방을 만들고, 참여하고, 현재 작업 방과 다음 단계를 안내합니다."""
         if action == "guide":
             return await _guide_room(None, guide_topic=guide_topic)
         target = {
@@ -648,7 +648,7 @@ def install(mcp: FastMCP) -> None:
         room_id: int | None = None,
         message: str | None = None,
     ) -> dict[str, Any]:
-        """폼과 투표를 찾고, 보내고, 결과를 확인하거나 마감합니다.
+        """teamplay-talk(팀플톡)에서 폼과 투표를 찾고, 보내고, 결과를 확인하거나 마감합니다.
 
         진행 중인 폼 목록을 확인하고, 만든 폼을 팀원에게 보내거나 응답 결과를 정리할
         때 사용합니다. 제목 일부로 찾을 수 있지만, 여러 폼이 비슷하면 폼 번호를 함께
@@ -698,7 +698,7 @@ def install(mcp: FastMCP) -> None:
         close_minutes: int | None = None,
         message: str | None = None,
     ) -> dict[str, Any]:
-        """로드맵을 책임 카드로 나누고, 선호/회피와 난이도를 봐서 역할 배정안을 계산하거나 확정합니다."""
+        """teamplay-talk(팀플톡)에서 로드맵을 책임 카드로 나누고, 선호/회피와 난이도를 봐서 역할 배정안을 계산하거나 확정합니다."""
         target = {
             "start": "assign_roles",
             "finalize": "finalize_roles",
@@ -740,7 +740,7 @@ def install(mcp: FastMCP) -> None:
         dry_run: bool = False,
         room_id: int | None = None,
     ) -> dict[str, Any]:
-        """프로젝트 로드맵을 만들고, 일정과 팀원별 할 일로 이어갑니다."""
+        """teamplay-talk(팀플톡)에서 프로젝트 로드맵을 만들고, 일정과 팀원별 할 일로 이어갑니다."""
         target = {
             "build": "build_roadmap",
             "view": "view_roadmap",
@@ -789,7 +789,7 @@ def install(mcp: FastMCP) -> None:
         after_task_ids: list[int] | None = None,
         before_task_ids: list[int] | None = None,
     ) -> dict[str, Any]:
-        """로드맵의 개별 할 일을 추가하거나 수정하고 삭제합니다."""
+        """teamplay-talk(팀플톡)에서 로드맵의 개별 할 일을 추가하거나 수정하고 삭제합니다."""
         target = {"add": "add_task", "update": "update_task", "delete": "delete_task"}[action]
         return await _run_legacy(legacy, target, {
             "task_id": task_id,
@@ -828,7 +828,7 @@ def install(mcp: FastMCP) -> None:
         apply_checkin: bool = True,
         publish: bool = False,
     ) -> dict[str, Any]:
-        """데일리 체크인을 만들고, 응답을 할 일 상태와 팀 리포트에 반영합니다."""
+        """teamplay-talk(팀플톡)에서 데일리 체크인을 만들고, 응답을 할 일 상태와 팀 리포트에 반영합니다."""
         target = {
             "create_checkin": "create_daily_checkin",
             "apply_checkin": "apply_daily_checkin",
@@ -874,7 +874,7 @@ def install(mcp: FastMCP) -> None:
         include_done: bool = False,
         default_minutes: int = 30,
     ) -> dict[str, Any]:
-        """회의나 배정된 로드맵 할 일을 팀원들의 카카오톡 캘린더에 등록합니다."""
+        """teamplay-talk(팀플톡)에서 회의나 배정된 로드맵 할 일을 팀원들의 카카오톡 캘린더에 등록합니다."""
         target = {
             "room_event": "calendar_create_room_event",
             "task_events": "calendar_create_task_events",
@@ -925,7 +925,7 @@ def install(mcp: FastMCP) -> None:
         preset: str | None = None,
         limit: int | None = None,
     ) -> dict[str, Any]:
-        """내 카카오톡 캘린더 일정을 만들고 확인하거나 수정, 삭제합니다."""
+        """teamplay-talk(팀플톡)에서 내 카카오톡 캘린더 일정을 만들고 확인하거나 수정, 삭제합니다."""
         target = {
             "create": "calendar_create_event",
             "list": "calendar_list_events",

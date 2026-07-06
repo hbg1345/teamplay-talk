@@ -278,7 +278,7 @@ def register(mcp: FastMCP) -> None:
         close_minutes: int | None = None,
         close_on_all: bool = False,
     ) -> dict[str, Any]:
-        """폼이나 투표를 만들고 응답 링크를 반환합니다.
+        """teamplay-talk(팀플톡)에서 폼이나 투표를 만들고 응답 링크를 반환합니다.
 
         단일선택, 복수선택, 선호 순위, 점수, 주관식 질문을 섞어 팀 의견을 받을 수
         있습니다. 기본은 멤버별 식별 폼이라 1인 1응답과 완료 처리가 됩니다.
@@ -381,7 +381,7 @@ def register(mcp: FastMCP) -> None:
         anonymous: bool = True,
         close_minutes: int | None = 1440,
     ) -> dict[str, Any]:
-        """팀원에게 자유의견을 받아 의사결정을 시작합니다.
+        """teamplay-talk(팀플톡)에서 팀원에게 자유의견을 받아 의사결정을 시작합니다.
 
         주제, 아이디어, 진행 방향처럼 아직 후보가 정리되지 않았을 때 먼저 사용합니다.
         팀원이 자유롭게 남긴 답변을 모은 뒤, AI가 후보로 정리하고 필요하면 본투표로
@@ -475,7 +475,7 @@ def register(mcp: FastMCP) -> None:
         anonymous: bool = False,
         close_minutes: int | None = 1440,
     ) -> dict[str, Any]:
-        """약속 장소 결정을 위한 위치 후보 수집 폼을 만듭니다.
+        """teamplay-talk(팀플톡)에서 약속 장소 결정을 위한 위치 후보 수집 폼을 만듭니다.
 
         긴 자유서술 한 칸 대신 짧은 장소 입력칸 여러 개와 기타 의견을 나누어 받습니다.
         응답이 모이면 비슷한 역, 상권, 장소명을 묶어 본투표 후보로 정리하기 쉽습니다.
@@ -607,7 +607,7 @@ def register(mcp: FastMCP) -> None:
         anonymous: bool = False,
         close_minutes: int | None = 1440,
     ) -> dict[str, Any]:
-        """로드맵과 할 일에 대한 팀원 의견을 구조적으로 모읍니다.
+        """teamplay-talk(팀플톡)에서 로드맵과 할 일에 대한 팀원 의견을 구조적으로 모읍니다.
 
         로드맵 단계, 개인 할 일, 병목, 프로젝트 범위 조정처럼 팀 운영에 반영해야 할
         의견을 받을 때 사용합니다. 현재 로드맵 요약을 함께 보여주고, 응답을 바탕으로
