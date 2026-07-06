@@ -26,8 +26,9 @@ from fastmcp.tools.tool import ToolResult
 from mcp.types import TextContent
 
 MAX_CHARS = 350       # PlayMCP 네이티브 content part 한도(경험값). 넘으면 축소.
-TARGET_CHARS = 300    # 축소 후 목표 길이(안전 마진).
-ARRAY_SAMPLE = 3      # 큰 배열에서 남길 앞부분 개수.
+ARRAY_SAMPLE = 3      # 이 개수를 넘는 배열은 개수만 남긴다(항목은 대시보드에).
+STRING_CAP = 120      # 긴 문자열은 이 길이로 자른다.
+HARD_CAP = 550        # 개요가 이보다도 크면 핵심만 남기는 최소 폴백(드묾).
 
 _HINT = (
     "결과가 커서 요약만 반환됨. 사용자에겐 핵심만 짧게 말하고, 전체 상세는 "
@@ -75,34 +76,47 @@ def _extract_dict(result: ToolResult) -> dict[str, Any]:
     return {"result": str(data)[:120] if data is not None else ""}
 
 
-def _compact(data: dict[str, Any]) -> dict[str, Any]:
-    """큰 배열은 개수+샘플로 줄이고 힌트를 붙인다."""
+_DASH_NOTE = "전체 목록은 room_dashboard 링크로 안내하세요."
+
+
+def _overview(data: dict[str, Any]) -> dict[str, Any]:
+    """개요만 남긴다 — 큰 배열은 개수로 접고, 긴 문자열은 자르며, count·next·상태
+    같은 스칼라 요약 필드는 유지한다. AI가 쓸모있는 요약을 하도록."""
     out: dict[str, Any] = {}
     for k, v in data.items():
-        if isinstance(v, list) and len(v) > ARRAY_SAMPLE:
-            out[k] = {"_count": len(v), "_sample": v[:ARRAY_SAMPLE], "_truncated": True}
-        elif isinstance(v, str) and len(v) > 160:
-            out[k] = v[:157] + "…"
+        if isinstance(v, list):
+            out[k] = {"_count": len(v)} if len(v) > ARRAY_SAMPLE else v
+        elif isinstance(v, str) and len(v) > STRING_CAP:
+            out[k] = v[: STRING_CAP - 1] + "…"
         else:
             out[k] = v
     out["_truncated"] = True
-    out["chat_response_hint"] = _HINT
+    # 기존 chat_response_hint(툴 고유 안내)를 살리고 대시보드 안내만 덧붙인다.
+    existing = out.get("chat_response_hint")
+    out["chat_response_hint"] = (
+        f"{existing} {_DASH_NOTE}" if isinstance(existing, str) else f"{_HINT}"
+    )
     return out
 
 
-def _shrink_to_fit(data: dict[str, Any]) -> dict[str, Any]:
-    compact = _compact(data)
-    if len(json.dumps(compact, ensure_ascii=False)) <= TARGET_CHARS:
-        return compact
-    # 2차: 배열/큰 값 다 버리고 핵심 스칼라 + 힌트만.
+def _minimal(data: dict[str, Any]) -> dict[str, Any]:
+    """개요조차 큰 드문 경우 — 핵심 스칼라 + 힌트만."""
     keep: dict[str, Any] = {}
-    for k in ("ok", "error", "status", "count", "next"):
+    for k in ("ok", "error", "status", "count", "created_count",
+              "needs_role_assignment", "required_next_tool", "next"):
         v = data.get(k)
-        if isinstance(v, (bool, int, float)) or (isinstance(v, str) and len(v) <= 120):
+        if isinstance(v, (bool, int, float)) or (isinstance(v, str) and len(v) <= STRING_CAP):
             keep[k] = v
     keep["_truncated"] = True
     keep["chat_response_hint"] = _HINT
     return keep
+
+
+def _shrink_to_fit(data: dict[str, Any]) -> dict[str, Any]:
+    overview = _overview(data)
+    if len(json.dumps(overview, ensure_ascii=False)) <= HARD_CAP:
+        return overview
+    return _minimal(data)
 
 
 class ResponseSizeGuard(Middleware):
