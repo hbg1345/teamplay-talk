@@ -41,7 +41,7 @@ def register(mcp: FastMCP) -> None:
         },
     )
     async def notify_room(message: str, room_id: int | None = None) -> dict[str, Any]:
-        """팀플톡 방 멤버 전원에게 카카오톡 알림을 보냅니다.
+        """방 멤버 전원에게 카카오톡 알림을 보냅니다.
 
         카카오 로그인을 마친 멤버의 '나와의 채팅방'으로 공지와 결정 사항을
         보냅니다. 투표 결과 공유, 회의 확정, 다음 행동 안내처럼 팀 전체가 알아야
