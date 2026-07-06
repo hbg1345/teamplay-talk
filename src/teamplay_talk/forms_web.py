@@ -253,8 +253,12 @@ __APP_REACT_LIQUID_IMPORTS__
     return map;
   }
   function syncRoleAvoidChoices(survey) {
+    // SurveyJS가 값 변경 시 질문 엘리먼트를 교체 → 래퍼 클래스를 매번 다시 붙인다(self-heal).
+    var q = document.querySelector('.sd-question[data-name="role_avoids"]');
+    if (!q) return;
+    q.classList.add("tp-role-avoids-question");
     var selected = selectedValueMap(survey && survey.getValue ? survey.getValue("role_avoids") : []);
-    document.querySelectorAll(".tp-role-avoids-question .sd-selectbase__item").forEach(function(item){
+    q.querySelectorAll(".sd-selectbase__item").forEach(function(item){
       var input = item.querySelector("input");
       var isChecked = Boolean(input && input.checked) || item.classList.contains("sd-item--checked");
       var value = choiceValueFromItem(item);
@@ -505,6 +509,12 @@ __APP_REACT_LIQUID_IMPORTS__
       } else {
         showErr("render 메서드 없음 (survey-js-ui 로드 확인)");
       }
+      try {  // 역할 회피 하이라이트가 SurveyJS 재렌더에도 살아남게 감시
+        if (window.MutationObserver) {
+          new MutationObserver(function(){ syncRoleAvoidChoices(survey); }).observe(el, { childList: true, subtree: true });
+        }
+      } catch (e) {}
+      syncRoleAvoidChoices(survey);
     }
   } catch(e) { showErr((e && e.message) ? e.message : String(e)); }
 </script>
