@@ -198,8 +198,8 @@ __APP_REACT_LIQUID_IMPORTS__
 __APP_LUCIDE_SCRIPT__
 <style>
   __APP_THEME_CSS__
-  .shell{position:relative;z-index:1;display:grid;grid-template-columns:260px minmax(0,1fr) 336px;gap:16px;width:min(1440px,100%);margin:0 auto;padding:16px clamp(12px,2vw,24px) 44px;align-items:start}
-  .workspace{position:sticky;top:16px;min-height:calc(100vh - 32px);display:flex;flex-direction:column;padding:14px;background:linear-gradient(180deg,var(--workspace),var(--workspace-2));color:#fff8e8;box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 28px 80px rgba(37,33,29,.20)}
+  .shell{position:relative;z-index:1;display:grid;grid-template-columns:260px minmax(0,1fr);gap:16px;width:min(1440px,100%);margin:0 auto;padding:16px clamp(12px,2vw,24px) 44px;align-items:start}
+  .workspace{position:sticky;top:16px;min-height:calc(100vh - 60px);display:flex;flex-direction:column;padding:14px;background:linear-gradient(180deg,var(--workspace),var(--workspace-2));color:#fff8e8;box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 28px 80px rgba(37,33,29,.20)}
   .workspace__top{display:grid;gap:12px;padding:4px 4px 14px;border-bottom:1px solid rgba(255,255,255,.14)}
   .workspace__home{display:grid;grid-template-columns:38px minmax(0,1fr);gap:12px;align-items:start;color:inherit;text-decoration:none;border-radius:12px;padding:2px;transition:background .16s ease,transform .16s cubic-bezier(.2,.8,.2,1)}
   .workspace__home:hover{background:rgba(255,255,255,.07);transform:translateY(-1px)}
@@ -224,11 +224,15 @@ __APP_LUCIDE_SCRIPT__
   .side-section{padding:13px 4px 0;border-top:1px solid rgba(255,255,255,.12)}
   .side-label{margin:0 0 8px;color:rgba(255,248,232,.52);font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
   .members{display:grid;gap:7px;margin:0}
-  .member{display:grid;grid-template-columns:26px minmax(0,1fr);gap:8px;align-items:center;min-height:38px;border-radius:var(--radius);padding:5px 7px;background:rgba(255,255,255,.08)}
+  .member{display:grid;grid-template-columns:26px minmax(0,1fr);gap:8px;align-items:center;width:100%;min-height:38px;border:0;border-radius:var(--radius);padding:5px 7px;background:rgba(255,255,255,.08);font-family:inherit;text-align:left;cursor:pointer;transition:background .14s ease}
+  .member:hover,.member:focus-visible{background:rgba(255,255,255,.16)}
+  .member:focus-visible{outline:2px solid var(--kakao-yellow);outline-offset:2px}
   .member:before{content:attr(data-initial);display:grid;place-items:center;width:26px;height:26px;border-radius:7px;background:rgba(255,255,255,.16);color:#fff;font-weight:800;font-size:.76rem}
   .member b{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:760;color:#fff8e8}
   .member-copy{display:block;min-width:0}
   .member-role{display:block;min-width:0;color:rgba(255,248,232,.62);font-size:.76rem;font-weight:650;line-height:1.25;white-space:normal;overflow-wrap:anywhere}
+  .member.is-active{background:rgba(255,255,255,.22)}
+  .member-detail-role{margin:6px 0 0;color:var(--muted);font-weight:720;font-size:.9rem}
   .conversation{min-width:0;display:grid;gap:12px}
   .channel-header{padding:16px 18px 14px}
   .channel-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:start}
@@ -236,13 +240,10 @@ __APP_LUCIDE_SCRIPT__
   .channel-header h2{margin:0;font-family:var(--font-display);font-size:1.9rem;line-height:1.1;font-weight:800}
   .sub{margin:8px 0 0;color:var(--muted);line-height:1.5;max-width:68ch}
   .stats{display:grid;grid-template-columns:repeat(4,82px);gap:6px}
-  .stat{min-height:58px;border:1px solid rgba(33,24,8,.10);border-radius:var(--radius);background:rgba(255,252,244,.74);padding:9px 10px;box-shadow:inset 0 1px 0 rgba(255,255,255,.72)}
+  .stat{min-height:58px;border:1px solid rgba(33,24,8,.10);border-radius:var(--radius);background:rgba(255,255,255,.74);padding:9px 10px;box-shadow:inset 0 1px 0 rgba(255,255,255,.72)}
   .stat strong{display:block;font-size:1.08rem;line-height:1;font-weight:800;font-variant-numeric:tabular-nums;color:var(--ink)}
   .stat span{display:block;margin-top:6px;color:var(--muted);font-size:.72rem;font-weight:700}
-  .project-rail{position:sticky;top:16px;min-width:0}
-  #roadmapPanel[hidden]{display:none}
-  .shell.is-feed-only{grid-template-columns:260px minmax(0,1fr)}
-  .roadmap-panel{border:1px solid var(--glass-line);border-radius:var(--radius);background:linear-gradient(180deg,rgba(255,255,255,.76),rgba(255,250,237,.52));padding:15px;box-shadow:inset 0 1px 0 var(--glass-hi),var(--shadow-lg);backdrop-filter:blur(12px) saturate(1.12);-webkit-backdrop-filter:blur(12px) saturate(1.12);transition:box-shadow .18s ease,border-color .18s ease}
+  .roadmap-panel{border:1px solid var(--glass-line);border-radius:var(--radius);background:linear-gradient(180deg,rgba(255,255,255,.94),rgba(255,255,255,.86));padding:15px;box-shadow:inset 0 1px 0 var(--glass-hi),var(--shadow-lg);backdrop-filter:blur(12px) saturate(1.12);-webkit-backdrop-filter:blur(12px) saturate(1.12);transition:box-shadow .18s ease,border-color .18s ease}
   .roadmap-panel.is-focused{border-color:rgba(254,229,0,.58);box-shadow:inset 0 1px 0 var(--glass-hi),0 0 0 3px rgba(254,229,0,.24),var(--shadow-lg)}
   .roadmap-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:start;margin-bottom:16px}
   .roadmap-head h2{margin:0;font-size:1.12rem;line-height:1.25;font-weight:820}
@@ -256,14 +257,40 @@ __APP_LUCIDE_SCRIPT__
   .member-card h3{margin:0;font-size:.95rem;font-weight:820}
   .member-card .role{margin:4px 0 10px;color:var(--muted);font-size:.8rem;font-weight:720;line-height:1.35;white-space:normal;overflow-wrap:anywhere}
   .task-list{display:grid;gap:7px;margin:0;padding:0;list-style:none}
-  .task-item{border:1px solid rgba(33,24,8,.10);border-radius:var(--radius);padding:9px;background:rgba(255,252,244,.72)}
+  .task-item{border:1px solid rgba(33,24,8,.10);border-radius:var(--radius);padding:9px;background:rgba(255,255,255,.72)}
   .task-item.done{opacity:.72}
   .task-title{font-weight:760;line-height:1.35}
   .task-meta{margin-top:4px;color:var(--muted);font-size:.78rem;font-weight:680}
+  .roadmap-flow{position:relative;min-height:220px;overflow:hidden;padding:6px 4px 16px;margin-top:4px;cursor:grab;touch-action:none;user-select:none}
+  .roadmap-flow.is-dragging{cursor:grabbing}
+  .flow-arrows{position:absolute;top:0;left:0;pointer-events:none;overflow:visible;z-index:0}
+  .flow-arrow{fill:none;stroke:#c8cbd1;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+  .flow-arrow-head{fill:#c8cbd1}
+  .roadmap-flow-inner{position:absolute;top:0;left:0;z-index:1;display:flex;gap:36px;transform-origin:0 0;will-change:transform}
+  .flow-col{position:relative;display:flex;flex-direction:column;gap:16px;min-width:210px}
+  .flow-node{border:1px solid var(--glass-line);border-radius:var(--radius);background:rgba(255,255,255,.92);padding:11px 12px;box-shadow:var(--shadow-md)}
+  .flow-node.status-done{opacity:.7}
+  .flow-node.status-doing{border:1.5px solid var(--warning);animation:flowPulse 2.2s ease-in-out infinite}
+  @keyframes flowPulse{
+    0%,100%{box-shadow:0 0 0 3px rgba(236,178,46,.22),var(--shadow-md)}
+    50%{box-shadow:0 0 0 7px rgba(236,178,46,.10),var(--shadow-md)}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .flow-node.status-doing{animation:none;box-shadow:0 0 0 3px rgba(236,178,46,.22),var(--shadow-md)}
+  }
+  .flow-node h4{margin:0;font-size:.92rem;font-weight:820;line-height:1.32}
+  .flow-status{display:inline-flex;align-items:center;gap:4px;margin-top:6px;font-size:.74rem;font-weight:730;color:var(--muted)}
+  .flow-status svg{width:13px;height:13px;stroke:currentColor;stroke-width:2.3;fill:none}
+  .flow-status.doing{color:#8a5b00}
+  .flow-meta{margin-top:3px;color:var(--quiet);font-size:.74rem;font-weight:680}
+  .flow-todos{margin:9px 0 0;padding:0;list-style:none;display:grid;gap:5px}
+  .flow-todos li{font-size:.78rem;font-weight:680;color:var(--ink-soft);padding:5px 7px;border-radius:6px;background:rgba(33,24,8,.05)}
+  .flow-todos li.done{opacity:.62;text-decoration:line-through}
+  .flow-todos li.flow-more{color:var(--muted);background:none;padding:2px 7px}
   .roadmap-note{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
-  .timeline{min-width:0;border:1px solid rgba(33,24,8,.10);border-radius:var(--radius);background:rgba(255,252,244,.88);box-shadow:var(--shadow-md);overflow:hidden;contain:layout paint style}
+  .timeline{min-width:0;border:1px solid rgba(33,24,8,.10);border-radius:var(--radius);background:rgba(255,255,255,.88);box-shadow:var(--shadow-md);overflow:hidden;contain:layout paint style}
   .event{position:relative;display:grid;grid-template-columns:42px minmax(0,1fr);gap:12px;padding:16px 18px;content-visibility:auto;contain-intrinsic-size:280px;contain:layout paint style}
-  .event:after{content:"";position:absolute;left:72px;right:18px;bottom:0;height:1px;background:rgba(33,24,8,.10)}
+  .event:after{content:"";position:absolute;left:72px;right:18px;bottom:0;height:2px;background:rgba(33,24,8,.32)}
   .event:last-child:after{display:none}
   .event-avatar{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border:1px solid rgba(37,33,29,.13);border-radius:8px;background:linear-gradient(180deg,rgba(255,255,255,.78),rgba(255,250,240,.54));color:var(--workspace);box-shadow:inset 0 1px 0 rgba(255,255,255,.86),0 8px 20px rgba(45,36,18,.08);text-align:center}
   .event-avatar svg{display:block;width:18px;height:18px;stroke:currentColor;stroke-width:2.15;stroke-linecap:round;stroke-linejoin:round;fill:none}
@@ -272,7 +299,15 @@ __APP_LUCIDE_SCRIPT__
   .event-avatar.location,.event-avatar.roadmap_input,.event-avatar.decision_meeting_location{background:linear-gradient(180deg,rgba(18,100,163,.15),rgba(255,250,240,.64));color:var(--slack-blue);border-color:rgba(18,100,163,.18)}
   .event-avatar.retro,.event-avatar.opinion{background:linear-gradient(180deg,rgba(224,30,90,.14),rgba(255,250,240,.64));color:var(--slack-red);border-color:rgba(224,30,90,.18)}
   .card{min-width:0;background:transparent;padding:0}
-  .card-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:start;margin-bottom:12px}
+  .card-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:start;margin-bottom:0;cursor:pointer;border-radius:6px}
+  .card-head:hover .title{color:var(--workspace)}
+  .card-head:focus-visible{outline:2px solid var(--kakao-yellow);outline-offset:3px}
+  .event.is-open .card-head{margin-bottom:12px}
+  .event-toggle{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;flex-shrink:0;color:var(--quiet)}
+  .event-toggle svg{width:16px;height:16px;stroke:currentColor;stroke-width:2.2;fill:none;transition:transform .16s ease}
+  .event.is-open .event-toggle svg{transform:rotate(180deg)}
+  .event .summary{display:none}
+  .event.is-open .summary{display:grid}
   .message-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px}
   .when{display:inline-flex;gap:5px;align-items:center;color:var(--muted);font-size:.78rem;font-weight:680;font-variant-numeric:tabular-nums}
   .when b{display:inline;color:var(--muted);font-size:inherit;font-weight:760}
@@ -284,7 +319,7 @@ __APP_LUCIDE_SCRIPT__
   .kind.retro,.kind.opinion{background:var(--slack-red-soft);color:var(--slack-red);border-color:rgba(224,30,90,.15)}
   .title{margin:0;font-size:1.05rem;line-height:1.34;font-weight:820;word-break:keep-all}
   .meta{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
-  .badge{position:relative;isolation:isolate;overflow:hidden;display:inline-flex;align-items:center;min-height:26px;border:1px solid rgba(33,24,8,.11);border-radius:999px;background:rgba(255,251,241,.64);padding:0 9px;font-size:.76rem;font-weight:720;color:var(--ink-soft)}
+  .badge{position:relative;isolation:isolate;overflow:hidden;display:inline-flex;align-items:center;min-height:26px;border:1px solid rgba(33,24,8,.11);border-radius:999px;background:rgba(255,255,255,.64);padding:0 9px;font-size:.76rem;font-weight:720;color:var(--ink-soft)}
   .badge.open{background:var(--amber-soft);color:#82500b;border-color:rgba(216,132,24,.28)}
   .badge.private{background:var(--rose-soft);color:#8b2639;border-color:rgba(191,64,88,.24)}
   .badge.report{background:var(--slack-blue-soft);color:var(--slack-blue);border-color:rgba(18,100,163,.22)}
@@ -294,9 +329,9 @@ __APP_LUCIDE_SCRIPT__
   .block h3{margin:0 0 9px;font-size:.9rem;line-height:1.3;font-weight:800}
   .block p{margin:0;color:var(--muted);line-height:1.5}
   .inline-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
-  .mini{position:relative;isolation:isolate;overflow:hidden;display:inline-flex;align-items:center;border:1px solid var(--glass-line);border-radius:999px;background:rgba(255,251,241,.68);padding:6px 9px;color:var(--ink-soft);font-size:.8rem;font-weight:700}
+  .mini{position:relative;isolation:isolate;overflow:hidden;display:inline-flex;align-items:center;border:1px solid var(--glass-line);border-radius:999px;background:rgba(255,255,255,.68);padding:6px 9px;color:var(--ink-soft);font-size:.8rem;font-weight:700}
   .best-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}
-  .best{position:relative;isolation:isolate;overflow:hidden;display:inline-flex;align-items:center;gap:7px;border:1px solid rgba(254,229,0,.28);border-radius:999px;background:rgba(255,251,241,.82);color:var(--ink);padding:7px 10px;font-weight:800;font-size:.84rem}
+  .best{position:relative;isolation:isolate;overflow:hidden;display:inline-flex;align-items:center;gap:7px;border:1px solid rgba(254,229,0,.28);border-radius:999px;background:rgba(255,255,255,.82);color:var(--ink);padding:7px 10px;font-weight:800;font-size:.84rem}
   .best:before{content:"";position:relative;z-index:2;flex:0 0 auto;width:7px;height:7px;border-radius:999px;background:var(--kakao-yellow);box-shadow:0 0 0 3px rgba(254,229,0,.16)}
   .bars{display:grid;gap:8px;margin-top:8px}
   .bar{display:grid;grid-template-columns:minmax(92px,1fr) 42px;gap:10px;align-items:center}
@@ -305,26 +340,27 @@ __APP_LUCIDE_SCRIPT__
   .track{height:8px;background:rgba(255,255,255,.76);border-radius:999px;overflow:hidden;border:1px solid rgba(33,24,8,.08)}
   .fill{height:100%;background:linear-gradient(90deg,var(--workspace),var(--warning));border-radius:999px}
   .answers{display:grid;gap:8px;margin:8px 0 0;padding:0;list-style:none}
-  .answers li{padding:9px 10px;border:1px solid rgba(33,24,8,.10);border-radius:var(--radius);background:rgba(255,252,244,.76);line-height:1.45;word-break:break-word}
+  .answers li{padding:9px 10px;border:1px solid rgba(33,24,8,.10);border-radius:var(--radius);background:rgba(255,255,255,.76);line-height:1.45;word-break:break-word}
   .preference-grid,.assignment-grid{display:grid;gap:8px;margin-top:9px}
   .assignment-grid{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
-  .preference-card,.assignment-card{border:1px solid rgba(33,24,8,.10);border-radius:var(--radius);background:rgba(255,252,244,.74);padding:10px;box-shadow:inset 0 1px 0 rgba(255,255,255,.58)}
+  .preference-card,.assignment-card{border:1px solid rgba(33,24,8,.10);border-radius:var(--radius);background:rgba(255,255,255,.74);padding:10px;box-shadow:inset 0 1px 0 rgba(255,255,255,.58)}
   .assignment-card{padding:12px 14px}
   .preference-card b,.assignment-card b{display:block;color:var(--ink);font-size:.86rem;font-weight:820;line-height:1.35}
   .preference-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
-  .preference-chip{display:inline-flex;align-items:center;gap:5px;border:1px solid rgba(33,24,8,.10);border-radius:999px;background:rgba(255,251,241,.76);padding:5px 8px;color:var(--ink-soft);font-size:.78rem;font-weight:720;line-height:1.25}
+  .preference-chip{display:inline-flex;align-items:center;gap:5px;border:1px solid rgba(33,24,8,.10);border-radius:999px;background:rgba(255,255,255,.76);padding:5px 8px;color:var(--ink-soft);font-size:.78rem;font-weight:720;line-height:1.25}
   .preference-rank{display:inline-grid;place-items:center;min-width:18px;height:18px;border-radius:999px;background:var(--workspace);color:#fff8e8;font-size:.68rem;font-weight:820;font-variant-numeric:tabular-nums;padding:0 5px}
   .assignment-role{display:block;margin-top:5px;color:var(--ink-soft);font-size:.86rem;font-weight:740;line-height:1.4;overflow-wrap:anywhere}
-  .decision-callout{display:grid;gap:10px;border:1px solid rgba(33,24,8,.10);border-radius:var(--radius);background:linear-gradient(180deg,rgba(255,253,247,.84),rgba(255,250,240,.58));padding:12px 14px;box-shadow:inset 0 1px 0 rgba(255,255,255,.72)}
-  .decision-time{display:inline-flex;width:max-content;max-width:100%;align-items:center;min-height:30px;border:1px solid rgba(33,24,8,.11);border-radius:999px;background:rgba(255,251,241,.78);padding:0 10px;color:var(--ink);font-size:.86rem;font-weight:820;line-height:1.2;box-shadow:inset 0 1px 0 rgba(255,255,255,.68)}
+  .decision-callout{display:grid;gap:10px;border:1px solid rgba(33,24,8,.10);border-radius:var(--radius);background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(255,255,255,.78));padding:12px 14px;box-shadow:inset 0 1px 0 rgba(255,255,255,.72)}
+  .decision-time{display:inline-flex;width:max-content;max-width:100%;align-items:center;min-height:30px;border:1px solid rgba(33,24,8,.11);border-radius:999px;background:rgba(255,255,255,.78);padding:0 10px;color:var(--ink);font-size:.86rem;font-weight:820;line-height:1.2;box-shadow:inset 0 1px 0 rgba(255,255,255,.68)}
   .decision-title{margin:0;color:var(--ink);font-weight:820;line-height:1.45}
   .decision-note{margin:0;color:var(--muted);font-size:.88rem;line-height:1.5}
-  .empty{border:1px dashed rgba(33,24,8,.24);border-radius:var(--radius);background:rgba(255,251,241,.62);padding:36px 22px;text-align:center;color:var(--muted)}
-  body.dashboard-page:before{background:linear-gradient(rgba(255,255,255,.34) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.28) 1px,transparent 1px);background-size:56px 56px;mask-image:none;-webkit-mask-image:none;opacity:.58}
+  .empty{border:1px dashed rgba(33,24,8,.24);border-radius:var(--radius);background:rgba(255,255,255,.62);padding:36px 22px;text-align:center;color:var(--muted)}
+  body.dashboard-page{background:#fff;--muted:#17140f;--quiet:#17140f;--ink-soft:#17140f}
+  body.dashboard-page:before{display:none}
   body.dashboard-page:after{display:none}
   body.dashboard-page .glass-panel,
   body.dashboard-page .roadmap-panel{
-    background:linear-gradient(180deg,rgba(255,253,247,.86),rgba(255,250,240,.66));
+    background:linear-gradient(180deg,rgba(255,255,255,.94),rgba(255,255,255,.86));
     box-shadow:inset 0 1px 0 rgba(255,255,255,.76),0 14px 36px rgba(45,36,18,.09);
     backdrop-filter:none;
     -webkit-backdrop-filter:none;
@@ -333,13 +369,12 @@ __APP_LUCIDE_SCRIPT__
   body.dashboard-page .glass-panel:after{opacity:.20;mix-blend-mode:normal}
   body.dashboard-page .roadmap-panel{contain:layout paint style}
   @media (max-width:1180px){
-    .shell{grid-template-columns:236px minmax(0,1fr);grid-template-areas:"workspace conversation" "workspace rail"}
+    .shell{grid-template-columns:236px minmax(0,1fr);grid-template-areas:"workspace conversation"}
     .workspace{grid-area:workspace}
     .conversation{grid-area:conversation}
-    .project-rail{grid-area:rail;position:relative;top:auto}
   }
   @media (max-width:840px){
-    .shell{display:grid;grid-template-columns:1fr;grid-template-areas:"workspace" "conversation" "rail";gap:12px;padding:12px 10px 36px}
+    .shell{display:grid;grid-template-columns:1fr;grid-template-areas:"workspace" "conversation";gap:12px;padding:12px 10px 36px}
     .workspace{position:relative;top:auto;min-height:auto}
     .workspace__top{grid-template-columns:38px minmax(0,1fr);align-items:start}
     .workspace__copy{min-width:0}
@@ -348,7 +383,6 @@ __APP_LUCIDE_SCRIPT__
     .members{grid-template-columns:repeat(auto-fit,minmax(142px,1fr))}
     .channel-row{display:block}
     .stats{grid-template-columns:repeat(4,minmax(0,1fr));margin-top:14px}
-    .project-rail{position:relative;top:auto}
     .card-head{display:block}
     .meta{justify-content:flex-start;margin-top:10px}
   }
@@ -386,7 +420,7 @@ __APP_LUCIDE_SCRIPT__
     </div>
     <nav class="workspace__nav" aria-label="방 요약">
       <button class="nav-item is-active" type="button" data-nav="all"><span class="nav-icon"><i data-lucide="list"></i></span><span>활동 피드</span><b id="sideEventCount">0</b></button>
-      <button class="nav-item" type="button" data-nav="tasks"><span class="nav-icon"><i data-lucide="clipboard-check"></i></span><span>태스크</span><b id="sideTaskCount">0</b></button>
+      <button class="nav-item" type="button" data-nav="tasks"><span class="nav-icon"><i data-lucide="clipboard-check"></i></span><span>로드맵</span><b id="sideTaskCount">0</b></button>
       <button class="nav-item" type="button" data-nav="responses"><span class="nav-icon"><i data-lucide="message-circle"></i></span><span>응답</span><b id="sideResponseCount">0</b></button>
       <button class="nav-item" type="button" data-nav="decisions"><span class="nav-icon"><i data-lucide="badge-check"></i></span><span>결정</span><b id="sideDecisionCount">0</b></button>
     </nav>
@@ -413,7 +447,6 @@ __APP_LUCIDE_SCRIPT__
     </header>
     <section class="timeline" id="timeline"></section>
   </main>
-  <aside id="roadmapPanel" class="project-rail"></aside>
 </div>
 <script>
 const dashboard = __DATA__;
@@ -422,6 +455,7 @@ const dailyReports = [...(dashboard.daily_reports || [])].sort((a, b) => new Dat
 const decisions = [...(dashboard.decisions || [])].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 const roadmap = dashboard.roadmap || {progress:{done:0,total:0}, task_layer_summary:{milestones:0,todos:0}, by_member:[], unassigned_tasks:[], calendar_candidates:[]};
 let activeNav = "all";
+let selectedMemberId = null;
 let currentEvents = [];
 
 function escapeText(value) {
@@ -498,6 +532,7 @@ function collapseDecisionEvents(events) {
 function visibleEventsForNav(events, nav) {
   if (nav === "responses") return events.filter((event) => event.type === "form");
   if (nav === "decisions") return events.filter((event) => event.type === "decision");
+  if (nav === "tasks") return [];
   return events;
 }
 
@@ -557,6 +592,190 @@ function renderTask(task) {
   `;
 }
 
+function hasRoadmapContent() {
+  const total = Number((roadmap.progress && roadmap.progress.total) || 0);
+  const milestoneCount = Number((roadmap.task_layer_summary && roadmap.task_layer_summary.milestones) || 0);
+  return Boolean(total || milestoneCount);
+}
+
+function statusIcon(status) {
+  if (status === "done") return '<svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>';
+  if (status === "doing") return '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>';
+  return '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg>';
+}
+
+function computeMilestoneLayers(milestones, edges) {
+  const ids = milestones.map((m) => Number(m.id));
+  const idSet = new Set(ids);
+  const incoming = {};
+  ids.forEach((id) => { incoming[id] = []; });
+  (edges || []).forEach((e) => {
+    const from = Number(e.from);
+    const to = Number(e.to);
+    if (idSet.has(from) && idSet.has(to)) incoming[to].push(from);
+  });
+  const layer = {};
+  function resolve(id, seen) {
+    if (layer[id] !== undefined) return layer[id];
+    if (seen.has(id)) { layer[id] = 0; return 0; }
+    seen.add(id);
+    const preds = incoming[id];
+    const l = preds.length ? Math.max(...preds.map((p) => resolve(p, seen))) + 1 : 0;
+    layer[id] = l;
+    return l;
+  }
+  ids.forEach((id) => resolve(id, new Set()));
+  return layer;
+}
+
+function renderFlowTodos(todos) {
+  const list = todos || [];
+  const items = list.slice(0, 4);
+  if (!items.length) return "";
+  const more = list.length > items.length
+    ? `<li class="flow-more">외 ${list.length - items.length}개</li>`
+    : "";
+  return `<ul class="flow-todos">${items.map((t) => `<li class="${t.status === "done" ? "done" : ""}">${escapeText(t.title)}${t.assignee ? ` · ${escapeText(t.assignee)}` : ""}</li>`).join("")}${more}</ul>`;
+}
+
+function roundedElbowPath(x1, y1, x2, y2, radius) {
+  const midX = (x1 + x2) / 2;
+  if (y1 === y2) return `M${x1},${y1} L${x2},${y2}`;
+  const dx1 = midX > x1 ? 1 : -1;
+  const dx2 = x2 > midX ? 1 : -1;
+  const dy = y2 > y1 ? 1 : -1;
+  const r = Math.max(0, Math.min(radius, Math.abs(midX - x1), Math.abs(x2 - midX), Math.abs(y2 - y1) / 2));
+  if (r < 1) return `M${x1},${y1} L${midX},${y1} L${midX},${y2} L${x2},${y2}`;
+  return (
+    `M${x1},${y1} L${midX - dx1 * r},${y1} ` +
+    `Q${midX},${y1} ${midX},${y1 + dy * r} ` +
+    `L${midX},${y2 - dy * r} ` +
+    `Q${midX},${y2} ${midX + dx2 * r},${y2} ` +
+    `L${x2},${y2}`
+  );
+}
+
+function drawFlowArrows() {
+  const flow = document.getElementById("roadmapFlow");
+  const svg = document.getElementById("flowArrows");
+  if (!flow || !svg) return;
+  const w = flow.clientWidth;
+  const h = flow.clientHeight;
+  svg.setAttribute("width", w);
+  svg.setAttribute("height", h);
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  const edges = roadmap.edges || [];
+  if (!edges.length) { svg.innerHTML = ""; return; }
+  const flowRect = flow.getBoundingClientRect();
+  const nodeRect = (id) => {
+    const el = flow.querySelector(`[data-node-id="${id}"]`);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    const anchorOffset = Math.min(26, r.height / 2);
+    return {
+      left: r.left - flowRect.left,
+      right: r.right - flowRect.left,
+      midY: r.top - flowRect.top + anchorOffset
+    };
+  };
+  let html = '<defs><marker id="flowArrowHead" markerWidth="8" markerHeight="8" refX="6" refY="3.5" orient="auto"><path class="flow-arrow-head" d="M0,0 L7,3.5 L0,7 Z"/></marker></defs>';
+  edges.forEach((e) => {
+    const from = nodeRect(e.from);
+    const to = nodeRect(e.to);
+    if (!from || !to) return;
+    const x1 = from.right, y1 = from.midY, x2 = to.left, y2 = to.midY;
+    const d = roundedElbowPath(x1, y1, x2, y2, 14);
+    html += `<path class="flow-arrow" d="${d}" marker-end="url(#flowArrowHead)"/>`;
+  });
+  svg.innerHTML = html;
+}
+
+window.addEventListener("resize", () => {
+  if (activeNav !== "tasks") return;
+  sizeFlowViewport();
+  drawFlowArrows();
+});
+
+let flowZoom = 1;
+let flowPanX = 0;
+let flowPanY = 0;
+let flowDragState = null;
+let flowInitialized = false;
+
+function sizeFlowViewport() {
+  const flow = document.getElementById("roadmapFlow");
+  const inner = document.getElementById("roadmapFlowInner");
+  if (!flow || !inner) return;
+  const maxH = Math.min(window.innerHeight * 0.7, 720);
+  flow.style.height = `${Math.max(220, Math.min(inner.offsetHeight + 24, maxH))}px`;
+}
+
+function initFlowPanIfNeeded() {
+  if (flowInitialized) return;
+  const flow = document.getElementById("roadmapFlow");
+  const inner = document.getElementById("roadmapFlowInner");
+  if (!flow || !inner) return;
+  flowPanX = (flow.clientWidth - inner.offsetWidth) / 2;
+  flowPanY = (flow.clientHeight - inner.offsetHeight) / 2;
+  flowInitialized = true;
+}
+
+function clampFlowPan() {
+  const flow = document.getElementById("roadmapFlow");
+  const inner = document.getElementById("roadmapFlowInner");
+  if (!flow || !inner) return;
+  const keep = Math.min(220, inner.offsetWidth * 0.6, inner.offsetHeight * 0.6);
+  const scaledW = inner.offsetWidth * flowZoom;
+  const scaledH = inner.offsetHeight * flowZoom;
+  let minX = keep - scaledW;
+  let maxX = flow.clientWidth - keep;
+  if (minX > maxX) { minX = maxX = (flow.clientWidth - scaledW) / 2; }
+  let minY = keep - scaledH;
+  let maxY = flow.clientHeight - keep;
+  if (minY > maxY) { minY = maxY = (flow.clientHeight - scaledH) / 2; }
+  flowPanX = Math.min(maxX, Math.max(minX, flowPanX));
+  flowPanY = Math.min(maxY, Math.max(minY, flowPanY));
+}
+
+function applyFlowTransform() {
+  const inner = document.getElementById("roadmapFlowInner");
+  if (!inner) return;
+  clampFlowPan();
+  inner.style.transform = `translate(${flowPanX}px, ${flowPanY}px) scale(${flowZoom})`;
+  drawFlowArrows();
+}
+
+function bindFlowInteractions() {
+  const flow = document.getElementById("roadmapFlow");
+  if (!flow || flow.dataset.flowBound) return;
+  flow.dataset.flowBound = "1";
+  flow.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    flowZoom = Math.min(2, Math.max(0.4, Math.round((flowZoom + delta) * 100) / 100));
+    applyFlowTransform();
+  }, { passive: false });
+  flow.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    flowDragState = { startX: e.clientX, startY: e.clientY, panX: flowPanX, panY: flowPanY };
+    flow.classList.add("is-dragging");
+    flow.setPointerCapture(e.pointerId);
+  });
+  flow.addEventListener("pointermove", (e) => {
+    if (!flowDragState) return;
+    flowPanX = flowDragState.panX + (e.clientX - flowDragState.startX);
+    flowPanY = flowDragState.panY + (e.clientY - flowDragState.startY);
+    applyFlowTransform();
+  });
+  const endFlowDrag = () => {
+    flowDragState = null;
+    flow.classList.remove("is-dragging");
+  };
+  flow.addEventListener("pointerup", endFlowDrag);
+  flow.addEventListener("pointercancel", endFlowDrag);
+  flow.addEventListener("pointerleave", () => { if (flowDragState) endFlowDrag(); });
+}
+
 function renderRoadmap() {
   const total = Number((roadmap.progress && roadmap.progress.total) || 0);
   const layer = roadmap.task_layer_summary || {};
@@ -565,28 +784,52 @@ function renderRoadmap() {
   const done = Number((roadmap.progress && roadmap.progress.done) || 0);
   const pct = total ? Math.round(done / total * 100) : 0;
   const needsTodo = Boolean(layer.needs_todo_decomposition);
-  const members = (roadmap.by_member || []).map((member) => {
-    const tasks = (member.tasks || []).slice(0, 5);
-    const more = (member.tasks || []).length > tasks.length ? `<li class="task-item"><div class="task-meta">외 ${(member.tasks || []).length - tasks.length}개</div></li>` : "";
-    return `
-      <section class="member-card">
-        <h3>${escapeText(member.nickname)}</h3>
-        <div class="role">${escapeText(member.role || "역할 미정")} · ${escapeText((member.progress && member.progress.done) || 0)}/${escapeText((member.progress && member.progress.total) || 0)} 완료</div>
-        <ul class="task-list">${tasks.map(renderTask).join("") || `<li class="task-item"><div class="task-meta">아직 배정된 태스크가 없습니다.</div></li>`}${more}</ul>
-      </section>
-    `;
-  }).join("");
+  const milestones = roadmap.milestones || [];
+  const milestoneLayer = computeMilestoneLayers(milestones, roadmap.edges || []);
+  const columns = [];
+  milestones.forEach((m) => {
+    const l = milestoneLayer[Number(m.id)] || 0;
+    if (!columns[l]) columns[l] = [];
+    columns[l].push(m);
+  });
+  const flowHtml = columns.length ? `
+    <div class="roadmap-flow" id="roadmapFlow">
+      <svg class="flow-arrows" id="flowArrows"></svg>
+      <div class="roadmap-flow-inner" id="roadmapFlowInner">
+        ${columns.map((col) => `
+          <div class="flow-col">
+            ${(col || []).map((m) => `
+              <div class="flow-node status-${escapeText(m.status)}" data-node-id="${escapeText(m.id)}">
+                <h4>${escapeText(m.title)}</h4>
+                <div class="flow-status ${m.status === "doing" ? "doing" : ""}">${statusIcon(m.status)}<span>${escapeText(statusLabel(m.status))}</span></div>
+                <div class="flow-meta">${escapeText(taskDate(m))}</div>
+                ${renderFlowTodos(m.todos)}
+              </div>
+            `).join("")}
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  ` : "";
+  if (flowHtml) {
+    window.requestAnimationFrame(() => {
+      bindFlowInteractions();
+      sizeFlowViewport();
+      initFlowPanIfNeeded();
+      applyFlowTransform();
+    });
+  }
   return `
     <section class="roadmap-panel">
       <div class="roadmap-head">
         <div>
           <h2>로드맵 진행</h2>
-          <p>${needsTodo ? "로드맵 단계는 준비됐고, 이제 개인별 실행 todo로 분해해야 합니다." : "역할분배와 연결된 개인별 할일, 마감 후보, 미배정 태스크를 한곳에 모았습니다."}</p>
+          <p>${needsTodo ? "로드맵 단계는 준비됐고, 이제 개인별 실행 todo로 분해해야 합니다." : "마일스톤 간 선행 관계와 각 단계의 담당 todo를 한눈에 봅니다."}</p>
         </div>
         <span class="progress-chip">${done}/${total} 완료</span>
       </div>
       <div class="progress-line"><span style="width:${Math.max(2, pct)}%"></span></div>
-      <div class="member-grid">${members}</div>
+      ${flowHtml}
       <div class="roadmap-note">
         <span class="badge">${escapeText(milestoneCount)}개 단계</span>
         <span class="badge ${needsTodo ? "open" : ""}">${escapeText(total)}개 todo</span>
@@ -689,7 +932,7 @@ function renderFormEvent(form, sequence) {
     <article class="event">
       <div class="event-avatar ${escapeText(kindClass(form.kind))}" aria-hidden="true">${eventIcon(form.kind)}</div>
       <section class="card">
-        <div class="card-head">
+        <div class="card-head" role="button" tabindex="0" aria-expanded="false">
           <div>
             <div class="message-meta">
               <span class="kind ${escapeText(kindClass(form.kind))}">${eventNumber(sequence)} · ${escapeText(kindLabel(form.kind))}</span>
@@ -697,7 +940,7 @@ function renderFormEvent(form, sequence) {
             </div>
             <h2 class="title">${escapeText(form.title)}</h2>
           </div>
-          <div class="meta">${badges.map((b) => `<span class="badge ${b === "진행중" ? "open" : b === "식별" ? "private" : ""}">${escapeText(b)}</span>`).join("")}</div>
+          <div class="meta">${badges.map((b) => `<span class="badge ${b === "진행중" ? "open" : b === "식별" ? "private" : ""}">${escapeText(b)}</span>`).join("")}<span class="event-toggle" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span></div>
         </div>
         <div class="summary">${summary}</div>
       </section>
@@ -719,7 +962,7 @@ function renderReportEvent(report, sequence) {
     <article class="event">
       <div class="event-avatar daily_report" aria-hidden="true">${eventIcon("daily_report")}</div>
       <section class="card">
-        <div class="card-head">
+        <div class="card-head" role="button" tabindex="0" aria-expanded="false">
           <div>
             <div class="message-meta">
               <span class="kind daily_report">${eventNumber(sequence)} · ${escapeText(kindLabel("daily_report"))}</span>
@@ -732,6 +975,7 @@ function renderReportEvent(report, sequence) {
             <span class="badge ${counts.overdue ? "open" : ""}">밀림 ${escapeText(counts.overdue || 0)}</span>
             <span class="badge">오늘 ${escapeText(counts.due_today || 0)}</span>
             <span class="badge">예정 ${escapeText(counts.future || 0)}</span>
+            <span class="event-toggle" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span>
           </div>
         </div>
         <div class="summary">
@@ -857,7 +1101,7 @@ function renderDecisionEvent(decision, sequence) {
     <article class="event">
       <div class="event-avatar ${escapeText(kindClass(kind))}" aria-hidden="true">${eventIcon(kind)}</div>
       <section class="card">
-        <div class="card-head">
+        <div class="card-head" role="button" tabindex="0" aria-expanded="false">
           <div>
             <div class="message-meta">
               <span class="kind ${escapeText(kindClass(kind))}">${eventNumber(sequence)} · ${escapeText(kindLabel(kind))}</span>
@@ -865,7 +1109,7 @@ function renderDecisionEvent(decision, sequence) {
             </div>
             <h2 class="title">${escapeText(decisionDisplayTitle(decision))}</h2>
           </div>
-          <div class="meta"><span class="badge report">확정</span></div>
+          <div class="meta"><span class="badge report">확정</span><span class="event-toggle" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span></div>
         </div>
         <div class="summary">${renderDecisionSummary(decision)}</div>
       </section>
@@ -902,8 +1146,31 @@ function renderTimelineEvent(event) {
   return renderFormEvent(event.data, sequence);
 }
 
+const navSubtitle = {
+  all: "방에서 만든 투표, 체크인, 리포트, 확정 결정을 최신순으로 모았습니다.",
+  responses: "팀원들이 남긴 투표/폼 응답을 모았습니다.",
+  decisions: "역할분배, 회의 시간·장소 등 확정된 결정을 모았습니다.",
+  tasks: "마일스톤 간 선행 관계와 각 단계의 담당 todo를 한눈에 봅니다."
+};
+
 function renderFeed() {
   const timeline = document.getElementById("timeline");
+  const subtitle = document.getElementById("subtitle");
+  if (activeNav === "member") {
+    const member = dashboard.members.find((m) => Number(m.id) === selectedMemberId);
+    if (subtitle) subtitle.textContent = member ? `${member.nickname}님이 맡은 역할과 진행 상황입니다.` : navSubtitle.all;
+    timeline.innerHTML = renderMemberDetail(selectedMemberId);
+    syncIcons();
+    return;
+  }
+  if (subtitle) subtitle.textContent = navSubtitle[activeNav] || navSubtitle.all;
+  if (activeNav === "tasks") {
+    const roadmapHtml = renderRoadmap();
+    timeline.innerHTML = roadmapHtml
+      || `<div class="empty"><h2>아직 로드맵이 없습니다</h2><p>로드맵을 만들면 멤버별 태스크가 여기 표시됩니다.</p></div>`;
+    syncIcons();
+    return;
+  }
   const events = filteredEvents(currentEvents);
   const emptyText = {
     responses: "아직 투표/폼 기록이 없습니다.",
@@ -916,21 +1183,91 @@ function renderFeed() {
   syncIcons();
 }
 
+function toggleEventCard(head) {
+  const article = head.closest(".event");
+  if (!article) return;
+  const open = article.classList.toggle("is-open");
+  head.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+function bindTimelineToggle() {
+  const timeline = document.getElementById("timeline");
+  if (!timeline || timeline.dataset.toggleBound) return;
+  timeline.dataset.toggleBound = "1";
+  timeline.addEventListener("click", (e) => {
+    const head = e.target.closest(".card-head");
+    if (head) toggleEventCard(head);
+  });
+  timeline.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const head = e.target.closest(".card-head");
+    if (!head) return;
+    e.preventDefault();
+    toggleEventCard(head);
+  });
+}
+
+function findMemberBucket(memberId) {
+  return (roadmap.by_member || []).find((b) => Number(b.member_id) === Number(memberId));
+}
+
+function renderMemberDetail(memberId) {
+  const member = dashboard.members.find((m) => Number(m.id) === Number(memberId));
+  if (!member) return `<div class="empty"><h2>멤버를 찾을 수 없습니다</h2></div>`;
+  const bucket = findMemberBucket(memberId);
+  const role = (bucket && bucket.role) || member.role || "역할 미정";
+  const tasks = (bucket && bucket.tasks) || [];
+  const done = tasks.filter((t) => t.status === "done");
+  const pending = tasks.filter((t) => t.status !== "done");
+  const taskItem = (t) => `<li>${escapeText(t.title)}${t.status === "doing" ? " · 진행중" : ""}</li>`;
+  return `
+    <section class="roadmap-panel">
+      <div class="roadmap-head">
+        <div>
+          <h2>${escapeText(member.nickname)}</h2>
+          <p class="member-detail-role">${escapeText(role)}</p>
+        </div>
+        <span class="progress-chip">${done.length}/${tasks.length} 완료</span>
+      </div>
+      <div class="block" style="margin-top:16px">
+        <h3>완료</h3>
+        <ul class="answers">${done.length ? done.map(taskItem).join("") : "<li>완료한 항목이 없습니다.</li>"}</ul>
+      </div>
+      <div class="block" style="margin-top:16px">
+        <h3>미완료</h3>
+        <ul class="answers">${pending.length ? pending.map(taskItem).join("") : "<li>남은 할 일이 없습니다.</li>"}</ul>
+      </div>
+    </section>
+  `;
+}
+
+function selectMember(memberId) {
+  selectedMemberId = Number(memberId);
+  activeNav = "member";
+  document.querySelectorAll(".nav-item").forEach((button) => button.classList.remove("is-active"));
+  document.querySelectorAll(".member").forEach((button) => {
+    button.classList.toggle("is-active", Number(button.dataset.memberId) === selectedMemberId);
+  });
+  renderFeed();
+}
+
+function bindMemberSelect() {
+  const members = document.getElementById("members");
+  if (!members || members.dataset.selectBound) return;
+  members.dataset.selectBound = "1";
+  members.addEventListener("click", (e) => {
+    const btn = e.target.closest(".member");
+    if (btn) selectMember(btn.dataset.memberId);
+  });
+}
+
 function setActiveNav(nav) {
   activeNav = nav;
+  selectedMemberId = null;
   document.querySelectorAll(".nav-item").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.nav === nav);
   });
-  if (nav === "tasks") {
-    renderFeed();
-    const panel = document.querySelector("#roadmapPanel:not([hidden]) .roadmap-panel");
-    if (panel) {
-      panel.scrollIntoView({behavior: "smooth", block: "start"});
-      panel.classList.add("is-focused");
-      window.setTimeout(() => panel.classList.remove("is-focused"), 1200);
-    }
-    return;
-  }
+  document.querySelectorAll(".member").forEach((button) => button.classList.remove("is-active"));
   renderFeed();
 }
 
@@ -951,7 +1288,6 @@ function render() {
   const visibleDecisionEvents = visibleEventsForNav(currentEvents, "decisions");
   document.getElementById("roomName").textContent = dashboard.room.name;
   document.getElementById("roomInvite").textContent = `초대 코드 ${dashboard.room.invite_code}`;
-  document.getElementById("subtitle").textContent = `방에서 만든 투표, 체크인, 리포트, 확정 결정을 최신순으로 모았습니다.`;
   document.getElementById("formCount").textContent = visibleAllEvents.length;
   document.getElementById("memberCount").textContent = dashboard.members.length;
   document.getElementById("taskCount").textContent = taskTotal;
@@ -962,16 +1298,12 @@ function render() {
   document.getElementById("sideDecisionCount").textContent = visibleDecisionEvents.length;
 
   const members = document.getElementById("members");
-  members.innerHTML = dashboard.members.map((member) => `<span class="member" data-initial="${escapeText(memberInitial(member.nickname))}"><span class="member-copy"><b>${escapeText(member.nickname)}</b><span class="member-role">${escapeText(member.role || "역할 미정")}</span></span></span>`).join("");
-  const shell = document.getElementById("dashboardShell");
-  const roadmapPanel = document.getElementById("roadmapPanel");
-  const roadmapHtml = renderRoadmap();
-  roadmapPanel.innerHTML = roadmapHtml;
-  roadmapPanel.hidden = !roadmapHtml;
-  shell.classList.toggle("is-feed-only", !roadmapHtml);
+  members.innerHTML = dashboard.members.map((member) => `<button type="button" class="member" data-member-id="${escapeText(member.id)}" data-initial="${escapeText(memberInitial(member.nickname))}"><span class="member-copy"><b>${escapeText(member.nickname)}</b><span class="member-role">${escapeText(member.role || "역할 미정")}</span></span></button>`).join("");
   const taskNav = document.querySelector('[data-nav="tasks"]');
-  if (taskNav) taskNav.disabled = !roadmapHtml;
+  if (taskNav) taskNav.disabled = !hasRoadmapContent();
   bindNav();
+  bindTimelineToggle();
+  bindMemberSelect();
   renderFeed();
   syncIcons();
 }
