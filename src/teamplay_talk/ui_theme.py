@@ -98,7 +98,7 @@ function shouldSkipLiquid(element) {
   if (
     element.closest(".sd-root-modern") &&
     element.matches(
-      ".sd-selectbase__item,.sd-ranking-item,.sd-input,.sd-comment,.sd-dropdown,.sd-tagbox,.sd-btn,.sd-navigation__complete-btn"
+      ".sd-selectbase__item,.sd-ranking-item,.sd-input,.sd-comment,.sd-dropdown,.sd-tagbox"
     )
   ) {
     return true;
