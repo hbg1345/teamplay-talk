@@ -13,7 +13,7 @@
 #
 # ── PlayMCP OAuth 폼(카카오) ─────────────────────────────────────────────
 #   Authorization Endpoint : https://kauth.kakao.com/oauth/authorize
-#   Token Endpoint         : https://teamplay-server.playmcp-endpoint.kakaocloud.io/kakao/token
+#   Token Endpoint         : https://teamplay-talk.playmcp-endpoint.kakaocloud.io/kakao/token
 #   Client ID              : 카카오 REST API 키 / Grant Type: AUTHORIZATION_CODE
 # ─────────────────────────────────────────────────────────────────────────
 set -euo pipefail

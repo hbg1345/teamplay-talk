@@ -54,8 +54,10 @@ def _b64d(raw: str) -> bytes:
 
 def create_dashboard_token(room_id: int, user_id: int, ttl_seconds: int = _TOKEN_TTL_SECONDS) -> str:
     """room_id/user_id/만료시각을 담은 HMAC 토큰을 만든다."""
+    room = storage.get_room(room_id)
     payload = {
         "room_id": int(room_id),
+        "room_public_id": str((room or {}).get("public_id") or ""),
         "user_id": int(user_id),
         "exp": int(time.time()) + ttl_seconds,
     }
@@ -75,6 +77,14 @@ def _verify_dashboard_token(token: str, room_id: int) -> dict[str, int] | None:
         if int(payload.get("room_id", -1)) != int(room_id):
             return None
         if int(payload.get("exp", 0)) < int(time.time()):
+            return None
+        room = storage.get_room(room_id)
+        if room is None:
+            return None
+        # 서버/DB가 갈라진 상태에서 같은 숫자 room_id가 다른 방을 가리키는
+        # 경우를 막는다. public_id는 DB에 저장된 난수 식별자라 복제되지 않은
+        # 다른 DB에서는 맞을 가능성이 극히 낮다.
+        if str(payload.get("room_public_id") or "") != str(room.get("public_id") or ""):
             return None
         user_id = int(payload.get("user_id", 0))
         if not storage.is_room_member(room_id, user_id):
