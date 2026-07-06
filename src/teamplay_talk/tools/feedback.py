@@ -23,14 +23,20 @@ class PollQuestion(BaseModel):
 
     title: str = Field(description="질문 내용")
     type: Literal["single", "multi", "rank", "rating", "text"] = Field(
-        default="single",
         description=(
+            "필수. 절대 생략하지 말 것 — 생략하면 선택지 없는 객관식으로 만들어져 "
+            "사용자가 답을 입력할 방법이 없는 빈 폼이 된다. "
             "single=객관식 단일선택, multi=복수선택, "
-            "rank=선호 순위(드래그 정렬), rating=점수(1~N), text=주관식"
+            "rank=선호 순위(드래그 정렬), rating=점수(1~N), text=주관식. "
+            "선택지(choices)를 정할 수 없는 질문(자유 응답)이면 반드시 text로 지정할 것."
         ),
     )
     choices: list[str] = Field(
-        default_factory=list, description="선택지 (single/multi/rank용; text/rating은 비움)"
+        default_factory=list,
+        description=(
+            "선택지 (single/multi/rank는 필수— 비우면 답할 수 없는 빈 폼이 됨; "
+            "text/rating은 비워둘 것)"
+        ),
     )
     rate_max: int = Field(default=5, description="rating 최대 점수 (rating 타입에서만)")
 
