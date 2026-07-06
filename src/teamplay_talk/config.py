@@ -30,6 +30,8 @@ class Settings:
     kakao_rest_api_key: str
     kakao_client_secret: str | None
     kakao_redirect_uri: str
+    invite_oauth_enabled: bool
+    invite_state_secret: str | None
     daily_task_digest_enabled: bool
     daily_task_digest_hour_kst: int
     daily_checkin_enabled: bool
@@ -58,6 +60,9 @@ class Settings:
             kakao_redirect_uri=os.getenv(
                 "KAKAO_REDIRECT_URI", f"http://localhost:{port}/auth/kakao/callback"
             ),
+            invite_oauth_enabled=os.getenv("INVITE_OAUTH_ENABLED", "").lower()
+            in {"1", "true", "yes", "on"},
+            invite_state_secret=os.getenv("INVITE_STATE_SECRET") or None,
             daily_task_digest_enabled=os.getenv("DAILY_TASK_DIGEST_ENABLED", "").lower()
             in {"1", "true", "yes", "on"},
             daily_task_digest_hour_kst=max(0, min(23, digest_hour)),

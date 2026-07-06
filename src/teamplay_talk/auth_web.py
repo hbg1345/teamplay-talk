@@ -30,12 +30,12 @@ _STATE_TTL_SECONDS = 60 * 60 * 24  # 24시간
 
 
 def _secret() -> bytes:
-    """state 서명 키. 진짜 비밀에서만 가져온다(공개값 폴백 없음)."""
-    raw = settings.kakao_client_secret or settings.kakao_rest_api_key
+    """state 서명 키. 진짜 비밀에서만 가져온다(공개 client id 폴백 없음)."""
+    raw = settings.invite_state_secret or settings.kakao_client_secret
     if not raw:
         raise RuntimeError(
-            "초대 링크 state 서명 키가 없습니다. KAKAO_CLIENT_SECRET 또는 "
-            "KAKAO_REST_API_KEY를 설정하세요."
+            "초대 링크 state 서명 키가 없습니다. INVITE_STATE_SECRET 또는 "
+            "KAKAO_CLIENT_SECRET을 설정하세요."
         )
     return raw.encode("utf-8")
 
@@ -83,8 +83,10 @@ def _redirect_uri() -> str:
 def build_invite_oauth_url(invite_code: str) -> str | None:
     """친구가 클릭하면 인증+방 참여까지 되는 카카오 로그인 링크를 만든다.
 
-    서명 키(kakao 자격증명)가 없으면 None을 반환한다(링크 생략).
+    INVITE_OAUTH_ENABLED가 꺼져 있거나 서명 키가 없으면 None을 반환한다.
     """
+    if not settings.invite_oauth_enabled:
+        return None
     try:
         state = _sign_state(
             {"invite_code": invite_code, "exp": int(time.time()) + _STATE_TTL_SECONDS}
@@ -110,6 +112,9 @@ def _page(title: str, message: str, status: int = 200) -> HTMLResponse:
 
 async def kakao_callback(request: Request) -> HTMLResponse:
     """GET /auth/kakao/callback?code=..&state=.. — 인증 후 방 참여를 완결한다."""
+    if not settings.invite_oauth_enabled:
+        return _page("비활성화됨", "카카오 초대 링크 참여는 현재 사용하지 않습니다.", 404)
+
     code = request.query_params.get("code")
     state = request.query_params.get("state") or ""
     data = _verify_state(state)

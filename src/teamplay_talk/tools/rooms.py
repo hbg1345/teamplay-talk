@@ -54,8 +54,8 @@ def _decision_payload(decision: dict[str, Any]) -> dict[str, Any]:
 def _invite_payload(room: dict[str, Any]) -> dict[str, str]:
     invite_code = room["invite_code"]
     join_command = f'join_room(invite_code="{invite_code}")'
-    # 클릭 한 번으로 카카오 인증+방 참여가 되는 링크(친구가 teamplay-talk를 아직
-    # 연결 안 했어도 됨). 서명 키가 없으면 None → 문구에서 생략.
+    # 프로토타입 기본값은 PlayMCP 초대 코드 참여다. OAuth 초대 링크는
+    # INVITE_OAUTH_ENABLED=true일 때만 생성된다.
     oauth_join_url = build_invite_oauth_url(invite_code)
     lines = [
         f"팀플톡 '{room['name']}' 방에 참여해 주세요.",

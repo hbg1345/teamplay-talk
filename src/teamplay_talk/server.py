@@ -144,8 +144,10 @@ register_dashboard_routes(mcp)
 # 카카오 토큰 프록시(/kakao/token) — PlayMCP의 Basic 인증을 카카오용 body로 변환
 register_kakao_token_proxy(mcp)
 
-# 카카오 OAuth 초대 콜백(/auth/kakao/callback) — 링크 클릭 → 인증 + 방 참여 원샷
-register_auth_routes(mcp)
+# 카카오 OAuth 초대 콜백(/auth/kakao/callback) — 기본 비활성화.
+# 프로토타입 기본 참여 흐름은 PlayMCP에서 초대 코드를 입력하는 방식이다.
+if settings.invite_oauth_enabled:
+    register_auth_routes(mcp)
 
 # 홈페이지(랜딩) — / , /favicon.svg
 register_home_routes(mcp)
