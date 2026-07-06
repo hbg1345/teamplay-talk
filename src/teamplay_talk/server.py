@@ -173,12 +173,14 @@ def _public_transport_security() -> dict[str, list[str]]:
 
 def main() -> None:
     start_scheduler()  # 폼 마감 감지 + 드라이버 nudge (백그라운드)
+    # NOTE: FastMCP 3.x의 run()은 allowed_hosts/allowed_origins 인자를 받지 않는다.
+    # 또한 public 호스트로 화이트리스트를 걸면 KC 헬스체크(내부 IP/localhost)가
+    # 거부되어 503이 난다. 호스트 라우팅은 KC/PlayMCP 앞단이 담당하므로 제한하지 않는다.
     mcp.run(
         transport="http",
         host=settings.host,
         port=settings.port,
         uvicorn_config={"access_log": False},
-        **_public_transport_security(),
     )
 
 
