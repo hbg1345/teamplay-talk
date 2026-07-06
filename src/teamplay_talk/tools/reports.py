@@ -84,7 +84,7 @@ def register(mcp: FastMCP) -> None:
         },
     )
     async def room_dashboard(room_id: int | None = None) -> dict[str, Any]:
-        """현재 작업 방의 결과 타임라인 대시보드 링크를 반환합니다.
+        """teamplay-talk(팀플톡) — 현재 작업 방의 결과 타임라인 대시보드 링크를 반환합니다.
 
         방에서 만든 투표, 의견수렴, 회의 시간, 역할, 리포트를 시간순으로 볼 수 있는
         대시보드 링크를 만듭니다. 진행 중인 폼과 최근 결정도 함께 요약하므로, 현재

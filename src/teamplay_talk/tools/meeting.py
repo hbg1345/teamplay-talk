@@ -67,7 +67,7 @@ def register(mcp: FastMCP) -> None:
         room_id: int | None = None,
         close_minutes: int | None = 1440,
     ) -> dict[str, Any]:
-        """회의 가능 시간을 모으는 날짜×시간 그리드 폼을 만듭니다.
+        """teamplay-talk(팀플톡) — 회의 가능 시간을 모으는 날짜×시간 그리드 폼을 만듭니다.
 
         팀원들이 날짜와 시간 칸마다 가능 여부를 체크합니다. 기본은 오늘부터 14일,
         오전 9시부터 밤 10시까지 1시간 단위입니다. 응답이 모이면 모두가 어려운 시간을
