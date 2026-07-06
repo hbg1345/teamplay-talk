@@ -176,10 +176,14 @@ def main() -> None:
     # NOTE: FastMCP 3.x의 run()은 allowed_hosts/allowed_origins 인자를 받지 않는다.
     # 또한 public 호스트로 화이트리스트를 걸면 KC 헬스체크(내부 IP/localhost)가
     # 거부되어 503이 난다. 호스트 라우팅은 KC/PlayMCP 앞단이 담당하므로 제한하지 않는다.
+    # PlayMCP는 stateless(no session) MCP 서버를 권장한다. stateless_http=True면
+    # 매 요청이 세션 없이 독립 처리되어, 세션 미유지 클라이언트(PlayMCP)에서도
+    # initialize 없이 바로 tools/list·tool call이 동작한다.
     mcp.run(
         transport="http",
         host=settings.host,
         port=settings.port,
+        stateless_http=True,
         uvicorn_config={"access_log": False},
     )
 
