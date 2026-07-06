@@ -16,6 +16,7 @@ from typing import Any
 from fastmcp import FastMCP
 
 from .. import storage
+from ..auth_web import build_invite_oauth_url
 from ..identity import resolve_caller
 
 _NEED_AUTH = {
@@ -53,16 +54,28 @@ def _decision_payload(decision: dict[str, Any]) -> dict[str, Any]:
 def _invite_payload(room: dict[str, Any]) -> dict[str, str]:
     invite_code = room["invite_code"]
     join_command = f'join_room(invite_code="{invite_code}")'
-    invite_share_text = (
-        f"팀플톡 '{room['name']}' 방에 참여해 주세요.\n"
-        f"초대 코드: {invite_code}\n"
-        f'PlayMCP에서 teamplay-talk를 열고 "초대 코드 {invite_code}로 방에 참여할래"라고 요청하면 됩니다.'
-    )
-    return {
+    # 클릭 한 번으로 카카오 인증+방 참여가 되는 링크(친구가 teamplay-talk를 아직
+    # 연결 안 했어도 됨). 서명 키가 없으면 None → 문구에서 생략.
+    oauth_join_url = build_invite_oauth_url(invite_code)
+    lines = [
+        f"팀플톡 '{room['name']}' 방에 참여해 주세요.",
+        f"초대 코드: {invite_code}",
+    ]
+    if oauth_join_url:
+        lines.append(f"카카오로 바로 참여하기: {oauth_join_url}")
+    else:
+        lines.append(
+            f'PlayMCP에서 teamplay-talk를 열고 "초대 코드 {invite_code}로 방에 참여할래"라고 요청하면 됩니다.'
+        )
+    invite_share_text = "\n".join(lines)
+    payload = {
         "invite_code": invite_code,
         "join_command": join_command,
         "invite_share_text": invite_share_text,
     }
+    if oauth_join_url:
+        payload["oauth_join_url"] = oauth_join_url
+    return payload
 
 
 def _room_onboarding(room: dict[str, Any]) -> dict[str, Any]:

@@ -17,6 +17,7 @@ from fastmcp import FastMCP
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
+from .auth_web import register_auth_routes
 from .config import settings
 from .dashboard_web import register_dashboard_routes
 from .forms_web import register_form_routes
@@ -142,6 +143,9 @@ register_dashboard_routes(mcp)
 
 # 카카오 토큰 프록시(/kakao/token) — PlayMCP의 Basic 인증을 카카오용 body로 변환
 register_kakao_token_proxy(mcp)
+
+# 카카오 OAuth 초대 콜백(/auth/kakao/callback) — 링크 클릭 → 인증 + 방 참여 원샷
+register_auth_routes(mcp)
 
 # 홈페이지(랜딩) — / , /favicon.svg
 register_home_routes(mcp)
