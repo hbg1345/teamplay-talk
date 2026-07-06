@@ -13,6 +13,8 @@ MCP 엔드포인트: ``http://<host>:<port>/mcp/``
 
 from __future__ import annotations
 
+from urllib.parse import urlsplit
+
 from fastmcp import FastMCP
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
@@ -153,6 +155,24 @@ if settings.invite_oauth_enabled:
 register_home_routes(mcp)
 
 
+def _public_transport_security() -> dict[str, list[str]]:
+    parsed = urlsplit(settings.public_base_url)
+    allowed_hosts: list[str] = []
+    allowed_origins: list[str] = []
+
+    if parsed.netloc:
+        allowed_hosts.append(parsed.netloc)
+        if parsed.hostname and parsed.hostname not in allowed_hosts:
+            allowed_hosts.append(parsed.hostname)
+    if parsed.scheme and parsed.netloc:
+        allowed_origins.append(f"{parsed.scheme}://{parsed.netloc}")
+
+    return {
+        "allowed_hosts": allowed_hosts,
+        "allowed_origins": allowed_origins,
+    }
+
+
 def main() -> None:
     start_scheduler()  # 폼 마감 감지 + 드라이버 nudge (백그라운드)
     mcp.run(
@@ -160,6 +180,7 @@ def main() -> None:
         host=settings.host,
         port=settings.port,
         uvicorn_config={"access_log": False},
+        **_public_transport_security(),
     )
 
 
