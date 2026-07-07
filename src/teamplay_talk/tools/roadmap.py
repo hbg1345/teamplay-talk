@@ -1174,8 +1174,18 @@ def register(mcp: FastMCP) -> None:
                 **formatted,
             }
 
+        # 부모 마일스톤에 날짜가 있으면 todo가 물려받는다(todo가 자체 날짜를 안 준 경우만).
+        # → build/schedule에서 마일스톤 날짜를 먼저 잡아두면 decompose가 자동 배정하므로
+        #   나중에 날짜를 다시 유도할 필요가 없다.
+        ms_dates = {
+            int(t["id"]): (_iso(t.get("start_at")), _iso(t.get("end_at")))
+            for t in milestone_rows
+        }
         created: list[dict[str, Any]] = []
         for todo, parent_id in resolved_todos:
+            inherit_start, inherit_end = (
+                ms_dates.get(int(parent_id), (None, None)) if parent_id else (None, None)
+            )
             task = storage.add_task(
                 room_id,
                 title=todo.title,
@@ -1184,8 +1194,8 @@ def register(mcp: FastMCP) -> None:
                 status=todo.status,
                 task_type="todo",
                 parent_task_id=parent_id,
-                start_at=todo.start_at,
-                end_at=todo.end_at,
+                start_at=todo.start_at or inherit_start,
+                end_at=todo.end_at or inherit_end,
             )
             created.append(_task_payload(task))
 
