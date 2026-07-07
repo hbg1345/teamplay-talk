@@ -946,6 +946,8 @@ def register(mcp: FastMCP) -> None:
         total_days = (final_day - start_day).days + 1
         durations = _allocate_milestone_days(milestones, total_days)
         scheduled: list[dict[str, Any]] = []
+        all_tasks = roadmap.get("tasks", [])
+        dated_todos = 0
         cursor = start_day
         for idx, (task, duration) in enumerate(zip(milestones, durations, strict=False)):
             if total_days >= len(milestones):
@@ -970,6 +972,26 @@ def register(mcp: FastMCP) -> None:
                 "end_date": end_day.isoformat(),
                 "duration_days": (end_day - item_start).days + 1,
             })
+            # 이 마일스톤 아래 실행 todo에도 날짜를 물려준다(날짜 없을 때만; 이미 있으면 존중).
+            # 데일리 체크인이 날짜 있는 todo 기준으로 돌기 때문에, 마일스톤 일정이 잡히는
+            # 순간 자식 todo 전부에 마감일(마일스톤 종료일)을 배정한다.
+            mid = int(task["id"])
+            ms_start = _day_start_utc(item_start)
+            ms_end = _day_end_utc(end_day)
+            for child in all_tasks:
+                if (child.get("task_type") or "milestone") != "todo":
+                    continue
+                if int(child.get("parent_task_id") or 0) != mid:
+                    continue
+                if child.get("end_at"):
+                    continue
+                storage.update_task(
+                    int(child["id"]),
+                    room_id,
+                    start_at=child.get("start_at") or ms_start,
+                    end_at=ms_end,
+                )
+                dated_todos += 1
             cursor = end_day + timedelta(days=1)
         formatted = _format(storage.get_roadmap(room_id))
         return {
@@ -980,7 +1002,15 @@ def register(mcp: FastMCP) -> None:
             "final_date": final_day.isoformat(),
             "final_milestone_hint": final_milestone,
             "scheduled_milestones": scheduled,
-            "next": "로드맵 마일스톤 일정이 저장됐습니다. 다음은 역할분배 또는 단계별 실행 todo 분해로 이어가면 됩니다.",
+            "dated_todos": dated_todos,
+            "next": (
+                "로드맵 마일스톤 일정이 저장됐습니다. "
+                + (
+                    f"각 단계 아래 실행 todo {dated_todos}개에 마감일을 물려줬습니다 — 이제 데일리 체크인이 날짜별로 동작합니다. "
+                    if dated_todos else ""
+                )
+                + "다음은 역할분배 또는 단계별 실행 todo 분해로 이어가면 됩니다."
+            ),
             "suggested_next_actions": [
                 "일정이 괜찮은지 팀장에게 확인하기",
                 "마일스톤 기준 역할분배 시작하기",
@@ -988,7 +1018,8 @@ def register(mcp: FastMCP) -> None:
                 "날짜가 있는 todo를 캘린더에 등록하기",
             ],
             "chat_response_hint": (
-                "각 마일스톤의 날짜를 목록으로 보여주세요. decompose나 todo 생성이 아니라 기존 로드맵 일정 배치가 완료됐다고 말하세요."
+                "각 마일스톤의 날짜를 목록으로 보여주세요. decompose나 todo 생성이 아니라 기존 로드맵 일정 배치가 완료됐다고 말하세요. "
+                "todo에 마감일이 물려졌으면 데일리 체크인이 날짜별로 가능해졌다고 덧붙이세요."
             ),
             **formatted,
         }
@@ -1184,6 +1215,7 @@ def register(mcp: FastMCP) -> None:
                 "역할명에만 묶인 todo가 있으면 역할을 확정하거나 역할명 보정하기",
                 "이번 주 팀원별 todo 확인하기",
                 "누락·중복이 보이면 할일 조정·삭제하기",
+                "마일스톤에 날짜(일정)를 잡으면 실행 todo에도 마감일이 붙어 데일리 체크인이 날짜별로 동작함 — 일정 배치 제안하기(선택)",
                 "팀원 의견이 더 필요하면 개별 할일 의견 폼 만들기",
                 "확정되면 개인별 또는 팀 전체에 공지하기",
             ],

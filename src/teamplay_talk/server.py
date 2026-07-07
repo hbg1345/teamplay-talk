@@ -115,7 +115,7 @@ mcp = FastMCP(
         "roadmap_manage(action=build)는 큰 단계(milestone)용이고 개인 실행 todo가 아니다. 사용자가 '각자 todo 초안', '조원별 할일'을 물으면 "
         "로드맵 milestone을 roadmap_manage(action=decompose)로 1~2일짜리 실행 todo 여러 개로 분해한 뒤 roadmap_manage(action=member_tasks)를 조회하라. "
         "todo를 직접 만들어 decompose에 넘길 때는 각 todo에 parent_title 또는 parent_task_id를 넣어 어느 마일스톤 아래 작업인지 연결하라. 확실하지 않으면 todos를 비우고 decompose를 호출해 서버 자동 초안을 사용하라. "
-        "사용자가 '각 로드맵 일정/마일스톤 날짜/최종일 기준 일정'을 물으면 decompose가 아니라 roadmap_manage(action=schedule, final_date='YYYY-MM-DD')로 기존 milestone의 start_at/end_at을 배치하라. "
+        "사용자가 '각 로드맵 일정/마일스톤 날짜/최종일 기준 일정'을 물으면 decompose가 아니라 roadmap_manage(action=schedule, final_date='YYYY-MM-DD')로 기존 milestone의 start_at/end_at을 배치하라. schedule은 마일스톤 날짜를 잡는 순간 그 아래 실행 todo 전부에 마감일(마일스톤 종료일)을 자동으로 물려주므로, todo별 날짜를 일일이 묻지 말고 마일스톤 일정만 유도하면 된다. 로드맵을 만들거나 decompose로 todo를 분해한 뒤에는, 데일리 체크인이 날짜 있는 todo를 기준으로 동작하니 '마일스톤에 날짜(일정)를 잡을까요?'처럼 일정 배치를 한 번 제안하라(선택사항, 강요 금지). 날짜는 목록으로 길게 나열하지 말고 개수·핵심만 말하라."
         "예: '7월 9일 최종 시현'이면 현재 연도를 붙여 final_date='2026-07-09'처럼 넘겨라. "
         "팀원 의견 원문 하나를 task_manage(action=add) 한 줄로 저장하지 말고, 필요한 하위 작업으로 쪼개라. "
         "개인별 할일을 말할 때는 기억으로 말하지 말고 roadmap_manage(action=view/member_tasks)가 반환한 DB 태스크를 기준으로 말해라. "
