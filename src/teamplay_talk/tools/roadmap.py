@@ -81,6 +81,53 @@ def _task_due_label(task: dict[str, Any]) -> str:
     return "일정 미정"
 
 
+def _created_todo_summary(
+    created: list[dict[str, Any]],
+    roadmap: dict[str, Any],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    """Return decompose-first summaries so the AI describes created todos, not milestones."""
+    milestones = {
+        int(task["id"]): str(task.get("title") or "")
+        for task in roadmap.get("tasks", [])
+        if (task.get("task_type") or "milestone") == "milestone"
+    }
+    by_parent: dict[int | None, dict[str, Any]] = {}
+    by_assignee: dict[str, dict[str, Any]] = {}
+    flat: list[dict[str, Any]] = []
+    for task in created:
+        parent_id = task.get("parent_task_id")
+        parent_key = int(parent_id) if parent_id is not None else None
+        parent_title = milestones.get(parent_key, task.get("parent_title") or "상위 단계 미정")
+        item = {
+            "id": task.get("id"),
+            "title": task.get("title"),
+            "details": task.get("details"),
+            "assignee": task.get("assignee"),
+            "parent_title": parent_title,
+            "start_at": task.get("start_at"),
+            "end_at": task.get("end_at"),
+            "status": task.get("status"),
+            "due_label": _task_due_label(task),
+        }
+        flat.append(item)
+        bucket = by_parent.setdefault(parent_key, {
+            "milestone": parent_title,
+            "todo_count": 0,
+            "todos": [],
+        })
+        bucket["todo_count"] += 1
+        bucket["todos"].append(item)
+        assignee = str(task.get("assignee") or "담당 미정")
+        member_bucket = by_assignee.setdefault(assignee, {
+            "assignee": assignee,
+            "todo_count": 0,
+            "todos": [],
+        })
+        member_bucket["todo_count"] += 1
+        member_bucket["todos"].append(item)
+    return flat, list(by_parent.values()), list(by_assignee.values())
+
+
 def _parse_task_dt(value: Any) -> datetime | None:
     if value is None:
         return None
@@ -677,8 +724,8 @@ def _format(roadmap: dict[str, Any]) -> dict[str, Any]:
         "role_assignment_guidance": (
             "로드맵 단계명은 역할이 아닙니다. 역할을 나눌 때는 여러 태스크를 책임지는 "
             "책임 범위를 만들어야 합니다. 고정 역할명 사전에서 고르지 말고, 최종 산출물·반복 작업·의존관계에서 "
-            "이 프로젝트만의 역할명을 직접 도출하세요. 역할별 difficulty는 작업량·불확실성·의존도·마감 리스크로 매기고, "
-            "병목 역할은 slots를 2 이상으로 잡으세요."
+            "이 프로젝트만의 역할명을 직접 도출하세요. 작업량·불확실성·의존도·마감 리스크는 내부 균형값으로만 반영하고, "
+            "사용자에게 난이도나 필요 인원 숫자로 노출하지 마세요."
         ),
         "chat_response_hint": chat_hint,
         "user_prompt_examples": [
@@ -755,12 +802,28 @@ def register(mcp: FastMCP) -> None:
             }
         roadmap = storage.set_roadmap(room["id"], tasks, edges or [])
         formatted = _format(roadmap)
+        schedule_state = formatted.get("schedule_state") or {}
+        date_planning_prompt = (
+            "마감일이나 발표일이 정해져 있으면, 이 로드맵의 마일스톤 날짜도 지금 배치할까요?"
+            if schedule_state.get("needs_schedule")
+            else None
+        )
+        suggested_next_actions = list(formatted.get("suggested_next_actions") or [])
+        if date_planning_prompt and date_planning_prompt not in suggested_next_actions:
+            suggested_next_actions.insert(2, date_planning_prompt)
+        next_message = formatted.get("next")
+        if date_planning_prompt:
+            next_message = f"{next_message} {date_planning_prompt}"
         return {
             "ok": True,
             "room": room["name"],
             "topic": topic,
             "replaced_existing": bool(existing["tasks"]),
             **formatted,
+            "date_planning": schedule_state,
+            "date_planning_prompt": date_planning_prompt,
+            "next": next_message,
+            "suggested_next_actions": suggested_next_actions[:8],
         }
 
     @mcp.tool(
@@ -1113,12 +1176,25 @@ def register(mcp: FastMCP) -> None:
             auto_generated = True
         if not todos:
             formatted = _format(roadmap)
+            flat_todos, todos_by_milestone, todos_by_assignee = _created_todo_summary(
+                formatted.get("todo_tasks", []),
+                roadmap,
+            )
             return {
                 "ok": True,
                 "room_id": room_id,
                 "room": room["name"],
                 "created_todos": [],
                 "created_count": 0,
+                "primary_result": {
+                    "kind": "roadmap_already_decomposed",
+                    "message": f"이미 실행 todo {len(flat_todos)}개가 있습니다.",
+                    "existing_todos": flat_todos,
+                    "todos_by_milestone": todos_by_milestone,
+                    "todos_by_assignee": todos_by_assignee,
+                },
+                "existing_todos_by_milestone": todos_by_milestone,
+                "existing_todos_by_assignee": todos_by_assignee,
                 "auto_generated": auto_generated,
                 "already_decomposed": True,
                 "next": "이미 각 마일스톤 아래 실행 todo가 있습니다. 팀원별 할일을 확인하거나 필요한 todo만 추가·수정하세요.",
@@ -1128,8 +1204,12 @@ def register(mcp: FastMCP) -> None:
                     "날짜나 담당자 수정하기",
                     "개인별 할일을 카톡으로 공지하기",
                 ],
-                "chat_response_hint": "이미 생성된 todo가 있음을 말하고, 팀원별 할일을 확인하자고 제안하세요.",
-                **formatted,
+                "task_layer_summary": formatted.get("task_layer_summary"),
+                "schedule_state": formatted.get("schedule_state"),
+                "chat_response_hint": (
+                    "마일스톤만 반복하지 말고 primary_result.existing_todos 또는 existing_todos_by_milestone를 먼저 보여주세요. "
+                    "이미 생성된 todo가 있음을 말하고, 팀원별 할일을 확인하자고 제안하세요."
+                ),
             }
 
         milestone_rows = [
@@ -1243,16 +1323,39 @@ def register(mcp: FastMCP) -> None:
         synced = storage.sync_task_assignees_by_roles(room_id)
         formatted = _format(storage.get_roadmap(room_id))
         needs_role_assignment = bool(formatted["task_layer_summary"].get("needs_role_assignment"))
+        flat_todos, todos_by_milestone, todos_by_assignee = _created_todo_summary(
+            created,
+            storage.get_roadmap(room_id),
+        )
+        schedule_state = formatted.get("schedule_state") or {}
+        date_planning_prompt = (
+            "마감일이나 발표일이 정해져 있으면, 지금 마일스톤 날짜를 배치해 todo 마감일도 같이 잡을 수 있습니다."
+            if schedule_state.get("needs_schedule")
+            else None
+        )
         return {
             "ok": True,
             "room_id": room_id,
             "room": room["name"],
-            "created_todos": created,
+            "created_todos": flat_todos,
+            "created_todo_records": created,
             "created_count": len(created),
+            "primary_result": {
+                "kind": "roadmap_decomposed_to_todos",
+                "message": f"로드맵 마일스톤을 실행 todo {len(created)}개로 쪼개 저장했습니다.",
+                "created_todos": flat_todos,
+                "todos_by_milestone": todos_by_milestone,
+                "todos_by_assignee": todos_by_assignee,
+            },
+            "created_todos_by_milestone": todos_by_milestone,
+            "created_todos_by_assignee": todos_by_assignee,
             "auto_generated": auto_generated,
             "synced_todos": synced,
             "unresolved_parent": unresolved_parent,
             "needs_role_assignment": needs_role_assignment,
+            "task_layer_summary": formatted.get("task_layer_summary"),
+            "schedule_state": schedule_state,
+            "date_planning_prompt": date_planning_prompt,
             "required_next_tool": "set_roles" if needs_role_assignment else "member_tasks",
             "next": (
                 ("로드맵·역할·일정을 바탕으로 todo 초안을 자동 생성해 저장했습니다. " if auto_generated else "todo 분해가 저장됐습니다. ")
@@ -1261,6 +1364,7 @@ def register(mcp: FastMCP) -> None:
                     if needs_role_assignment else
                     "팀원별 이번 주 실행 목록을 확인하고, 필요하면 개인별로 공지하세요."
                 )
+                + (f" {date_planning_prompt}" if date_planning_prompt else "")
             ),
             "suggested_next_actions": [
                 "역할명에만 묶인 todo가 있으면 역할을 확정하거나 역할명 보정하기",
@@ -1271,12 +1375,12 @@ def register(mcp: FastMCP) -> None:
                 "확정되면 개인별 또는 팀 전체에 공지하기",
             ],
             "chat_response_hint": (
-                "생성된 todo를 팀원/역할별로 요약해서 보여주세요. "
+                "반드시 primary_result.created_todos 또는 created_todos_by_milestone를 먼저 보여주세요. "
+                "마일스톤 제목만 반복하지 말고, 실제 생성된 todo 제목과 완료 기준을 요약하세요. "
                 "auto_generated가 true면 사용자에게 세부 할일을 다시 요구하지 마세요. "
                 "각 todo가 어느 마일스톤 아래에 붙었는지도 필요하면 함께 보여주세요. "
                 "needs_role_assignment가 true면 실제 담당자 확정을 먼저 안내하고, false면 팀원별 할일 확인/공지로 이어가세요."
             ),
-            **formatted,
         }
 
     @mcp.tool(

@@ -112,6 +112,37 @@ def _task_brief(task: Any) -> Any:
     }
 
 
+def _todo_group_brief(group: Any) -> Any:
+    if not isinstance(group, dict):
+        return group
+    todos = [_task_brief(todo) for todo in group.get("todos", []) if isinstance(todo, dict)]
+    return {
+        key: value for key, value in {
+            "milestone": group.get("milestone"),
+            "assignee": group.get("assignee"),
+            "todo_count": group.get("todo_count", len(todos)),
+            "todos": todos[:5],
+        }.items()
+        if value is not None
+    }
+
+
+def _primary_result_brief(value: Any) -> Any:
+    if not isinstance(value, dict):
+        return value
+    out: dict[str, Any] = {}
+    for key, item in value.items():
+        if key in {"created_todos", "existing_todos"} and isinstance(item, list):
+            out[key] = _sample_list([_task_brief(todo) for todo in item], 12)
+        elif key in {"todos_by_milestone", "todos_by_assignee"} and isinstance(item, list):
+            out[key] = _sample_list([_todo_group_brief(group) for group in item], 8)
+        elif isinstance(item, str) and len(item) > STRING_CAP:
+            out[key] = item[: STRING_CAP - 1] + "…"
+        else:
+            out[key] = item
+    return out
+
+
 def _sync_summary(value: Any) -> Any:
     if not isinstance(value, dict):
         return value
@@ -155,6 +186,7 @@ def _roadmap_overview(data: dict[str, Any]) -> dict[str, Any]:
         "room_id": data.get("room_id"),
         "room": data.get("room"),
         "topic": data.get("topic"),
+        "primary_result": _primary_result_brief(data.get("primary_result")),
         "created_count": data.get("created_count"),
         "auto_generated": data.get("auto_generated"),
         "needs_role_assignment": data.get("needs_role_assignment"),
@@ -164,11 +196,21 @@ def _roadmap_overview(data: dict[str, Any]) -> dict[str, Any]:
         "next": data.get("next"),
         "task_layer_summary": data.get("task_layer_summary"),
         "schedule_state": data.get("schedule_state"),
+        "date_planning": data.get("date_planning"),
+        "date_planning_prompt": data.get("date_planning_prompt"),
         "progress": data.get("progress"),
         "synced_todos": _sync_summary(data.get("synced_todos")),
         "milestone_titles": data.get("milestone_titles", [])[:12],
         "milestones": _sample_list(milestones, 8),
         "created_todos": _sample_list(created, 12) if created else None,
+        "created_todos_by_milestone": _sample_list([
+            _todo_group_brief(group) for group in data.get("created_todos_by_milestone", [])
+            if isinstance(group, dict)
+        ], 8) if data.get("created_todos_by_milestone") else None,
+        "existing_todos_by_milestone": _sample_list([
+            _todo_group_brief(group) for group in data.get("existing_todos_by_milestone", [])
+            if isinstance(group, dict)
+        ], 8) if data.get("existing_todos_by_milestone") else None,
         "todo_tasks": _sample_list(todos, 12) if todos else None,
         "by_member": _sample_list(by_member, 8) if by_member else None,
         "unassigned_tasks": {"_count": len(data.get("unassigned_tasks") or [])},
@@ -216,8 +258,13 @@ def _minimal(data: dict[str, Any]) -> dict[str, Any]:
         "next",
         "task_layer_summary",
         "schedule_state",
+        "date_planning",
+        "date_planning_prompt",
+        "primary_result",
     ):
         v = data.get(k)
+        if k == "primary_result":
+            v = _primary_result_brief(v)
         if isinstance(v, (bool, int, float, dict)) or (isinstance(v, str) and len(v) <= STRING_CAP):
             keep[k] = v
     keep["_truncated"] = True

@@ -1,12 +1,12 @@
 """역할 분배 도구 (③ AI 결정형).
 
-흐름: assign_roles(AI가 만든 책임 카드+난이도) → 선호/회피 폼 → send_form 개인별 →
-멤버 선호 → finalize_roles(전체 책임 카드를 난이도 균형으로 배분) → 팀장 확인 → set_roles.
+흐름: assign_roles(AI가 만든 책임 카드) → 선호/회피 폼 → send_form 개인별 →
+멤버 선호 → finalize_roles(전체 책임 카드를 균형 배분) → 팀장 확인 → set_roles.
 
 핵심:
 - **전체집합 커버**: 모든 책임 카드가 누군가에게 배정된다(멤버<카드면 한 명이 여러 책임).
 - **공동 owner**: 멤버가 카드보다 많거나 책임이 큰 경우 한 책임 카드에 여러 멤버가 배정될 수 있다.
-- **난이도 균형**: 각 멤버의 난이도 합이 비슷하게 (LPT 그리디).
+- **부담 균형**: 각 멤버에게 비슷한 부담이 가도록 배정한다.
 - **선호/회피 반영**: 동률일 때 그 책임을 선호한 멤버에게, 회피한 멤버는 뒤로.
 - 난이도 점수는 **멤버 폼엔 안 보이고**(균형 배분용), 매칭은 서버에서 결정적으로.
 """
@@ -43,7 +43,7 @@ def _role_design_brief(
         "principle": (
             "로드맵과 프로젝트 맥락을 읽고, 팀원이 선호도를 고를 수 있는 역할/책임 카드를 자유롭게 만든다. "
             "카드명은 프로젝트에 맞게 자연스럽게 정하고, 서버는 이름을 강하게 검열하지 않는다. "
-            "difficulty와 slots는 이후 균형 배정에만 사용한다."
+            "이 단계에서는 사용자에게 초안을 설명하지 말고, 바로 role_manage(action='start')를 다시 호출한다."
         ),
         "roadmap_milestones": task_lines,
         "team_size": member_count,
@@ -54,29 +54,15 @@ def _role_design_brief(
         "role_design_steps": [
             "1. 로드맵과 최종 산출물을 보고 팀원이 고를 역할/책임 카드를 만든다.",
             "2. 카드 개수와 이름은 프로젝트 성격에 맞게 자유롭게 정한다.",
-            "3. 각 카드에 difficulty(1~10)를 붙인다. 멤버에게는 보이지 않고 균형 배분에만 쓴다.",
-            "4. 같은 카드를 여러 명이 함께 맡는 것이 자연스러우면 slots(1~10)를 2 이상으로 둔다.",
-            "5. 만든 카드 목록을 role_manage(action='start')에 roles로 다시 넣는다.",
+            "3. 만든 카드 목록을 role_manage(action='start')에 roles로 다시 넣는다.",
+            "4. 사용자가 보기 전까지 카드 초안을 채팅으로 설명하지 않는다.",
         ],
-        "difficulty_rubric": {
-            "base": 3,
-            "effort": "작업량이 많거나 여러 마일스톤에 걸치면 +1~3",
-            "ambiguity": "정답이 불명확하고 판단이 많이 필요하면 +1~2",
-            "dependency": "다른 역할이 이 결과를 받아야 하면 +1~2",
-            "deadline_risk": "마감 직전 품질을 좌우하면 +1~2",
-            "communication": "팀 조율·외부 확인이 많으면 +1",
-            "range": "최종 difficulty는 1~10 정수. 멤버에게 보여주지 않고 균형 배분에만 쓴다.",
-        },
-        "slot_rubric": (
-            "slots는 공동 owner 자리 수다. 기본 1이며, 같은 역할/책임을 여러 명이 함께 맡는 것이 자연스러우면 2 이상으로 둔다."
-        ),
         "hard_rules": [
-            "difficulty는 1~10 정수다.",
-            "slots는 1~10 정수다.",
+            "사용자에게 말할 때 difficulty, slots, 난이도, 필요 인원, 인원 수를 노출하지 않는다.",
             "책임 카드 목록을 만들면 곧바로 role_manage(action='start')에 roles로 다시 넣는다.",
         ],
         "output_schema": [
-            {"name": "프로젝트 어휘로 만든 책임 카드명", "difficulty": "1~10", "slots": "대부분 1"}
+            {"name": "프로젝트 어휘로 만든 책임 카드명"}
         ],
     }
 
@@ -290,13 +276,11 @@ def _helper_candidates(
         )
         helper_weight = max(1, round(difficulties.get(role, 5) * 0.4))
         helper_loads[helper] += helper_weight
-        reason = "난이도 높은 책임인데 owner가 1명이라 함께 진행을 권장합니다."
+        reason = "작업량이 큰 책임이라 함께 진행을 권장합니다."
         helpers.append({
             "card": role,
             "owner": owner,
             "helper": helper,
-            "difficulty": difficulties.get(role, 5),
-            "helper_weight": helper_weight,
             "reason": reason,
         })
     return helpers, helper_loads
@@ -323,17 +307,17 @@ def register(mcp: FastMCP) -> None:
         """Starts role assignment by creating a responsibility-card preference form for the team.
 
         역할 분배 **시작**. 너(AI)가 로드맵과 프로젝트 맥락을 보고 팀원이 선호도를 고를
-        역할/책임 카드와 난이도를 직접 만들어 넘겨라. 사용자에게 역할 목록 작성을 떠넘기지 마라.
+        역할/책임 카드를 직접 만들어 넘겨라. 사용자에게 역할 목록 작성을 떠넘기지 마라.
 
         역할 생성:
         ① 로드맵과 최종 산출물을 확인
         ② 팀원이 고를 역할/책임 카드 생성
-        ③ 각 카드에 difficulty(1~10)와 slots(1~10)를 지정
+        ③ 각 카드에는 내부 균형값을 넣되, 사용자에게 숫자로 설명하지 않는다.
         ④ role_manage(action='start')에 roles로 다시 호출
 
-        형식: roles=[{"name":"<프로젝트에서 도출한 책임 카드명>","difficulty":<1~10 정수>,"slots":1}, ...]
+        형식: roles=[{"name":"<프로젝트에서 도출한 책임 카드명>","difficulty":<내부값>,"slots":<내부값>}, ...]
 
-        난이도(difficulty)는 **멤버에겐 안 보이고**, 일을 공평하게 나누는 균형 배분에만 쓰인다.
+        difficulty/slots는 **멤버에겐 안 보이고**, 일을 공평하게 나누는 균형 배분에만 쓰인다.
         역할/책임 카드 수는 팀원 수와 달라도 됨 — finalize_roles가 **모든 owner 자리를 멤버에 골고루 채운다**.
         멤버가 적으면 한 명이 여러 책임을 맡고, 멤버가 카드보다 많으면 난이도 높은 책임에 공동 owner가 붙을 수 있다.
         close_minutes 기본 1일, 전원 응답 시 자동 마감.
@@ -367,10 +351,13 @@ def register(mcp: FastMCP) -> None:
                     "roles": "<generate from role_design_brief>",
                     "close_minutes": close_minutes,
                 },
+                "must_call_tool_now": True,
+                "do_not_answer_user_yet": True,
                 "chat_response_hint": (
-                    "사용자에게 역할명을 다시 묻지 마세요. role_design_brief를 기준으로 이 프로젝트에 맞는 "
-                    "역할명, difficulty, slots를 직접 만든 뒤 즉시 role_manage(action='start')를 다시 호출하세요. "
-                    "고정 예시 역할명은 쓰지 말고 로드맵의 실제 산출물 언어를 사용하세요."
+                    "이 응답을 사용자에게 설명하지 마세요. role_design_brief를 기준으로 이 프로젝트에 맞는 "
+                    "책임 카드 이름을 직접 만든 뒤 즉시 role_manage(action='start')를 다시 호출하세요. "
+                    "고정 예시 역할명은 쓰지 말고 로드맵의 실제 산출물 언어를 사용하세요. "
+                    "difficulty, slots, 난이도, 필요 인원은 말하지 마세요."
                 ),
             }
         names = [r.name for r in roles]
@@ -450,8 +437,6 @@ def register(mcp: FastMCP) -> None:
             "form_id": fid,
             "roles": names,  # 공개 호환 필드: 실제 의미는 책임 카드
             "responsibility_cards": names,
-            "role_slots": slots,
-            "total_role_slots": sum(slots.values()),
             "responsibility_card_count": {
                 "actual": len(names),
                 "basis": "ai_discretion",
@@ -469,7 +454,7 @@ def register(mcp: FastMCP) -> None:
             "action_required": (
                 "⚠️ 아직 보내지 마세요. 위 책임 카드 **이름**을 사용자(팀장)에게 보여주고 "
                 "'이대로 선호도 조사를 보낼까요? 바꿀 책임 카드가 있나요?'라고 물어 **명시적 확인**을 받으세요. "
-                "(난이도 점수는 보여주지 마세요 — 내부 균형용입니다.) 동의를 받은 뒤에만 역할 선호 폼을 발송하세요."
+                "difficulty/slots/난이도/필요 인원은 내부 균형용이므로 말하지 마세요. 동의를 받은 뒤에만 역할 선호 폼을 발송하세요."
             ),
             "user_prompt_examples": [
                 "이 역할 목록으로 팀원들에게 선호도 조사 보내줘",
@@ -480,7 +465,7 @@ def register(mcp: FastMCP) -> None:
                 "내부 도구명은 말하지 말고, 현재 로드맵을 참고해 만든 책임 카드 목록을 "
                 f"팀장에게 보여준 뒤 '팀원은 맡고 싶은 것 최대 {limits['want_max']}개, "
                 f"피하고 싶은 것 최대 {limits['avoid_max']}개만 고르면 됩니다. 이대로 보낼까요?'처럼 확인을 받으세요. "
-                "로드맵을 책임 단위로 나눴다는 점을 짧게 설명하세요."
+                "로드맵을 책임 단위로 나눴다는 점을 짧게 설명하세요. difficulty, slots, 난이도, 필요 인원은 말하지 마세요."
             ),
         }
 
@@ -588,9 +573,6 @@ def register(mcp: FastMCP) -> None:
                 "responsibility_cards": _compact_roles(assigned[m]),
                 "raw_roles": assigned[m],
                 "role": ", ".join(_compact_roles(assigned[m])),
-                "workload": loads[m],
-                "helper_workload": helper_loads.get(m, 0),
-                "total_workload": loads[m] + helper_loads.get(m, 0),
                 "helper_cards": helper_cards_by_member.get(m, []),
                 "note": notes.get(m, ""),  # 멤버 자유기입(제약/사정) — 리더가 확정 전에 볼 것
                 "wanted": prefs.get(m, []),
@@ -609,8 +591,6 @@ def register(mcp: FastMCP) -> None:
             "helper_assignments": helper_assignments,
             "assignment_mode": assignment_mode,
             "preference_summary": preference_summary,
-            "role_slots": required_slots,
-            "covered_role_slots": covered_counts,
             "all_roles_covered": all(covered_counts.get(role, 0) >= required_slots[role] for role in roles),
             "uncovered_roles": [
                 role for role in roles
@@ -635,9 +615,8 @@ def register(mcp: FastMCP) -> None:
                 ],
             },
             "note": (
-                "모든 책임 카드 owner 자리를 배정합니다. 멤버가 카드보다 많거나 slots가 2 이상이면 "
-                "한 책임 카드에 여러 owner가 붙을 수 있고, 무거운 단독 owner 카드만 helper를 별도로 제안합니다. "
-                "workload는 owner 난이도 합, helper_workload는 함께 진행 부담입니다. "
+                "모든 책임 카드가 누군가에게 배정되도록 계산했습니다. "
+                "작업량이 큰 단독 책임에는 함께 진행할 helper를 별도로 제안할 수 있습니다. "
                 "⚠️ 각 멤버의 note가 있으면 팀장에게 보여주고, 필요하면 조정한 뒤 역할을 확정. "
                 "AI 단독 확정 X — 팀장이 메모 보고 최종 판단."
             ),
