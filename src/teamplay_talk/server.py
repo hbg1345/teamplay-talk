@@ -128,10 +128,20 @@ mcp = FastMCP(
 )
 
 
+# 배포 검증 마커 — 어떤 커밋/기능이 실제로 떠 있는지 확인용. 기능 추가 때마다 갱신.
+BUILD_MARKER = "datesched+overview+wellknown (feat/response-compaction, 2026-07-07)"
+
+
 @mcp.custom_route("/health", methods=["GET"])
 async def health_check(_request: Request) -> PlainTextResponse:
     """배포 헬스체크용 엔드포인트."""
     return PlainTextResponse("ok")
+
+
+@mcp.custom_route("/version", methods=["GET"])
+async def version(_request: Request) -> PlainTextResponse:
+    """어떤 빌드가 떠 있는지 확인용. GET /version 으로 배포 반영 여부를 검증한다."""
+    return PlainTextResponse(BUILD_MARKER)
 
 
 # 도메인별 도구 등록
