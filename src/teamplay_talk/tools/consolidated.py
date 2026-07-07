@@ -221,6 +221,16 @@ def _matches_form(form: dict[str, Any], query: str | None) -> bool:
     return all(token in haystack for token in str(query).lower().split())
 
 
+def _is_role_assignment_form(form: dict[str, Any]) -> bool:
+    schema = form.get("schema_json") or {}
+    if schema.get("_workflow_kind") == "role_assignment":
+        return True
+    if schema.get("_role_assignment_mode") or schema.get("_role_cards"):
+        return True
+    title = f"{form.get('title') or ''} {schema.get('title') or ''}"
+    return "역할" in title and "선호" in title
+
+
 async def _list_forms(
     room_id: int | None,
     *,
@@ -273,6 +283,53 @@ async def _list_forms(
         "chat_response_hint": (
             "대시보드 링크로만 안내하지 말고 message 또는 forms_text를 그대로 사용해 방내 번호, 내부 ID, 제목, 상태, 응답 수를 바로 요약하세요. "
             "같은 문장을 반복하지 마세요. 마감/결과 확인이 필요하면 사용자가 제목이나 ID로 말해도 된다고 안내하세요."
+        ),
+    }
+
+
+async def _resolve_role_form_id(
+    room_id: int | None,
+    *,
+    form_id: int | None,
+    assignments: list[dict[str, Any]] | None = None,
+) -> tuple[int | None, dict[str, Any] | None]:
+    """Resolve the role preference form for finalize.
+
+    PlayMCP often loses the form_id after showing a preference result summary, then
+    calls role_manage(action='finalize') with an AI-made assignments array. Finalize
+    must be based on the original preference form, so recover the latest role form
+    in the active room when possible.
+    """
+    if form_id is not None:
+        return form_id, None
+
+    _caller, room, error = await require_room(room_id)
+    if error:
+        return None, error
+
+    role_forms = [
+        form for form in storage.list_room_forms(room["id"])
+        if _is_role_assignment_form(form)
+    ]
+    responded = [form for form in role_forms if int(form.get("total_responses") or 0) > 0]
+    candidates = responded or role_forms
+    if candidates:
+        chosen = candidates[0]  # list_room_forms is newest-first.
+        return int(chosen["id"]), None
+
+    return None, {
+        "ok": False,
+        "error": "역할 배정안을 계산할 역할 선호도 폼을 찾지 못했습니다.",
+        "needs_form_id": True,
+        "received_assignments": assignments or [],
+        "next": (
+            "역할 배정 계산은 팀원들이 응답한 역할 선호도 폼을 기준으로 합니다. "
+            "먼저 역할 선호도 조사를 만들고 보낸 뒤, 응답이 모이면 다시 배정안을 계산하세요."
+        ),
+        "chat_response_hint": (
+            "사용자에게 방금 넘긴 assignments는 확정 저장(action='set') 단계의 값이고, "
+            "배정 계산(action='finalize')에는 역할 선호도 폼 form_id가 필요하다고 설명하세요. "
+            "진행 중인 역할 선호도 폼이 있으면 그 결과를 먼저 확인하자고 안내하세요."
         ),
     }
 
@@ -698,12 +755,40 @@ def install(mcp: FastMCP) -> None:
         close_minutes: int | None = None,
         message: str | None = None,
     ) -> dict[str, Any]:
-        """teamplay-talk(팀플톡)에서 로드맵을 책임 카드로 나누고, 선호/회피와 난이도를 봐서 역할 배정안을 계산하거나 확정합니다."""
+        """teamplay-talk(팀플톡) 역할분배 허브.
+
+        start=책임 카드 선호 폼 생성, finalize=form_id로 배정안 계산(생략 시 최신 역할 폼),
+        set=확정 저장/공지. assignments는 set에서만 사용합니다.
+        """
         target = {
             "start": "assign_roles",
             "finalize": "finalize_roles",
             "set": "set_roles",
         }[action]
+        if action == "finalize":
+            resolved_form_id, resolve_error = await _resolve_role_form_id(
+                room_id,
+                form_id=form_id,
+                assignments=assignments,
+            )
+            if resolve_error is not None:
+                return resolve_error
+            result = await _run_legacy(legacy, target, {"form_id": resolved_form_id})
+            if isinstance(result, dict):
+                result.setdefault("resolved_form_id", resolved_form_id)
+                result.setdefault(
+                    "chat_response_hint",
+                    "역할 선호도 폼 응답을 기준으로 배정안을 계산했다고 말하세요. 아직 확정 저장 전입니다.",
+                )
+            return result
+        if action == "set" and assignments:
+            normalized: list[dict[str, Any]] = []
+            for item in assignments:
+                row = dict(item)
+                if "nickname" not in row and "member" in row:
+                    row["nickname"] = row.pop("member")
+                normalized.append(row)
+            assignments = normalized
         return await _run_legacy(legacy, target, {
             "roles": roles,
             "form_id": form_id,

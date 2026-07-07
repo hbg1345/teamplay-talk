@@ -651,6 +651,23 @@ def get_results(form_id: int) -> dict[str, Any] | None:
         out["workflow_stage"] = schema.get("_workflow_stage")
     if schema.get("_workflow_scope"):
         out["workflow_scope"] = schema.get("_workflow_scope")
+    if workflow_kind == "role_assignment":
+        out.update({
+            "required_next_tool": "role_manage",
+            "required_next_action": "finalize",
+            "required_next_arguments": {"form_id": form["id"]},
+            "next": (
+                "역할 선호 응답을 확인했습니다. 다음은 이 역할 선호도 폼을 기준으로 "
+                "난이도와 선호/회피를 반영한 배정안을 계산하는 단계입니다."
+                if rows else
+                "아직 역할 선호 응답이 없습니다. 팀원 응답이 모이면 배정안을 계산하세요."
+            ),
+            "chat_response_hint": (
+                "응답 요약 뒤에 '배정안을 계산할까요?'라고 물어보세요. "
+                "계산할 때는 반드시 required_next_arguments.form_id를 그대로 사용하세요. "
+                "사용자에게 form_id를 다시 묻지 마세요."
+            ),
+        })
     if not form["anonymous"]:
         out["responses"] = [
             {"member_id": r["member_id"], "nickname": r["nickname"], "answers": r["answers_json"] or {}}

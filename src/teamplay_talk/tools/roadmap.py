@@ -545,6 +545,22 @@ def _format(roadmap: dict[str, Any]) -> dict[str, Any]:
         if bucket["tasks"] or bucket.get("role")
     ]
     needs_todo_decomposition = bool(milestone_rows) and not bool(todo_rows)
+    undated_milestones = [
+        payload for row, payload in zip(milestone_rows, formatted_milestones, strict=False)
+        if not row.get("start_at") and not row.get("end_at")
+    ]
+    dated_milestones = len(milestone_rows) - len(undated_milestones)
+    undated_todos = [
+        payload for row, payload in zip(todo_rows, formatted_todos, strict=False)
+        if not row.get("start_at") and not row.get("end_at")
+    ]
+    dated_todos = len(todo_rows) - len(undated_todos)
+    needs_schedule = bool(milestone_rows) and bool(undated_milestones)
+    schedule_suggestion = (
+        "마감일이나 발표일이 정해졌다면 마일스톤 날짜를 먼저 배치하기"
+        if needs_schedule else
+        "마일스톤 날짜가 잡혀 있으니 todo가 그 일정을 물려받는지 확인하기"
+    )
 
     # 로드맵 이후 다음 행동 안내는 상태에 따라 갈린다.
     # 로드맵 직후에는 역할분배와 로드맵 의견수렴/수정을 먼저 드러내야
@@ -559,6 +575,7 @@ def _format(roadmap: dict[str, Any]) -> dict[str, Any]:
         roadmap_suggestions = [
             "로드맵이 맞는지 팀원 의견을 모아 수정·보완하기",
             "이 로드맵 기준으로 역할 책임 범위 나누기",
+            schedule_suggestion,
             "역할 선호도 조사를 팀원에게 보내기",
             "진행 흐름을 대시보드에서 확인하기",
         ]
@@ -571,7 +588,8 @@ def _format(roadmap: dict[str, Any]) -> dict[str, Any]:
             "채팅 응답에서는 생성/조회된 마일스톤 제목을 먼저 bullet로 보여주세요. "
             "방장/팀장 같은 운영 역할만 있으면 프로젝트 역할은 아직 없는 상태입니다. "
             "todo를 바로 제안하지 말고, '이 로드맵 기준으로 역할을 나눌까요?'를 우선 제안하세요. "
-            "보조 선택지로 로드맵 의견수렴/수정을 함께 보여주세요."
+            "보조 선택지로 로드맵 의견수렴/수정을 함께 보여주세요. "
+            "마감일이나 발표일이 있으면 마일스톤 날짜를 잡을지도 함께 물어보세요."
         )
     else:
         workflow_state = "roadmap_created_roles_present"
@@ -582,6 +600,7 @@ def _format(roadmap: dict[str, Any]) -> dict[str, Any]:
         roadmap_suggestions = [
             "로드맵이 맞는지 팀원 의견을 모아 수정·보완하기",
             "현재 역할이 이 마일스톤에 맞는지 점검하고 필요하면 역할분배 다시 하기",
+            schedule_suggestion,
             "개별 실행 태스크를 정하는 의견 폼 만들기",
             (
                 "일정이 잡힌 태스크를 전원 카카오 캘린더에 등록하기"
@@ -600,7 +619,8 @@ def _format(roadmap: dict[str, Any]) -> dict[str, Any]:
         chat_hint = (
             "채팅 응답에서는 생성/조회된 마일스톤 제목을 먼저 bullet로 보여주세요. "
             "역할이 이미 있으므로 '기존 역할 점검'과 '역할 기준 실행 todo 분해'를 제안할 수 있습니다. "
-            "그래도 로드맵 의견수렴/수정 선택지는 함께 보여주세요."
+            "그래도 로드맵 의견수렴/수정 선택지는 함께 보여주세요. "
+            "마감일이나 발표일이 있으면 마일스톤 날짜 배치도 함께 제안하세요."
         )
     return {
         "tasks": formatted_tasks,
@@ -613,12 +633,33 @@ def _format(roadmap: dict[str, Any]) -> dict[str, Any]:
         "progress": {"done": done, "total": len(todo_rows)},
         "task_layer_summary": {
             "milestones": len(milestone_rows),
+            "dated_milestones": dated_milestones,
+            "undated_milestones": len(undated_milestones),
             "todos": len(todo_rows),
+            "dated_todos": dated_todos,
+            "undated_todos": len(undated_todos),
             "assigned_todos": len(todo_rows) - len(unassigned_tasks),
             "role_only_todos": len(role_only_tasks),
             "unassigned_todos": len(unassigned_tasks),
             "needs_todo_decomposition": needs_todo_decomposition,
             "needs_role_assignment": bool(role_only_tasks),
+            "needs_schedule": needs_schedule,
+        },
+        "schedule_state": {
+            "needs_schedule": needs_schedule,
+            "dated_milestones": dated_milestones,
+            "undated_milestones": [
+                {"id": task.get("id"), "title": task.get("title")}
+                for task in undated_milestones[:8]
+            ],
+            "dated_todos": dated_todos,
+            "undated_todos": len(undated_todos),
+            "next": (
+                "마감일이나 발표일이 있으면 roadmap_manage(action='schedule')로 마일스톤 날짜를 잡으세요. "
+                "그 날짜는 자식 todo에 자동으로 이어져 데일리 체크인이 날짜별로 동작합니다."
+                if needs_schedule else
+                "마일스톤 날짜가 이미 잡혀 있습니다. 역할 확정 후 실행 todo를 만들면 날짜를 자동으로 물려받습니다."
+            ),
         },
         "by_member": by_member,
         "unassigned_tasks": unassigned_tasks,
@@ -630,7 +671,7 @@ def _format(roadmap: dict[str, Any]) -> dict[str, Any]:
         "workflow_order_guidance": workflow_order_guidance,
         "roadmap_response_guidance": (
             "채팅 응답에서는 먼저 생성/조회된 마일스톤 제목을 bullet로 보여주세요. "
-            "그 다음 로드맵 의견수렴/수정, 마일스톤 기반 역할분배, 역할 확정 후 todo 분해 순서로 제안하세요. "
+            "그 다음 로드맵 의견수렴/수정, 마일스톤 기반 역할분배, 마감일이 있으면 마일스톤 날짜 배치, 역할 확정 후 todo 분해 순서로 제안하세요. "
             "역할이 아직 없으면 '현재 역할 기준'이라는 표현을 쓰지 마세요."
         ),
         "role_assignment_guidance": (

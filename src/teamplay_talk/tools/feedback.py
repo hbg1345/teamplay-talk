@@ -24,19 +24,13 @@ class PollQuestion(BaseModel):
     title: str = Field(description="질문 내용")
     type: Literal["single", "multi", "rank", "rating", "text"] = Field(
         description=(
-            "필수. 절대 생략하지 말 것 — 생략하면 선택지 없는 객관식으로 만들어져 "
-            "사용자가 답을 입력할 방법이 없는 빈 폼이 된다. "
-            "single=객관식 단일선택, multi=복수선택, "
-            "rank=선호 순위(드래그 정렬), rating=점수(1~N), text=주관식. "
-            "선택지(choices)를 정할 수 없는 질문(자유 응답)이면 반드시 text로 지정할 것."
+            "필수. single=단일선택, multi=복수선택, rank=선호순위, "
+            "rating=점수, text=주관식. 선택지가 없으면 text를 사용."
         ),
     )
     choices: list[str] = Field(
         default_factory=list,
-        description=(
-            "선택지 (single/multi/rank는 필수— 비우면 답할 수 없는 빈 폼이 됨; "
-            "text/rating은 비워둘 것)"
-        ),
+        description="single/multi/rank의 선택지. text/rating은 비워둔다.",
     )
     rate_max: int = Field(default=5, description="rating 최대 점수 (rating 타입에서만)")
 
@@ -278,15 +272,10 @@ def register(mcp: FastMCP) -> None:
         close_minutes: int | None = None,
         close_on_all: bool = False,
     ) -> dict[str, Any]:
-        """teamplay-talk(팀플톡)에서 폼이나 투표를 만들고 응답 링크를 반환합니다.
+        """teamplay-talk(팀플톡)에서 단일/복수/순위/점수/주관식 폼을 만듭니다.
 
-        단일선택, 복수선택, 선호 순위, 점수, 주관식 질문을 섞어 팀 의견을 받을 수
-        있습니다. 기본은 멤버별 식별 폼이라 1인 1응답과 완료 처리가 됩니다.
-        가벼운 의견수렴처럼 익명이 중요한 경우에만 익명 폼을 선택합니다. 만든 뒤에는 폼 발송
-        기능으로 팀원에게 보내야 합니다.
-
-        선행조건: 현재 작업 방이 있어야 합니다. 방이 없으면 폼/투표를 만들기 전에
-        먼저 방 생성/참여를 안내하고 순서(방 → … → 폼)를 알려주세요.
+        기본은 멤버별 식별 폼(1인 1응답)입니다. 익명이 꼭 필요할 때만
+        anonymous=True를 사용합니다. 생성 후에는 form_manage(action='send')로 보냅니다.
 
         Args:
             title: 폼 제목 (예: "회식 날짜 투표")
@@ -381,14 +370,10 @@ def register(mcp: FastMCP) -> None:
         anonymous: bool = True,
         close_minutes: int | None = 1440,
     ) -> dict[str, Any]:
-        """teamplay-talk(팀플톡)에서 팀원에게 자유의견을 받아 의사결정을 시작합니다.
+        """teamplay-talk(팀플톡)에서 후보가 정리되지 않은 주제의 자유의견을 모읍니다.
 
-        주제, 아이디어, 진행 방향처럼 아직 후보가 정리되지 않았을 때 먼저 사용합니다.
-        팀원이 자유롭게 남긴 답변을 모은 뒤, AI가 후보로 정리하고 필요하면 본투표로
-        이어갈 수 있습니다. 약속 장소 후보처럼 입력 형식이 중요한 경우에는 장소 후보
-        수집 기능을 쓰는 편이 더 안정적입니다.
-
-        선행조건: 현재 작업 방이 있어야 합니다. 방이 없으면 먼저 방 생성/참여를 안내하세요.
+        응답을 AI가 후보로 정리한 뒤 필요하면 본투표로 이어갑니다. 장소 후보는
+        gather_locations가 더 적합합니다.
 
         Args:
             question: 팀원에게 물을 질문 (네가 맥락 보고 직접 작성)
@@ -475,14 +460,10 @@ def register(mcp: FastMCP) -> None:
         anonymous: bool = False,
         close_minutes: int | None = 1440,
     ) -> dict[str, Any]:
-        """teamplay-talk(팀플톡)에서 약속 장소 결정을 위한 위치 후보 수집 폼을 만듭니다.
+        """teamplay-talk(팀플톡)에서 약속 장소 후보를 여러 짧은 입력칸으로 모읍니다.
 
-        긴 자유서술 한 칸 대신 짧은 장소 입력칸 여러 개와 기타 의견을 나누어 받습니다.
-        응답이 모이면 비슷한 역, 상권, 장소명을 묶어 본투표 후보로 정리하기 쉽습니다.
-
-        선행조건: 현재 작업 방이 있어야 합니다. 방이 없으면 먼저 방 생성/참여를 안내하세요.
-        카카오맵 MCP가 있으면 장소명 확인에 보조적으로 활용할 수 있고, 없으면 제출된
-        후보만 기준으로 정리합니다.
+        응답 후 비슷한 역/상권/장소명을 묶어 본투표 후보로 정리합니다. 카카오맵
+        MCP가 있으면 장소명 확인에만 보조적으로 씁니다.
 
         Args:
             title: 폼 제목
@@ -607,13 +588,10 @@ def register(mcp: FastMCP) -> None:
         anonymous: bool = False,
         close_minutes: int | None = 1440,
     ) -> dict[str, Any]:
-        """teamplay-talk(팀플톡)에서 로드맵과 할 일에 대한 팀원 의견을 구조적으로 모읍니다.
+        """teamplay-talk(팀플톡)에서 로드맵, todo, 병목, 범위 조정 의견을 모읍니다.
 
-        로드맵 단계, 개인 할 일, 병목, 프로젝트 범위 조정처럼 팀 운영에 반영해야 할
-        의견을 받을 때 사용합니다. 현재 로드맵 요약을 함께 보여주고, 응답을 바탕으로
-        할 일 수정, 우선순위 투표, 팀 공지로 이어갈 수 있습니다.
-
-        선행조건: 현재 작업 방이 있어야 합니다. 방이 없으면 먼저 방 생성/참여를 안내하세요.
+        현재 로드맵 요약을 함께 보여주고, 응답을 todo 수정, 우선순위 투표,
+        팀 공지로 이어갈 수 있습니다.
 
         Args:
             scope: roadmap=로드맵 단계, todo=구체 할일, blockers=막힌 점, scope=범위 조정

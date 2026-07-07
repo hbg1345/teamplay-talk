@@ -1312,6 +1312,7 @@ dependencies = [
     { name = "cryptography" },
     { name = "fastmcp" },
     { name = "httpx" },
+    { name = "mcp" },
     { name = "psycopg", extra = ["binary"] },
     { name = "psycopg-pool" },
     { name = "python-dotenv" },
@@ -1320,8 +1321,9 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "cryptography", specifier = ">=42" },
-    { name = "fastmcp", specifier = ">=3.4.3" },
+    { name = "fastmcp", specifier = "==3.4.3" },
     { name = "httpx", specifier = ">=0.27" },
+    { name = "mcp", specifier = "==1.28.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2" },
     { name = "psycopg-pool", specifier = ">=3.2" },
     { name = "python-dotenv", specifier = ">=1.0" },
