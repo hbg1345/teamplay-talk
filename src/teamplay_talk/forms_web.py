@@ -11,6 +11,8 @@ create_poll이 만든 SurveyJS JSON 폼을 누구나 브라우저로 응답한�
 from __future__ import annotations
 
 import html
+
+from .web_analytics import GA4_HEAD
 import json as jsonlib
 
 from starlette.requests import Request
@@ -28,6 +30,7 @@ from .ui_theme import (
 _PAGE = """<!doctype html>
 <html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+__GA__
 <title>__TITLE__</title>
 __APP_FONT_LINKS__
 __APP_REACT_LIQUID_IMPORTS__
@@ -581,6 +584,7 @@ async def view_form(request: Request) -> HTMLResponse:
     schema_str = jsonlib.dumps(schema, ensure_ascii=False).replace("</", "<\\/")
     page = (
         _PAGE.replace("__TITLE__", html.escape(str(form["title"])))
+        .replace("__GA__", GA4_HEAD)
         .replace("__APP_FONT_LINKS__", APP_FONT_LINKS)
         .replace("__APP_REACT_LIQUID_IMPORTS__", APP_REACT_LIQUID_IMPORTS)
         .replace("__APP_REACT_LIQUID_BOOTSTRAP__", APP_REACT_LIQUID_BOOTSTRAP)

@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import base64
 import hashlib
+
+from .web_analytics import GA4_HEAD
 import hmac
 import html
 import json
@@ -202,6 +204,7 @@ _PAGE = """<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+__GA__
 <title>__TITLE__</title>
 __APP_FONT_LINKS__
 __APP_REACT_LIQUID_IMPORTS__
@@ -211,14 +214,17 @@ __APP_LUCIDE_SCRIPT__
   .shell{position:relative;z-index:1;display:grid;grid-template-columns:260px minmax(0,1fr);gap:16px;width:min(1440px,100%);margin:0 auto;padding:16px clamp(12px,2vw,24px) 44px;align-items:start}
   .workspace{position:sticky;top:16px;min-height:calc(100vh - 60px);display:flex;flex-direction:column;padding:14px;background:linear-gradient(180deg,var(--workspace),var(--workspace-2));color:#fff8e8;box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 28px 80px rgba(37,33,29,.20)}
   .workspace__top{display:grid;gap:12px;padding:4px 4px 14px;border-bottom:1px solid rgba(255,255,255,.14)}
-  .workspace__home{display:grid;grid-template-columns:38px minmax(0,1fr);gap:12px;align-items:start;color:inherit;text-decoration:none;border-radius:12px;padding:2px;transition:background .16s ease,transform .16s cubic-bezier(.2,.8,.2,1)}
-  .workspace__home:hover{background:rgba(255,255,255,.07);transform:translateY(-1px)}
-  .workspace__home:focus-visible{outline:2px solid var(--kakao-yellow);outline-offset:3px}
-  .workspace__mark{display:grid;place-items:center;width:38px;height:38px;border-radius:8px;background:var(--kakao-yellow);color:var(--kakao-black);box-shadow:0 12px 30px rgba(254,229,0,.18);font-family:var(--font-display);font-weight:800}
+  .workspace__home{display:grid;grid-template-columns:38px minmax(0,1fr);gap:12px;align-items:start;color:inherit;border-radius:12px;padding:2px}
+  .workspace__copy{min-width:0}
+  .workspace__mark{display:grid;place-items:center;width:38px;height:38px;border-radius:8px;background:var(--kakao-yellow);color:var(--kakao-black);box-shadow:0 12px 30px rgba(254,229,0,.18);font-family:var(--font-display);font-weight:800;text-decoration:none;transition:transform .16s cubic-bezier(.2,.8,.2,1),box-shadow .16s ease}
+  .workspace__mark:hover{transform:translateY(-1px);box-shadow:0 14px 34px rgba(254,229,0,.24)}
+  .workspace__mark:focus-visible,.workspace__product:focus-visible{outline:2px solid var(--kakao-yellow);outline-offset:3px}
   .workspace__mark .tp-mark{width:23px;height:auto}
   .eyebrow{margin:0;color:rgba(255,248,232,.62);font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
   .tp-eyebrow{color:rgba(255,248,232,.74);font-size:.8rem;letter-spacing:.005em;text-transform:none}
-  h1{margin:2px 0 0;font-family:var(--font-display);font-size:1.55rem;line-height:1.12;letter-spacing:0;font-weight:800;color:#fff8e8}
+  .workspace__product{display:inline-flex;width:max-content;max-width:100%;color:rgba(255,248,232,.74);text-decoration:none;border-radius:6px}
+  .workspace__product:hover{color:#fff8e8;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}
+  h1{margin:2px 0 0;font-family:var(--font-display);font-size:1.55rem;line-height:1.12;letter-spacing:0;font-weight:800;color:#fff8e8;word-break:keep-all;overflow-wrap:anywhere}
   .workspace__sub{margin:7px 0 0;color:rgba(255,248,232,.66);line-height:1.45;font-size:.88rem}
   .workspace__nav{display:grid;gap:3px;margin:14px 0;padding:0;list-style:none}
   .nav-item{position:relative;display:grid;grid-template-columns:26px minmax(0,1fr) auto;align-items:center;gap:8px;width:100%;min-height:36px;border:0;border-radius:var(--radius);padding:0 8px;background:transparent;color:rgba(255,248,232,.78);font-weight:700;font-size:.9rem;text-align:left;overflow:hidden;transition:background .16s ease,color .16s ease,transform .16s cubic-bezier(.2,.8,.2,1)}
@@ -386,8 +392,13 @@ __APP_LUCIDE_SCRIPT__
   @media (max-width:840px){
     .shell{display:grid;grid-template-columns:1fr;grid-template-areas:"workspace" "conversation";gap:12px;padding:12px 10px 36px}
     .workspace{position:relative;top:auto;min-height:auto}
-    .workspace__top{grid-template-columns:38px minmax(0,1fr);align-items:start}
-    .workspace__copy{min-width:0}
+    .workspace__top{display:block}
+    .workspace__home{grid-template-columns:38px minmax(0,1fr);grid-template-areas:"mark product" "room room" "invite invite";align-items:center}
+    .workspace__mark{grid-area:mark}
+    .workspace__copy{display:contents}
+    .workspace__product{grid-area:product;align-self:center}
+    h1{grid-area:room;margin-top:10px;max-width:100%}
+    .workspace__sub{grid-area:invite;max-width:100%}
     .workspace__nav{grid-template-columns:repeat(2,minmax(0,1fr))}
     .side-section{display:block}
     .members{grid-template-columns:repeat(auto-fit,minmax(142px,1fr))}
@@ -419,14 +430,14 @@ __APP_LUCIDE_SCRIPT__
 <div class="shell" id="dashboardShell">
   <aside class="workspace">
     <div class="workspace__top">
-      <a class="workspace__home" href="/" aria-label="teamplay-talk 홈페이지">
-        <div class="workspace__mark">__APP_BRAND_MARK__</div>
+      <div class="workspace__home">
+        <a class="workspace__mark" href="/" aria-label="teamplay-talk 홈페이지">__APP_BRAND_MARK__</a>
         <div class="workspace__copy">
-          <p class="eyebrow tp-eyebrow">teamplay-talk</p>
+          <a class="eyebrow tp-eyebrow workspace__product" href="/">teamplay-talk</a>
           <h1 id="roomName"></h1>
           <p class="workspace__sub" id="roomInvite"></p>
         </div>
-      </a>
+      </div>
     </div>
     <nav class="workspace__nav" aria-label="방 요약">
       <button class="nav-item is-active" type="button" data-nav="all"><span class="nav-icon"><i data-lucide="list"></i></span><span>활동 피드</span><b id="sideEventCount">0</b></button>
@@ -1340,6 +1351,7 @@ async def view_room_dashboard(request: Request) -> HTMLResponse:
     title = html.escape(f"{data['room']['name']} 결과 타임라인")
     page = (
         _PAGE.replace("__TITLE__", title)
+        .replace("__GA__", GA4_HEAD)
         .replace("__APP_FONT_LINKS__", APP_FONT_LINKS)
         .replace("__APP_REACT_LIQUID_IMPORTS__", "")
         .replace("__APP_LUCIDE_SCRIPT__", APP_LUCIDE_SCRIPT)

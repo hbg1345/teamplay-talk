@@ -129,7 +129,7 @@ mcp = FastMCP(
 
 
 # 배포 검증 마커 — 어떤 커밋/기능이 실제로 떠 있는지 확인용. 기능 추가 때마다 갱신.
-BUILD_MARKER = "datesched+overview+wellknown (feat/response-compaction, 2026-07-07)"
+BUILD_MARKER = "datesched+overview+wellknown+ga4 (feat/response-compaction, 2026-07-08)"
 
 
 @mcp.custom_route("/health", methods=["GET"])

@@ -21,6 +21,8 @@ _STATIC = Path(__file__).resolve().parent / "static"
 _PUBLIC_URL = "https://teamplay-talk.tech"
 _HAM_BONGKOO_LINKEDIN = "https://www.linkedin.com/in/bongkoo-ham-1a49a8325/"
 _CONTACT_EMAIL = "teamplaytalk@gmail.com"
+from .web_analytics import GA4_HEAD
+
 _GTM_HEAD = """<!-- Google Tag Manager -->
 <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
 new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -986,6 +988,7 @@ def _page() -> str:
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 {_GTM_HEAD}
+{GA4_HEAD}
 <title>teamplay-talk — 팀플의 PM을, AI에게</title>
 <meta name="description" content="AI에게 한마디면 투표·회의 시간·역할 분배·로드맵·데일리 리포트까지. 결과는 팀원들의 카카오톡으로. 팀플 조율을 AI가 PM처럼 해내는 Kakao PlayMCP 협업 도구.">
 <meta property="og:title" content="teamplay-talk — 팀플의 PM을, AI에게">
