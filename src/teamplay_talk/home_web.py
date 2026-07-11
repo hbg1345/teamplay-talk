@@ -431,14 +431,6 @@ document.querySelectorAll('.rv').forEach(el=>io.observe(el));
   window.addEventListener('resize', spy);
   spy();
 })();
-function copyEndpoint(btn){
-  const url='https://teamplay-talk.tech/mcp/';
-  const lbl=btn.querySelector('.ep-copy')||btn;
-  const flash=ok=>{lbl.textContent=ok?(LANG==='en'?'Copied!':'복사됨!'):(LANG==='en'?'Copy failed':'복사 실패');clearTimeout(lbl._t);lbl._t=setTimeout(()=>{lbl.textContent=(LANG==='en'?'Copy':'복사')},1600)};
-  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(url).then(()=>flash(true)).catch(()=>flash(false));}
-  else{try{const ta=document.createElement('textarea');ta.value=url;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.focus();ta.select();document.execCommand('copy');document.body.removeChild(ta);flash(true)}catch(e){flash(false)}}
-}
-window.copyEndpoint=copyEndpoint;
 
 // 인터랙티브 채팅 데모 — 실제 MCP 흐름(확인 게이트). CD 순서 = 칩 순서.
 var CD_KO=[
@@ -932,7 +924,7 @@ var EN={
   "wf_h2":"From kickoff to deadline,<br>one workflow.","wf_p":"Not a pile of one-off features — the whole team project runs end to end. Each step's output becomes the next step's input.",
   "feat_h2":"Right when you need it, here's how it helps.","feat_p":"One tool for every moment a decision is needed. Teammates just reply with a single link.",
   "mk_h2":"The makers","mk_p":"Built by two, serious about making team projects actually run.",
-  "cn_h2":"Connect right from PlayMCP","cn_p":"One Kakao login and you're in. Developers can also connect directly via the MCP endpoint.","cn_copy":"Copy","foot_contact":"Contact teamplaytalk@gmail.com",
+  "cn_h2":"Connect right from PlayMCP","cn_p":"One Kakao login and you're in. Start using teamplay-talk right away.","cn_copy":"Copy","foot_contact":"Contact teamplaytalk@gmail.com",
   "owner_tag":"Owner · PlayMCP AI","cmdhint":"👆 Tap the blue <b>'next'</b> chip in the owner's chat to step through it yourself",
   "feat0t":"Polls · gather opinions","feat0d":"From dinner spots to talk topics — when opinions split. Pools the team's answers in one place so you see what everyone wants.",
   "feat1t":"Match meeting times","feat1d":"When nobody knows who's free. Everyone checks a date×time grid, and AI pinpoints the slot that works for all.",
@@ -1023,7 +1015,7 @@ def _page() -> str:
     <div class="nav-links">
       <a href="#how" data-i18n="nav_how">작동 방식</a><a href="#tutorial" data-i18n="nav_demo">데모</a><a href="#flow" data-i18n="nav_flow">워크플로우</a><a href="#features" data-i18n="nav_features">기능</a><a href="#makers" data-i18n="nav_makers">제작자</a>
     </div>
-    <a class="nav-cta" href="https://playmcp.kakao.com" target="_blank" rel="noopener" data-i18n="nav_cta">PlayMCP 연결</a>
+    <a class="nav-cta" href="https://playmcp.kakao.com/mcp/67634520786019826" target="_blank" rel="noopener" data-i18n="nav_cta">PlayMCP 연결</a>
   </div>
 </nav>
 
@@ -1035,7 +1027,7 @@ def _page() -> str:
       <p class="hero-sub" data-i18n="hero_sub">투표, 회의 시간, 역할 분배, 로드맵, 데일리 리포트까지.
       손 많이 가는 팀플 조율은 AI가 PM처럼 맡고, 팀원은 늘 쓰던 카카오톡으로 응답만 하면 돼요.</p>
       <div class="hero-ctas">
-        <a class="btn btn-primary" href="https://playmcp.kakao.com" target="_blank" rel="noopener" data-i18n="cta_primary">PlayMCP에서 연결하기</a>
+        <a class="btn btn-primary" href="https://playmcp.kakao.com/mcp/67634520786019826" target="_blank" rel="noopener" data-i18n="cta_primary">PlayMCP에서 연결하기</a>
         <a class="btn btn-ghost lg" href="#how" data-i18n="cta_ghost">작동 방식 보기</a>
       </div>
     </div>
@@ -1149,10 +1141,9 @@ def _page() -> str:
     <div class="connect card rv">
       <span class="eyebrow">Connect</span>
       <h2 style="margin-top:14px" data-i18n="cn_h2">PlayMCP에서 바로 연결하세요</h2>
-      <p data-i18n="cn_p">카카오 로그인 한 번이면 끝. 개발자는 MCP 엔드포인트로 직접 연결할 수도 있습니다.</p>
-      <div class="endpoint" role="button" tabindex="0" onclick="copyEndpoint(this)"><span class="ep-url">https://teamplay-talk.tech/mcp/</span><span class="ep-copy" data-i18n="cn_copy">복사</span></div>
+      <p data-i18n="cn_p">카카오 로그인 한 번이면 끝. 지금 바로 팀플톡을 시작하세요.</p>
       <div class="hero-ctas" style="margin-top:32px">
-        <a class="btn btn-primary" href="https://playmcp.kakao.com" target="_blank" rel="noopener" data-i18n="cta_primary">PlayMCP에서 연결하기</a>
+        <a class="btn btn-primary" href="https://playmcp.kakao.com/mcp/67634520786019826" target="_blank" rel="noopener" data-i18n="cta_primary">PlayMCP에서 연결하기</a>
       </div>
     </div>
   </div>
