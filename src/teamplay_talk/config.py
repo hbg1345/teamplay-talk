@@ -27,6 +27,11 @@ class Settings:
     database_url: str | None
     token_enc_key: str | None
     public_base_url: str
+    # 자체 OAuth 인증서버(authorize/token)의 공개 베이스 URL. 하이브리드에서
+    # OAuth 흐름은 항상 DO(teamplay-talk.tech)에서 처리해야 하므로(KC Envoy가
+    # 외부 토큰교환을 막음), DO/KC 양쪽 .env에 동일하게 DO 주소를 넣는다.
+    # 미설정 시 public_base_url로 폴백(로컬 개발용).
+    oauth_as_base_url: str
     kakao_rest_api_key: str
     kakao_client_secret: str | None
     kakao_redirect_uri: str
@@ -45,6 +50,7 @@ class Settings:
         digest_hour = int(os.getenv("DAILY_TASK_DIGEST_HOUR_KST", "9"))
         checkin_hour = int(os.getenv("DAILY_CHECKIN_HOUR_KST", "21"))
         report_hour = int(os.getenv("DAILY_REPORT_HOUR_KST", "9"))
+        public_base = os.getenv("PUBLIC_BASE_URL", f"http://localhost:{port}")
         return cls(
             host=os.getenv("HOST", "0.0.0.0"),
             port=port,
@@ -54,7 +60,8 @@ class Settings:
             # 평문 저장으로 동작(하위호환). scripts/gen_token_key.py로 생성.
             token_enc_key=os.getenv("TOKEN_ENC_KEY") or None,
             # 폼 공유 링크 생성에 쓰는 외부 접근 URL (배포 시 실제 도메인으로 지정)
-            public_base_url=os.getenv("PUBLIC_BASE_URL", f"http://localhost:{port}"),
+            public_base_url=public_base,
+            oauth_as_base_url=os.getenv("OAUTH_AS_BASE_URL") or public_base,
             kakao_rest_api_key=os.getenv("KAKAO_REST_API_KEY", ""),
             kakao_client_secret=os.getenv("KAKAO_CLIENT_SECRET") or None,
             kakao_redirect_uri=os.getenv(

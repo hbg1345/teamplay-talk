@@ -26,6 +26,7 @@ from .forms_web import register_form_routes
 from .home_web import register_home_routes
 from .kakao_token_proxy import register_kakao_token_proxy
 from .oauth_metadata import register_oauth_metadata
+from .oauth_server import register_oauth_server
 from .response_guard import ResponseSizeGuard
 from .tools import register_all
 from .triggers import start_scheduler
@@ -160,7 +161,11 @@ register_dashboard_routes(mcp)
 # 카카오 토큰 프록시(/kakao/token) — PlayMCP의 Basic 인증을 카카오용 body로 변환
 register_kakao_token_proxy(mcp)
 
-# OAuth discovery 메타데이터(.well-known) — 외부 AI 클라이언트의 자동 인증 발견용
+# 자체 OAuth 인증서버(/oauth/authorize·token·register + .well-known/oauth-authorization-server)
+# — 카카오를 뒤에서 중개하고 카카오 토큰을 그대로 발급(passthrough). PlayMCP 심사 요구.
+register_oauth_server(mcp)
+
+# OAuth 보호 리소스 메타데이터(.well-known/oauth-protected-resource) — 위 인증서버를 가리킴
 register_oauth_metadata(mcp)
 
 # 카카오 OAuth 초대 콜백(/auth/kakao/callback) — 기본 비활성화.
