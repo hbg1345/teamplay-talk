@@ -5,6 +5,9 @@ services:
   app:
     build: .
     env_file: .env
+    environment:
+      # KakaoCloud는 Dockerfile 기본값 8080을 사용하고, DO의 Caddy는 8000으로 연결한다.
+      PORT: "8000"
     restart: unless-stopped
     expose: ["8000"]
   caddy:
