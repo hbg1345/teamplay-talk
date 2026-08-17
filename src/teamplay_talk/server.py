@@ -201,7 +201,10 @@ def _public_transport_security() -> dict[str, list[str]]:
 
 
 def main() -> None:
-    start_scheduler()  # 폼 마감 감지 + 드라이버 nudge (백그라운드)
+    if settings.scheduler_enabled:
+        start_scheduler()  # 폼 마감 감지 + 드라이버 nudge (백그라운드)
+    else:
+        print("[scheduler] disabled for this deployment", flush=True)
     transport_security = _public_transport_security()
     # PlayMCP는 stateless(no session) MCP 서버를 권장한다. stateless_http=True면
     # 매 요청이 세션 없이 독립 처리되어, 세션 미유지 클라이언트(PlayMCP)에서도

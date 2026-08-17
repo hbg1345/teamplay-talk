@@ -8,6 +8,8 @@ services:
     environment:
       # KakaoCloud는 Dockerfile 기본값 8080을 사용하고, DO의 Caddy는 8000으로 연결한다.
       PORT: "8000"
+      # 하이브리드 운영에서 자동 발송은 KakaoCloud 한 곳에서만 실행한다.
+      SCHEDULER_ENABLED: "false"
     restart: unless-stopped
     expose: ["8000"]
   caddy:

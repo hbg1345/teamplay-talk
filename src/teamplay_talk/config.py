@@ -37,6 +37,7 @@ class Settings:
     kakao_redirect_uri: str
     invite_oauth_enabled: bool
     invite_state_secret: str | None
+    scheduler_enabled: bool
     daily_task_digest_enabled: bool
     daily_task_digest_hour_kst: int
     daily_checkin_enabled: bool
@@ -70,6 +71,8 @@ class Settings:
             invite_oauth_enabled=os.getenv("INVITE_OAUTH_ENABLED", "").lower()
             in {"1", "true", "yes", "on"},
             invite_state_secret=os.getenv("INVITE_STATE_SECRET") or None,
+            scheduler_enabled=os.getenv("SCHEDULER_ENABLED", "true").lower()
+            in {"1", "true", "yes", "on"},
             daily_task_digest_enabled=os.getenv("DAILY_TASK_DIGEST_ENABLED", "").lower()
             in {"1", "true", "yes", "on"},
             daily_task_digest_hour_kst=max(0, min(23, digest_hour)),
